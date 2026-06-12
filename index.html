@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clipboardy</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loadingOverlay" class="hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <div id="toast" class="hidden"></div>
+
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2>🔒 Login Clipboardy</h2>
+            <p>Masukkan kredensial GitHub Anda untuk mengakses database Gist.</p>
+            <input type="password" id="patInput" placeholder="GitHub Personal Access Token (PAT)">
+            <input type="text" id="gistIdInput" placeholder="Gist ID">
+            <button id="loginBtn">Simpan & Masuk</button>
+            <p class="help-text">Data disimpan secara lokal di browser ini.</p>
+        </div>
+    </div>
+
+    <div id="formModal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="formTitle">Tambah Clipboard</h2>
+            <input type="text" id="clipTitle" placeholder="Judul (opsional)">
+            <textarea id="clipText" rows="6" placeholder="Masukkan teks di sini..." required></textarea>
+            <div class="modal-actions">
+                <button id="cancelBtn" class="btn-secondary">Batal</button>
+                <button id="saveBtn" class="btn-primary">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" class="hidden">
+        <header>
+            <h1>📋 Clipboardy</h1>
+            <div class="header-actions">
+                <input type="text" id="searchInput" placeholder="Cari teks...">
+                <button id="addBtn" class="btn-primary">+ Tambah</button>
+                <button id="logoutBtn" class="btn-secondary">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="clipGrid" class="grid-container">
+                </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
