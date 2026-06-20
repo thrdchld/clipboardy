@@ -47,6 +47,12 @@ const DOM = {
     passwordInput: document.getElementById('passwordInput'),
     loginBtn: document.getElementById('loginBtn'),
     
+    sidebar: document.querySelector('.sidebar'),
+    sidebarBackdrop: document.getElementById('sidebarBackdrop'),
+    btnMobileMenu: document.getElementById('btnMobileMenu'),
+    
+    strictLockToggle: document.getElementById('strictLockToggle'),
+    
     clipGrid: document.getElementById('clipGrid'),
     emptyState: document.getElementById('emptyState'),
     
@@ -57,11 +63,11 @@ const DOM = {
     btnLock: document.getElementById('btnLock'),
     btnToggleView: document.getElementById('btnToggleView'),
     searchInput: document.getElementById('searchInput'),
+    btnClearSearch: document.getElementById('btnClearSearch'),
     syncIndicator: document.getElementById('syncIndicator'),
     
     toast: document.getElementById('toast'),
     
-    // Modal
     folderModal: document.getElementById('folderModal'),
     folderNameInput: document.getElementById('folderNameInput'),
     btnCancelFolder: document.getElementById('btnCancelFolder'),
@@ -81,20 +87,35 @@ async function hashPassword(password) {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Activity based auto-lock (5 mins)
 function resetAutoLockTimer() {
     if (isAppLocked) return;
+    if (DOM.strictLockToggle.checked) return; // Ignore timer if strict mode
     clearTimeout(autoLockTimer);
     autoLockTimer = setTimeout(lockApp, AUTO_LOCK_TIMEOUT);
 }
 
-// Pantau aktivitas untuk reset auto-lock
 ['mousemove', 'keydown', 'scroll', 'click'].forEach(evt => {
     window.addEventListener(evt, resetAutoLockTimer);
+});
+
+// Instant strict lock
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden && !isAppLocked && DOM.strictLockToggle.checked) {
+        lockApp();
+    }
+});
+window.addEventListener("blur", () => {
+    if (!isAppLocked && DOM.strictLockToggle.checked) {
+        lockApp();
+    }
 });
 
 function lockApp() {
     if (isAppLocked) return;
     isAppLocked = true;
+    
+    DOM.appScreen.classList.add('app-blur');
     
     // Bersihkan memori paksa
     currentRoomHash = null;
@@ -106,11 +127,16 @@ function lockApp() {
     if (unsubscribeFolders) { unsubscribeFolders(); unsubscribeFolders = null; }
     
     DOM.clipGrid.innerHTML = ''; 
-    DOM.appScreen.classList.add('hidden');
-    DOM.authScreen.classList.remove('hidden');
-    DOM.passwordInput.value = '';
     
-    showToast("🔒 Terkunci karena tidak ada aktivitas");
+    setTimeout(() => {
+        DOM.appScreen.classList.add('hidden');
+        DOM.appScreen.classList.remove('app-blur');
+        DOM.authScreen.classList.remove('hidden');
+        DOM.passwordInput.value = '';
+    }, 100);
+    
+    showToast("🔒 Terkunci");
+    closeMobileSidebar();
 }
 
 async function login() {
@@ -124,7 +150,6 @@ async function login() {
     try {
         currentRoomHash = await hashPassword(pwd);
         
-        // Load metadata (folders) pertama kali
         await ensureRoomMetadata();
         
         startFoldersSync();
@@ -147,7 +172,23 @@ async function login() {
 }
 
 // ==========================================
-// 📡 DATABASE SYNC (SUB-COLLECTIONS)
+// 📱 MOBILE SIDEBAR LOGIC
+// ==========================================
+function openMobileSidebar() {
+    DOM.sidebar.classList.add('open');
+    DOM.sidebarBackdrop.classList.remove('hidden');
+}
+
+function closeMobileSidebar() {
+    DOM.sidebar.classList.remove('open');
+    DOM.sidebarBackdrop.classList.add('hidden');
+}
+
+DOM.btnMobileMenu.addEventListener('click', openMobileSidebar);
+DOM.sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+
+// ==========================================
+// 📡 DATABASE SYNC
 // ==========================================
 
 async function ensureRoomMetadata() {
@@ -166,7 +207,6 @@ function startFoldersSync() {
     unsubscribeFolders = onSnapshot(roomRef, (docSnap) => {
         if (docSnap.exists() && docSnap.data().folders) {
             folders = docSnap.data().folders;
-            // Pastikan folder aktif masih ada
             if (!folders.find(f => f.id === currentFolderId)) {
                 currentFolderId = folders[0] ? folders[0].id : 'default';
             }
@@ -178,7 +218,6 @@ function startFoldersSync() {
 function startNotesSync() {
     if (unsubscribeNotes) unsubscribeNotes();
     
-    // Hanya fetch notes di folder yang sedang aktif
     const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
     const q = query(notesRef, where('folderId', '==', currentFolderId));
     
@@ -199,7 +238,8 @@ function startNotesSync() {
 function switchFolder(folderId) {
     currentFolderId = folderId;
     renderFolders();
-    startNotesSync(); // Pindah listener ke folder baru
+    startNotesSync();
+    closeMobileSidebar(); // Auto-close on mobile when folder selected
 }
 
 async function forceSaveNoteToServer(note) {
@@ -210,7 +250,7 @@ async function forceSaveNoteToServer(note) {
     try {
         await setDoc(noteRef, {
             ...note,
-            updatedAt: Date.now() // Use client timestamp for simple sorting without index issues
+            updatedAt: Date.now()
         }, { merge: true });
     } catch (err) {
         console.error(err);
@@ -242,7 +282,6 @@ function renderFolders() {
         nameSpan.textContent = f.name;
         li.appendChild(nameSpan);
         
-        // Jangan bisa hapus folder default
         if (f.id !== 'default') {
             const actions = document.createElement('div');
             actions.className = 'folder-actions';
@@ -284,7 +323,7 @@ async function saveNewFolder() {
 }
 
 async function deleteFolder(folderId) {
-    if (!confirm("Hapus folder ini? Catatan di dalamnya tidak akan terhapus otomatis tapi akan hilang dari UI.")) return;
+    if (!confirm("Hapus folder ini? Catatan di dalamnya tidak terhapus otomatis dari server tapi akan hilang dari UI.")) return;
     
     folders = folders.filter(f => f.id !== folderId);
     try {
@@ -299,18 +338,27 @@ async function deleteFolder(folderId) {
 // ==========================================
 // 🎨 UI RENDERING - GRID & CARDS
 // ==========================================
+function countWordsAndChars(text) {
+    const chars = text.length;
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    return `${words} words | ${chars} chars`;
+}
+
+function resizeTextarea(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = (textarea.scrollHeight) + 'px';
+}
+
 function renderGrid() {
     if (isAppLocked) return;
     DOM.clipGrid.innerHTML = "";
     
-    // Filter by viewMode (Archive) & Search
     let filtered = notesArray.filter(n => {
         const matchesView = viewMode === 'archived' ? n.archived : !n.archived;
         const matchesSearch = n.text.toLowerCase().includes(searchQuery);
         return matchesView && matchesSearch;
     });
 
-    // Sort in memory (Pinned first, then by updatedAt desc)
     filtered.sort((a, b) => {
         if (a.pinned === b.pinned) return (b.updatedAt || 0) - (a.updatedAt || 0);
         return a.pinned ? -1 : 1;
@@ -337,7 +385,10 @@ function renderGrid() {
             </div>
             <textarea class="card-body" placeholder="Ketik sesuatu...">${item.text}</textarea>
             <div class="card-footer">
-                <span class="card-date">${dateStr}</span>
+                <div class="card-stats">
+                    <span class="card-date">${dateStr}</span>
+                    <span class="word-count">${countWordsAndChars(item.text)}</span>
+                </div>
                 <div class="card-actions">
                     <button class="action-btn copy-btn">Copy</button>
                     <button class="action-btn del del-btn">Hapus</button>
@@ -345,11 +396,17 @@ function renderGrid() {
             </div>
         `;
         
-        // Event Listeners for Card
         const textInput = card.querySelector('.card-body');
+        const wordCountDisplay = card.querySelector('.word-count');
+        
+        // Auto-resize on initial render
+        setTimeout(() => resizeTextarea(textInput), 0);
+
         textInput.addEventListener('input', (e) => {
             item.text = e.target.value;
             item.updatedAt = Date.now();
+            wordCountDisplay.textContent = countWordsAndChars(item.text);
+            resizeTextarea(textInput);
             triggerNoteAutoSave(item);
         });
 
@@ -368,9 +425,17 @@ function renderGrid() {
             renderGrid();
         });
 
-        card.querySelector('.copy-btn').addEventListener('click', () => {
+        const copyBtn = card.querySelector('.copy-btn');
+        copyBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(textInput.value).then(() => {
-                showToast("Tersalin ke Clipboard!");
+                // Micro-animation
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = "Copied! ✅";
+                copyBtn.classList.add('copied');
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.classList.remove('copied');
+                }, 2000);
             });
         });
 
@@ -413,12 +478,14 @@ DOM.btnAddNote.addEventListener('click', async () => {
         updatedAt: Date.now()
     };
     
-    // Simpan ke server dulu
     await forceSaveNoteToServer(newNote);
     
     setTimeout(() => {
         const firstInput = DOM.clipGrid.querySelector('.card-body');
-        if (firstInput) firstInput.focus();
+        if (firstInput) {
+            firstInput.focus();
+            resizeTextarea(firstInput);
+        }
     }, 100);
 });
 
@@ -429,9 +496,30 @@ DOM.btnToggleView.addEventListener('click', () => {
     renderGrid();
 });
 
+// Search and Clear Search
 DOM.searchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase();
+    if (searchQuery.length > 0) {
+        DOM.btnClearSearch.classList.remove('hidden');
+    } else {
+        DOM.btnClearSearch.classList.add('hidden');
+    }
     renderGrid();
+});
+
+DOM.btnClearSearch.addEventListener('click', () => {
+    DOM.searchInput.value = '';
+    searchQuery = '';
+    DOM.btnClearSearch.classList.add('hidden');
+    renderGrid();
+});
+
+// Strict Lock Toggle handling
+DOM.strictLockToggle.addEventListener('change', () => {
+    if (!DOM.strictLockToggle.checked) {
+        // If turned off, start the 5 min timer immediately
+        resetAutoLockTimer();
+    }
 });
 
 // Modal Events

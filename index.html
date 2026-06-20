@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clipboardy Pro</title>
+    <title>Clipboardy</title>
     <!-- Modern Google Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,7 @@
     <!-- Lock / Login Screen -->
     <div id="authScreen">
         <div class="auth-box">
-            <h1>📋 Clipboardy Pro</h1>
+            <h1>📋 Clipboardy</h1>
             <p class="text-muted">Masukkan password rahasia Anda.</p>
             <input type="password" id="passwordInput" class="input-field" placeholder="Password Ruangan" autofocus>
             <button id="loginBtn" class="btn btn-primary">Buka Ruangan</button>
@@ -25,6 +25,9 @@
     <!-- Main App Layout -->
     <div id="appScreen" class="hidden">
         
+        <!-- Mobile Sidebar Backdrop -->
+        <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+
         <!-- Sidebar for Folders -->
         <aside class="sidebar">
             <div class="brand">
@@ -41,22 +44,32 @@
                     <!-- Folders render here via JS -->
                 </ul>
             </div>
+            
+            <div class="sidebar-footer">
+                <label class="toggle-container" title="Kunci instan saat pindah tab">
+                    <input type="checkbox" id="strictLockToggle" checked>
+                    <span class="slider"></span>
+                    <span class="toggle-label">Strict Auto-Lock</span>
+                </label>
+            </div>
         </aside>
 
         <!-- Main Content Area -->
         <main class="main-content">
             <header>
-                <div class="header-title">
+                <div class="header-title" style="display:flex; align-items:center; gap:10px;">
+                    <button id="btnMobileMenu" class="btn btn-icon hidden-desktop">☰</button>
                     <!-- Optional: we can update this via JS but static is fine -->
                 </div>
                 <div class="header-actions">
                     <div class="search-container">
                         <span class="search-icon">🔍</span>
                         <input type="text" id="searchInput" placeholder="Cari catatan...">
+                        <button id="btnClearSearch" class="btn-clear hidden">&times;</button>
                     </div>
                     <button id="btnToggleView" class="btn">Lihat Arsip</button>
-                    <button id="btnAddNote" class="btn btn-primary">+ Catatan Baru</button>
-                    <button id="btnLock" class="btn btn-danger">🔒 Kunci</button>
+                    <button id="btnAddNote" class="btn btn-primary fab-mobile">+ Catatan Baru</button>
+                    <button id="btnLock" class="btn btn-danger">🔒</button>
                 </div>
             </header>
 
