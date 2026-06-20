@@ -195,10 +195,18 @@ h1, h2, h3 { color: var(--text-main); }
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    padding: 20px 0;
-    transition: transform 0.3s ease;
     z-index: 50;
     flex-shrink: 0;
+    overflow: hidden; /* For smooth collapsing */
+}
+
+/* Sidebar Collapsed State (Desktop) */
+@media (min-width: 769px) {
+    .sidebar.collapsed {
+        width: 0;
+        padding: 0;
+        border-right: none;
+    }
 }
 
 .brand {
@@ -561,13 +569,11 @@ header {
         font-size: 24px;
         z-index: 40;
         box-shadow: var(--shadow-lg);
-        color: transparent; /* hide text */
     }
-    .fab-mobile::after {
-        content: '+';
-        color: white;
-        position: absolute;
-    }
-
+    .fab-mobile .fab-text { display: none; }
+    .fab-mobile .fab-icon { display: block !important; }
+    
     .grid { grid-template-columns: 1fr; }
 }
+
+.fab-icon { display: none; }

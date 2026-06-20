@@ -100,16 +100,17 @@ function resetAutoLockTimer() {
 });
 
 // Instant strict lock
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden && !isAppLocked && DOM.strictLockToggle.checked) {
-        lockApp();
-    }
-});
-window.addEventListener("blur", () => {
+function checkStrictLock() {
     if (!isAppLocked && DOM.strictLockToggle.checked) {
         lockApp();
     }
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) checkStrictLock();
 });
+window.addEventListener("blur", checkStrictLock);
+window.addEventListener("pagehide", checkStrictLock);
 
 function lockApp() {
     if (isAppLocked) return;
@@ -172,19 +173,25 @@ async function login() {
 }
 
 // ==========================================
-// 📱 MOBILE SIDEBAR LOGIC
+// 📱 SIDEBAR LOGIC (MOBILE & DESKTOP)
 // ==========================================
-function openMobileSidebar() {
-    DOM.sidebar.classList.add('open');
-    DOM.sidebarBackdrop.classList.remove('hidden');
+function toggleSidebar() {
+    if (window.innerWidth <= 768) {
+        DOM.sidebar.classList.add('open');
+        DOM.sidebarBackdrop.classList.remove('hidden');
+    } else {
+        DOM.sidebar.classList.toggle('collapsed');
+    }
 }
 
 function closeMobileSidebar() {
-    DOM.sidebar.classList.remove('open');
-    DOM.sidebarBackdrop.classList.add('hidden');
+    if (window.innerWidth <= 768) {
+        DOM.sidebar.classList.remove('open');
+        DOM.sidebarBackdrop.classList.add('hidden');
+    }
 }
 
-DOM.btnMobileMenu.addEventListener('click', openMobileSidebar);
+DOM.btnMobileMenu.addEventListener('click', toggleSidebar);
 DOM.sidebarBackdrop.addEventListener('click', closeMobileSidebar);
 
 // ==========================================

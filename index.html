@@ -58,7 +58,7 @@
         <main class="main-content">
             <header>
                 <div class="header-title" style="display:flex; align-items:center; gap:10px;">
-                    <button id="btnMobileMenu" class="btn btn-icon hidden-desktop">☰</button>
+                    <button id="btnMobileMenu" class="btn btn-icon">☰</button>
                     <!-- Optional: we can update this via JS but static is fine -->
                 </div>
                 <div class="header-actions">
@@ -68,7 +68,9 @@
                         <button id="btnClearSearch" class="btn-clear hidden">&times;</button>
                     </div>
                     <button id="btnToggleView" class="btn">Lihat Arsip</button>
-                    <button id="btnAddNote" class="btn btn-primary fab-mobile">+ Catatan Baru</button>
+                    <button id="btnAddNote" class="btn btn-primary fab-mobile">
+                        <span class="fab-text">+ Catatan Baru</span>
+                    </button>
                     <button id="btnLock" class="btn btn-danger">🔒</button>
                 </div>
             </header>
