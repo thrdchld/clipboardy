@@ -71,7 +71,11 @@ const DOM = {
     folderModal: document.getElementById('folderModal'),
     folderNameInput: document.getElementById('folderNameInput'),
     btnCancelFolder: document.getElementById('btnCancelFolder'),
-    btnSaveFolder: document.getElementById('btnSaveFolder')
+    btnSaveFolder: document.getElementById('btnSaveFolder'),
+    
+    lightboxModal: document.getElementById('lightboxModal'),
+    lightboxImage: document.getElementById('lightboxImage'),
+    closeLightbox: document.getElementById('closeLightbox')
 };
 
 // ==========================================
@@ -128,6 +132,8 @@ function lockApp() {
     if (unsubscribeFolders) { unsubscribeFolders(); unsubscribeFolders = null; }
     
     DOM.clipGrid.innerHTML = ''; 
+    DOM.lightboxModal.classList.add('hidden');
+    DOM.lightboxImage.src = '';
     
     setTimeout(() => {
         DOM.appScreen.classList.add('hidden');
@@ -383,6 +389,18 @@ function renderGrid() {
         
         const dateStr = item.updatedAt ? new Date(item.updatedAt).toLocaleString('id-ID', {day:'numeric', month:'short', hour: '2-digit', minute:'2-digit'}) : 'Baru';
 
+        const imageHtml = item.image ? `
+            <div class="card-image-wrapper">
+                <img src="${item.image}" class="card-image" alt="Catatan Gambar">
+                <button class="btn-remove-image" title="Hapus Gambar">&times;</button>
+            </div>
+        ` : '';
+
+        const uploadBtnHtml = item.image ? '' : `
+            <button class="action-btn upload-btn" title="Unggah Gambar">🖼️</button>
+            <input type="file" class="card-file-input" accept="image/*" style="display: none;">
+        `;
+
         card.innerHTML = `
             <div class="card-header">
                 <div class="card-badges">
@@ -390,6 +408,7 @@ function renderGrid() {
                     <span class="badge arc-btn ${item.archived ? 'active-arc' : ''}">${item.archived ? '📦 Unarchive' : '📦 Archive'}</span>
                 </div>
             </div>
+            ${imageHtml}
             <textarea class="card-body" placeholder="Ketik sesuatu...">${item.text}</textarea>
             <div class="card-footer">
                 <div class="card-stats">
@@ -397,6 +416,7 @@ function renderGrid() {
                     <span class="word-count">${countWordsAndChars(item.text)}</span>
                 </div>
                 <div class="card-actions">
+                    ${uploadBtnHtml}
                     <button class="action-btn copy-btn">Copy</button>
                     <button class="action-btn del del-btn">Hapus</button>
                 </div>
@@ -457,6 +477,55 @@ function renderGrid() {
                 }
             }
         });
+
+        if (item.image) {
+            // Lightbox viewer
+            card.querySelector('.card-image').addEventListener('click', () => {
+                DOM.lightboxImage.src = item.image;
+                DOM.lightboxModal.classList.remove('hidden');
+            });
+
+            // Remove image
+            card.querySelector('.btn-remove-image').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm("Hapus gambar dari catatan ini?")) {
+                    item.image = null;
+                    item.updatedAt = Date.now();
+                    forceSaveNoteToServer(item);
+                    renderGrid();
+                }
+            });
+        } else {
+            // Upload handlers
+            const uploadBtn = card.querySelector('.upload-btn');
+            const fileInput = card.querySelector('.card-file-input');
+
+            uploadBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                uploadBtn.textContent = "⏳...";
+                uploadBtn.disabled = true;
+
+                try {
+                    const compressedBase64 = await compressImage(file, 256);
+                    item.image = compressedBase64;
+                    item.updatedAt = Date.now();
+                    await forceSaveNoteToServer(item);
+                    renderGrid();
+                    showToast("Gambar berhasil diunggah!");
+                } catch (err) {
+                    console.error(err);
+                    showToast(err.message || "Gagal mengompres gambar.");
+                    uploadBtn.textContent = "🖼️";
+                    uploadBtn.disabled = false;
+                }
+            });
+        }
 
         DOM.clipGrid.appendChild(card);
     });
@@ -541,9 +610,99 @@ DOM.btnCancelFolder.addEventListener('click', () => {
 DOM.btnSaveFolder.addEventListener('click', saveNewFolder);
 DOM.folderNameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') saveNewFolder(); });
 
+// Lightbox Close Events
+DOM.closeLightbox.addEventListener('click', () => {
+    DOM.lightboxModal.classList.add('hidden');
+    DOM.lightboxImage.src = '';
+});
+DOM.lightboxModal.addEventListener('click', (e) => {
+    if (e.target === DOM.lightboxModal) {
+        DOM.lightboxModal.classList.add('hidden');
+        DOM.lightboxImage.src = '';
+    }
+});
+
 // Utility
 function showToast(msg) {
     DOM.toast.textContent = msg;
     DOM.toast.classList.add('show');
     setTimeout(() => DOM.toast.classList.remove('show'), 3000);
+}
+
+// Image Compression Algorithm
+function compressImage(file, maxSizeKB = 256) {
+    return new Promise((resolve, reject) => {
+        // Validate it's an image file
+        if (!file.type.startsWith('image/')) {
+            reject(new Error("File yang dipilih bukan gambar."));
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Max dimensions to avoid large memory footprints
+                const maxDim = 1200;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Initial high quality JPEG export
+                let quality = 0.9;
+                let base64 = canvas.toDataURL('image/jpeg', quality);
+                
+                // Calculate size in KB
+                const getKBSize = (b64Str) => (b64Str.length * 0.75) / 1024;
+
+                // Iterative quality reduction loop
+                while (getKBSize(base64) > maxSizeKB && quality > 0.1) {
+                    quality -= 0.1;
+                    base64 = canvas.toDataURL('image/jpeg', quality);
+                }
+
+                // If quality reduction isn't enough, iteratively scale down the canvas resolution
+                if (getKBSize(base64) > maxSizeKB) {
+                    let scale = 0.75;
+                    while (getKBSize(base64) > maxSizeKB && scale > 0.15) {
+                        const newWidth = Math.round(width * scale);
+                        const newHeight = Math.round(height * scale);
+                        
+                        canvas.width = newWidth;
+                        canvas.height = newHeight;
+                        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                        
+                        base64 = canvas.toDataURL('image/jpeg', 0.5); // Use a low quality setting for scaled dimensions
+                        scale -= 0.15;
+                    }
+                }
+
+                if (getKBSize(base64) > maxSizeKB) {
+                    reject(new Error(`Gambar terlalu besar. Kompresi maksimal hanya berhasil menurunkan ukuran ke ${Math.round(getKBSize(base64))} KB.`));
+                } else {
+                    resolve(base64);
+                }
+            };
+            img.onerror = (err) => reject(new Error("Gagal memuat gambar untuk kompresi."));
+        };
+        reader.onerror = (err) => reject(new Error("Gagal membaca file gambar."));
+    });
 }

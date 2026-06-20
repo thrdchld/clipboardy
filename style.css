@@ -577,3 +577,63 @@ header {
 }
 
 .fab-icon { display: none; }
+
+/* ==========================================
+   IMAGE CARD & LIGHTBOX SUPPORT 
+   ========================================== */
+.card-image-wrapper {
+    position: relative;
+    width: 100%;
+    margin-bottom: 15px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    aspect-ratio: 16 / 10;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+}
+
+.card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    cursor: zoom-in;
+    transition: transform 0.3s ease;
+}
+
+.card-image-wrapper:hover .card-image {
+    transform: scale(1.03);
+}
+
+.btn-remove-image {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+    line-height: 22px;
+    text-align: center;
+    cursor: pointer;
+    backdrop-filter: blur(2px);
+    transition: background 0.2s, transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-remove-image:hover {
+    background: var(--danger);
+    transform: scale(1.1);
+}
+
+#closeLightbox:hover {
+    color: #ffffff !important;
+}
+
+#lightboxModal:not(.hidden) #lightboxImage {
+    transform: scale(1) !important;
+}

@@ -100,6 +100,12 @@
         </div>
     </div>
 
+    <!-- Lightbox Modal for Image Preview -->
+    <div id="lightboxModal" class="modal-overlay hidden" style="background: rgba(0,0,0,0.95); z-index: 3000;">
+        <span id="closeLightbox" style="position: absolute; top: 20px; right: 30px; color: rgba(255,255,255,0.8); font-size: 40px; font-weight: bold; cursor: pointer; user-select: none; transition: color 0.2s;">&times;</span>
+        <img id="lightboxImage" src="" style="max-width: 90%; max-height: 90%; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); object-fit: contain; transform: scale(0.95); transition: transform 0.3s ease-out;" alt="Pratinjau Gambar">
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast"></div>
 
