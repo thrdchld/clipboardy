@@ -34,6 +34,7 @@ let unsubscribeFolders = null;
 let isAppLocked = true;
 let viewMode = 'active'; // 'active' atau 'archived'
 let searchQuery = '';
+let ignoreBlur = false;
 
 let autoLockTimer = null;
 const AUTO_LOCK_TIMEOUT = 5 * 60 * 1000; // 5 menit
@@ -105,6 +106,7 @@ function resetAutoLockTimer() {
 
 // Instant strict lock
 function checkStrictLock() {
+    if (ignoreBlur) return;
     if (!isAppLocked && DOM.strictLockToggle.checked) {
         lockApp();
     }
@@ -115,6 +117,25 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("blur", checkStrictLock);
 window.addEventListener("pagehide", checkStrictLock);
+
+// Helper safe confirm dialog to avoid blur auto-lock
+function safeConfirm(message) {
+    ignoreBlur = true;
+    const result = confirm(message);
+    setTimeout(() => {
+        ignoreBlur = false;
+    }, 300);
+    return result;
+}
+
+// Reset ignoreBlur when window gains focus back
+window.addEventListener("focus", () => {
+    if (ignoreBlur) {
+        setTimeout(() => {
+            ignoreBlur = false;
+        }, 300);
+    }
+});
 
 function lockApp() {
     if (isAppLocked) return;
@@ -336,7 +357,7 @@ async function saveNewFolder() {
 }
 
 async function deleteFolder(folderId) {
-    if (!confirm("Hapus folder ini? Catatan di dalamnya tidak terhapus otomatis dari server tapi akan hilang dari UI.")) return;
+    if (!safeConfirm("Hapus folder ini? Catatan di dalamnya tidak terhapus otomatis dari server tapi akan hilang dari UI.")) return;
     
     folders = folders.filter(f => f.id !== folderId);
     try {
@@ -437,6 +458,32 @@ function renderGrid() {
             triggerNoteAutoSave(item);
         });
 
+        textInput.addEventListener('paste', async (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    e.preventDefault();
+                    const file = items[i].getAsFile();
+                    if (!file) continue;
+
+                    showToast("⏳ Mengompres gambar dari clipboard...");
+                    
+                    try {
+                        const compressedBase64 = await compressImage(file, 256);
+                        item.image = compressedBase64;
+                        item.updatedAt = Date.now();
+                        await forceSaveNoteToServer(item);
+                        renderGrid();
+                        showToast("Gambar dari clipboard berhasil diunggah!");
+                    } catch (err) {
+                        console.error(err);
+                        showToast(err.message || "Gagal mengompres gambar dari clipboard.");
+                    }
+                    break;
+                }
+            }
+        });
+
         card.querySelector('.pin-btn').addEventListener('click', () => {
             item.pinned = !item.pinned;
             item.updatedAt = Date.now();
@@ -467,7 +514,7 @@ function renderGrid() {
         });
 
         card.querySelector('.del-btn').addEventListener('click', async () => {
-            if (confirm("Hapus catatan ini selamanya?")) {
+            if (safeConfirm("Hapus catatan ini selamanya?")) {
                 const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', item.id);
                 try {
                     await deleteDoc(noteRef);
@@ -488,7 +535,7 @@ function renderGrid() {
             // Remove image
             card.querySelector('.btn-remove-image').addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (confirm("Hapus gambar dari catatan ini?")) {
+                if (safeConfirm("Hapus gambar dari catatan ini?")) {
                     item.image = null;
                     item.updatedAt = Date.now();
                     forceSaveNoteToServer(item);
@@ -501,10 +548,16 @@ function renderGrid() {
             const fileInput = card.querySelector('.card-file-input');
 
             uploadBtn.addEventListener('click', () => {
+                ignoreBlur = true;
                 fileInput.click();
             });
 
+            fileInput.addEventListener('cancel', () => {
+                setTimeout(() => { ignoreBlur = false; }, 300);
+            });
+
             fileInput.addEventListener('change', async (e) => {
+                setTimeout(() => { ignoreBlur = false; }, 300);
                 const file = e.target.files[0];
                 if (!file) return;
 
