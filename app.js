@@ -420,7 +420,21 @@ function renderGrid() {
         const uploadBtnHtml = item.image ? '' : `
             <button class="action-btn upload-btn" title="Unggah Gambar">🖼️</button>
             <input type="file" class="card-file-input" accept="image/*" style="display: none;">
+            <button class="action-btn paste-img-btn" title="Tempel Gambar dari Clipboard Device">📋</button>
         `;
+
+        let moveOptions = `<option value="" disabled selected>Pindahkan...</option>`;
+        folders.forEach(f => {
+            if (f.id !== currentFolderId) {
+                moveOptions += `<option value="${f.id}">📁 ${f.name}</option>`;
+            }
+        });
+
+        const moveSelectHtml = folders.length > 1 ? `
+            <select class="action-btn move-select" title="Pindahkan Catatan" style="max-width: 95px; text-overflow: ellipsis; cursor: pointer;">
+                ${moveOptions}
+            </select>
+        ` : '';
 
         card.innerHTML = `
             <div class="card-header">
@@ -438,6 +452,7 @@ function renderGrid() {
                 </div>
                 <div class="card-actions">
                     ${uploadBtnHtml}
+                    ${moveSelectHtml}
                     <button class="action-btn copy-btn">Copy</button>
                     <button class="action-btn del del-btn">Hapus</button>
                 </div>
@@ -525,6 +540,19 @@ function renderGrid() {
             }
         });
 
+        if (folders.length > 1) {
+            card.querySelector('.move-select').addEventListener('change', async (e) => {
+                const targetFolderId = e.target.value;
+                if (targetFolderId) {
+                    item.folderId = targetFolderId;
+                    item.updatedAt = Date.now();
+                    await forceSaveNoteToServer(item);
+                    renderGrid();
+                    showToast("Catatan dipindahkan!");
+                }
+            });
+        }
+
         if (item.image) {
             // Lightbox viewer
             card.querySelector('.card-image').addEventListener('click', () => {
@@ -546,6 +574,7 @@ function renderGrid() {
             // Upload handlers
             const uploadBtn = card.querySelector('.upload-btn');
             const fileInput = card.querySelector('.card-file-input');
+            const pasteImgBtn = card.querySelector('.paste-img-btn');
 
             uploadBtn.addEventListener('click', () => {
                 ignoreBlur = true;
@@ -576,6 +605,47 @@ function renderGrid() {
                     showToast(err.message || "Gagal mengompres gambar.");
                     uploadBtn.textContent = "🖼️";
                     uploadBtn.disabled = false;
+                }
+            });
+
+            pasteImgBtn.addEventListener('click', async () => {
+                try {
+                    const items = await navigator.clipboard.read();
+                    let imageFound = false;
+                    for (const clipboardItem of items) {
+                        for (const type of clipboardItem.types) {
+                            if (type.startsWith('image/')) {
+                                pasteImgBtn.textContent = "⏳...";
+                                pasteImgBtn.disabled = true;
+                                
+                                const blob = await clipboardItem.getType(type);
+                                const file = new File([blob], "clipboard-image.png", { type });
+
+                                try {
+                                    const compressedBase64 = await compressImage(file, 256);
+                                    item.image = compressedBase64;
+                                    item.updatedAt = Date.now();
+                                    await forceSaveNoteToServer(item);
+                                    renderGrid();
+                                    showToast("Gambar berhasil ditempel!");
+                                } catch (err) {
+                                    console.error(err);
+                                    showToast(err.message || "Gagal mengompres gambar.");
+                                    pasteImgBtn.textContent = "📋";
+                                    pasteImgBtn.disabled = false;
+                                }
+                                imageFound = true;
+                                break;
+                            }
+                        }
+                        if (imageFound) break;
+                    }
+                    if (!imageFound) {
+                        showToast("Tidak ada gambar di clipboard.");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast("Gagal membaca clipboard. Izinkan akses clipboard.");
                 }
             });
         }
