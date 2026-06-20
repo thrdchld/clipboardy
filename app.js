@@ -76,7 +76,9 @@ const DOM = {
     
     lightboxModal: document.getElementById('lightboxModal'),
     lightboxImage: document.getElementById('lightboxImage'),
-    closeLightbox: document.getElementById('closeLightbox')
+    closeLightbox: document.getElementById('closeLightbox'),
+    btnDownloadLightbox: document.getElementById('btnDownloadLightbox'),
+    btnToggleViewText: document.getElementById('btnToggleViewText')
 };
 
 // ==========================================
@@ -417,10 +419,18 @@ function renderGrid() {
             </div>
         ` : '';
 
+        const downloadBtnHtml = item.image ? `
+            <button class="action-btn download-btn" title="Download Gambar" style="display:inline-flex; align-items:center; gap:4px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download
+            </button>
+        ` : '';
+
         const uploadBtnHtml = item.image ? '' : `
-            <button class="action-btn upload-btn" title="Unggah Gambar">🖼️</button>
+            <button class="action-btn upload-btn" title="Unggah Gambar" style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            </button>
             <input type="file" class="card-file-input" accept="image/*" style="display: none;">
-            <button class="action-btn paste-img-btn" title="Tempel Gambar dari Clipboard Device">📋</button>
         `;
 
         let moveOptions = `<option value="" disabled selected>Pindahkan...</option>`;
@@ -439,8 +449,14 @@ function renderGrid() {
         card.innerHTML = `
             <div class="card-header">
                 <div class="card-badges">
-                    <span class="badge pin-btn ${item.pinned ? 'active-pin' : ''}">${item.pinned ? '📌 Pinned' : '📌 Pin'}</span>
-                    <span class="badge arc-btn ${item.archived ? 'active-arc' : ''}">${item.archived ? '📦 Unarchive' : '📦 Archive'}</span>
+                    <span class="badge pin-btn ${item.pinned ? 'active-pin' : ''}" style="display:inline-flex; align-items:center; gap:4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A.5.5 0 0 0 6.36 14h11.28a.5.5 0 0 0 .25-.56l-1.78-.89a2 2 0 0 1-1.11-1.79V4H9v6.76zM8 4h8M10 2h4"/></svg>
+                        ${item.pinned ? 'Pinned' : 'Pin'}
+                    </span>
+                    <span class="badge arc-btn ${item.archived ? 'active-arc' : ''}" style="display:inline-flex; align-items:center; gap:4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                        ${item.archived ? 'Unarchive' : 'Archive'}
+                    </span>
                 </div>
             </div>
             ${imageHtml}
@@ -452,9 +468,16 @@ function renderGrid() {
                 </div>
                 <div class="card-actions">
                     ${uploadBtnHtml}
+                    ${downloadBtnHtml}
                     ${moveSelectHtml}
-                    <button class="action-btn copy-btn">Copy</button>
-                    <button class="action-btn del del-btn">Hapus</button>
+                    <button class="action-btn copy-btn" style="display:inline-flex; align-items:center; gap:4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Copy
+                    </button>
+                    <button class="action-btn del del-btn" style="display:inline-flex; align-items:center; gap:4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        Hapus
+                    </button>
                 </div>
             </div>
         `;
@@ -570,11 +593,16 @@ function renderGrid() {
                     renderGrid();
                 }
             });
+
+            // Download image
+            card.querySelector('.download-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                downloadImage(item.image, `image-${item.id}`);
+            });
         } else {
             // Upload handlers
             const uploadBtn = card.querySelector('.upload-btn');
             const fileInput = card.querySelector('.card-file-input');
-            const pasteImgBtn = card.querySelector('.paste-img-btn');
 
             uploadBtn.addEventListener('click', () => {
                 ignoreBlur = true;
@@ -603,50 +631,11 @@ function renderGrid() {
                 } catch (err) {
                     console.error(err);
                     showToast(err.message || "Gagal mengompres gambar.");
-                    uploadBtn.textContent = "🖼️";
+                    uploadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`;
                     uploadBtn.disabled = false;
                 }
             });
-
-            pasteImgBtn.addEventListener('click', async () => {
-                try {
-                    const items = await navigator.clipboard.read();
-                    let imageFound = false;
-                    for (const clipboardItem of items) {
-                        for (const type of clipboardItem.types) {
-                            if (type.startsWith('image/')) {
-                                pasteImgBtn.textContent = "⏳...";
-                                pasteImgBtn.disabled = true;
-                                
-                                const blob = await clipboardItem.getType(type);
-                                const file = new File([blob], "clipboard-image.png", { type });
-
-                                try {
-                                    const compressedBase64 = await compressImage(file, 256);
-                                    item.image = compressedBase64;
-                                    item.updatedAt = Date.now();
-                                    await forceSaveNoteToServer(item);
-                                    renderGrid();
-                                    showToast("Gambar berhasil ditempel!");
-                                } catch (err) {
-                                    console.error(err);
-                                    showToast(err.message || "Gagal mengompres gambar.");
-                                    pasteImgBtn.textContent = "📋";
-                                    pasteImgBtn.disabled = false;
-                                }
-                                imageFound = true;
-                                break;
-                            }
-                        }
-                        if (imageFound) break;
-                    }
-                    if (!imageFound) {
-                        showToast("Tidak ada gambar di clipboard.");
-                    }
-                } catch (err) {
-                    console.error(err);
-                    showToast("Gagal membaca clipboard. Izinkan akses clipboard.");
-                }
+        }           }
             });
         }
 
@@ -664,7 +653,7 @@ DOM.btnLock.addEventListener('click', lockApp);
 DOM.btnAddNote.addEventListener('click', async () => {
     if(viewMode === 'archived') {
         viewMode = 'active';
-        DOM.btnToggleView.textContent = "Lihat Arsip";
+        DOM.btnToggleViewText.textContent = "Lihat Arsip";
     }
     
     const newNoteId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -690,7 +679,7 @@ DOM.btnAddNote.addEventListener('click', async () => {
 
 DOM.btnToggleView.addEventListener('click', () => {
     viewMode = viewMode === 'active' ? 'archived' : 'active';
-    DOM.btnToggleView.textContent = viewMode === 'active' ? "Lihat Arsip" : "Kembali ke Aktif";
+    DOM.btnToggleViewText.textContent = viewMode === 'active' ? "Lihat Arsip" : "Kembali ke Aktif";
     DOM.btnToggleView.classList.toggle('btn-primary');
     renderGrid();
 });
@@ -745,7 +734,31 @@ DOM.lightboxModal.addEventListener('click', (e) => {
     }
 });
 
+// Lightbox Download Event
+DOM.btnDownloadLightbox.addEventListener('click', () => {
+    if (DOM.lightboxImage.src) {
+        downloadImage(DOM.lightboxImage.src, `download-${Date.now()}`);
+    }
+});
+
 // Utility
+function downloadImage(base64Data, baseFilename = 'image') {
+    const link = document.createElement('a');
+    link.href = base64Data;
+    
+    // Deduce file extension
+    let ext = 'jpg';
+    const match = base64Data.match(/^data:image\/(\w+);base64,/);
+    if (match && match[1]) {
+        ext = match[1];
+    }
+    
+    link.download = `${baseFilename}.${ext}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 function showToast(msg) {
     DOM.toast.textContent = msg;
     DOM.toast.classList.add('show');

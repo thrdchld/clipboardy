@@ -198,25 +198,28 @@ h1, h2, h3 { color: var(--text-main); }
     z-index: 50;
     flex-shrink: 0;
     overflow: hidden; /* For smooth collapsing */
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Sidebar Collapsed State (Desktop) */
 @media (min-width: 769px) {
     .sidebar.collapsed {
         width: 0;
-        padding: 0;
-        border-right: none;
+        border-right-color: transparent;
     }
 }
 
 .brand {
-    font-size: 1.5em;
+    font-size: 1.3em;
     font-weight: 800;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 0 20px 20px 20px;
+    height: 70px;
+    padding: 0 20px;
+    box-sizing: border-box;
     border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
 }
 
 .status-dot {
@@ -333,6 +336,12 @@ header {
     border-bottom: 1px solid var(--border);
     z-index: 30;
     gap: 15px;
+    height: 70px;
+    box-sizing: border-box;
+}
+
+#btnMobileMenu {
+    display: none;
 }
 
 .header-title h2 { font-size: 1.2em; font-weight: 700; }
@@ -547,6 +556,7 @@ header {
     }
 
     header { padding: 10px 15px; }
+    #btnMobileMenu { display: inline-flex; }
     .main-scroll { padding: 15px; }
     
     .header-actions { gap: 8px; }
