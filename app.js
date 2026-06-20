@@ -84,7 +84,7 @@ const DOM = {
 // ==========================================
 // 🔒 AUTH & AUTO-LOCK
 // ==========================================
-signInAnonymously(auth).catch(err => alert("Gagal koneksi: " + err.message));
+signInAnonymously(auth).catch(err => alert("Connection failed: " + err.message));
 onAuthStateChanged(auth, user => currentUser = user);
 
 async function hashPassword(password) {
@@ -165,16 +165,16 @@ function lockApp() {
         DOM.passwordInput.value = '';
     }, 100);
     
-    showToast("Aplikasi dikunci");
+    showToast("Application locked");
     closeMobileSidebar();
 }
 
 async function login() {
     const pwd = DOM.passwordInput.value.trim();
     if (!pwd) return;
-    if (!currentUser) return showToast("Menunggu koneksi server...");
+    if (!currentUser) return showToast("Waiting for server connection...");
 
-    DOM.loginBtn.textContent = "Membuka...";
+    DOM.loginBtn.textContent = "Unlocking...";
     DOM.loginBtn.disabled = true;
 
     try {
@@ -194,9 +194,9 @@ async function login() {
         
     } catch (err) {
         console.error(err);
-        showToast("Terjadi kesalahan.");
+        showToast("An error occurred.");
     } finally {
-        DOM.loginBtn.textContent = "Buka Ruangan";
+        DOM.loginBtn.textContent = "Unlock Room";
         DOM.loginBtn.disabled = false;
     }
 }
@@ -209,7 +209,7 @@ function toggleSidebar() {
         DOM.sidebar.classList.add('open');
         DOM.sidebarBackdrop.classList.remove('hidden');
     } else {
-        DOM.sidebar.classList.toggle('collapsed');
+        DOM.sidebar.classList.remove('collapsed');
     }
 }
 
@@ -222,6 +222,13 @@ function closeMobileSidebar() {
 
 DOM.btnMobileMenu.addEventListener('click', toggleSidebar);
 DOM.sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+document.getElementById('btnSidebarCollapse').addEventListener('click', () => {
+    if (window.innerWidth <= 768) {
+        closeMobileSidebar();
+    } else {
+        DOM.sidebar.classList.add('collapsed');
+    }
+});
 
 // ==========================================
 // 📡 DATABASE SYNC
@@ -267,7 +274,7 @@ function startNotesSync() {
         renderGrid();
     }, (error) => {
         console.error("Sync Error", error);
-        showToast("Terputus dari sinkronisasi catatan");
+        showToast("Disconnected from note sync");
     });
 }
 
@@ -290,7 +297,7 @@ async function forceSaveNoteToServer(note) {
         }, { merge: true });
     } catch (err) {
         console.error(err);
-        showToast("Gagal menyimpan catatan");
+        showToast("Failed to save note");
     }
 }
 
@@ -339,8 +346,8 @@ function renderFolders() {
             actions.className = 'folder-actions';
             const btnDel = document.createElement('button');
             btnDel.className = 'btn-delete-folder';
-            btnDel.setAttribute('title', 'Hapus Folder');
-            btnDel.setAttribute('aria-label', `Hapus Folder ${f.name}`);
+            btnDel.setAttribute('title', 'Delete Folder');
+            btnDel.setAttribute('aria-label', `Delete Folder ${f.name}`);
             btnDel.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
             btnDel.onclick = (e) => {
                 e.stopPropagation();
@@ -379,12 +386,12 @@ async function saveNewFolder() {
         await setDoc(roomRef, { folders }, { merge: true });
         switchFolder(newFolder.id);
     } catch(err) {
-        showToast("Gagal membuat folder");
+        showToast("Failed to create folder");
     }
 }
 
 async function deleteFolder(folderId) {
-    if (!safeConfirm("Hapus folder ini? Catatan di dalamnya tidak terhapus otomatis dari server tapi akan hilang dari UI.")) return;
+    if (!safeConfirm("Delete this folder? Notes inside it will not be deleted from the server, but will be removed from this view.")) return;
     
     folders = folders.filter(f => f.id !== folderId);
     try {
@@ -392,7 +399,7 @@ async function deleteFolder(folderId) {
         await setDoc(roomRef, { folders }, { merge: true });
         if (currentFolderId === folderId) switchFolder('default');
     } catch(err) {
-        showToast("Gagal menghapus folder");
+        showToast("Failed to delete folder");
     }
 }
 
@@ -435,15 +442,15 @@ function renderGrid() {
         const card = document.createElement('div');
         card.className = `card ${item.pinned ? 'pinned' : ''}`;
         
-        const dateStr = item.updatedAt ? new Date(item.updatedAt).toLocaleString('id-ID', {day:'numeric', month:'short', hour: '2-digit', minute:'2-digit'}) : 'Baru';
+        const dateStr = item.updatedAt ? new Date(item.updatedAt).toLocaleString('en-US', {day:'numeric', month:'short', hour: '2-digit', minute:'2-digit'}) : 'New';
 
         const imageHtml = item.image ? `
             <div class="card-image-wrapper">
-                <img src="${item.image}" class="card-image" alt="Catatan Gambar">
-                <button class="btn-download-image" title="Download Gambar" aria-label="Download Gambar">
+                <img src="${item.image}" class="card-image" alt="Note Image">
+                <button class="btn-download-image" title="Download Image" aria-label="Download Image">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                 </button>
-                <button class="btn-remove-image" title="Hapus Gambar" aria-label="Hapus Gambar">
+                <button class="btn-remove-image" title="Delete Image" aria-label="Delete Image">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
@@ -452,13 +459,13 @@ function renderGrid() {
         const downloadBtnHtml = '';
 
         const uploadBtnHtml = item.image ? '' : `
-            <button class="action-btn upload-btn" title="Unggah Gambar" aria-label="Unggah Gambar" style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px;">
+            <button class="action-btn upload-btn" title="Upload Image" aria-label="Upload Image" style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             </button>
-            <input type="file" class="card-file-input" accept="image/*" style="display: none;" aria-label="Unggah Gambar">
+            <input type="file" class="card-file-input" accept="image/*" style="display: none;" aria-label="Upload Image">
         `;
 
-        let moveOptions = `<option value="" disabled selected>Pindahkan...</option>`;
+        let moveOptions = `<option value="" disabled selected>Move...</option>`;
         folders.forEach(f => {
             if (f.id !== currentFolderId) {
                 moveOptions += `<option value="${f.id}">${f.name}</option>`;
@@ -466,7 +473,7 @@ function renderGrid() {
         });
 
         const moveSelectHtml = folders.length > 1 ? `
-            <select class="action-btn move-select" title="Pindahkan Catatan" aria-label="Pindahkan Catatan" style="max-width: 95px; text-overflow: ellipsis; cursor: pointer;">
+            <select class="badge move-select" title="Move Note" aria-label="Move Note" style="cursor: pointer; max-width: 95px; text-overflow: ellipsis;">
                 ${moveOptions}
             </select>
         ` : '';
@@ -474,18 +481,19 @@ function renderGrid() {
         card.innerHTML = `
             <div class="card-header">
                 <div class="card-badges">
-                    <span class="badge pin-btn ${item.pinned ? 'active-pin' : ''}" role="button" tabindex="0" aria-label="${item.pinned ? 'Lepas Pin Catatan' : 'Pin Catatan'}" style="display:inline-flex; align-items:center; gap:4px;">
+                    <span class="badge pin-btn ${item.pinned ? 'active-pin' : ''}" role="button" tabindex="0" aria-label="${item.pinned ? 'Unpin Note' : 'Pin Note'}" style="display:inline-flex; align-items:center; gap:4px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A.5.5 0 0 0 6.36 14h11.28a.5.5 0 0 0 .25-.56l-1.78-.89a2 2 0 0 1-1.11-1.79V4H9v6.76zM8 4h8M10 2h4"/></svg>
                         ${item.pinned ? 'Pinned' : 'Pin'}
                     </span>
-                    <span class="badge arc-btn ${item.archived ? 'active-arc' : ''}" role="button" tabindex="0" aria-label="${item.archived ? 'Kembalikan dari Arsip' : 'Arsipkan Catatan'}" style="display:inline-flex; align-items:center; gap:4px;">
+                    <span class="badge arc-btn ${item.archived ? 'active-arc' : ''}" role="button" tabindex="0" aria-label="${item.archived ? 'Unarchive Note' : 'Archive Note'}" style="display:inline-flex; align-items:center; gap:4px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-                        ${item.archived ? 'Unarchive' : 'Archive'}
+                        ${item.archived ? 'Unarchived' : 'Archive'}
                     </span>
+                    ${moveSelectHtml}
                 </div>
             </div>
             ${imageHtml}
-            <textarea class="card-body" placeholder="Ketik sesuatu..." aria-label="Isi Catatan">${item.text}</textarea>
+            <textarea class="card-body" placeholder="Type something..." aria-label="Note Content">${item.text}</textarea>
             <div class="card-footer">
                 <div class="card-stats">
                     <span class="card-date">${dateStr}</span>
@@ -493,14 +501,13 @@ function renderGrid() {
                 </div>
                 <div class="card-actions">
                     ${uploadBtnHtml}
-                    ${moveSelectHtml}
-                    <button class="action-btn copy-btn" title="Salin Catatan" aria-label="Salin Catatan" style="display:inline-flex; align-items:center; gap:4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <button class="action-btn copy-btn" title="Copy Note" aria-label="Copy Note" style="display:inline-flex; align-items:center; gap:4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                         Copy
                     </button>
-                    <button class="action-btn del del-btn" title="Hapus Catatan" aria-label="Hapus Catatan" style="display:inline-flex; align-items:center; gap:4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        Hapus
+                    <button class="action-btn del del-btn" title="Delete Note" aria-label="Delete Note" style="display:inline-flex; align-items:center; gap:4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        Delete
                     </button>
                 </div>
             </div>
@@ -528,7 +535,7 @@ function renderGrid() {
                     const file = items[i].getAsFile();
                     if (!file) continue;
 
-                    showToast("Mengompres gambar dari clipboard...");
+                    showToast("Compressing image from clipboard...");
                     
                     try {
                         const compressedBase64 = await compressImage(file, 256);
@@ -536,10 +543,10 @@ function renderGrid() {
                         item.updatedAt = Date.now();
                         await forceSaveNoteToServer(item);
                         renderGrid();
-                        showToast("Gambar dari clipboard berhasil diunggah!");
+                        showToast("Image from clipboard uploaded successfully!");
                     } catch (err) {
                         console.error(err);
-                        showToast(err.message || "Gagal mengompres gambar dari clipboard.");
+                        showToast(err.message || "Failed to compress image from clipboard.");
                     }
                     break;
                 }
@@ -595,13 +602,13 @@ function renderGrid() {
         });
 
         card.querySelector('.del-btn').addEventListener('click', async () => {
-            if (safeConfirm("Hapus catatan ini selamanya?")) {
+            if (safeConfirm("Delete this note permanently?")) {
                 const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', item.id);
                 try {
                     await deleteDoc(noteRef);
-                    showToast("Catatan dihapus");
+                    showToast("Note deleted");
                 } catch(err) {
-                    showToast("Gagal menghapus");
+                    showToast("Failed to delete note");
                 }
             }
         });
@@ -614,7 +621,7 @@ function renderGrid() {
                     item.updatedAt = Date.now();
                     await forceSaveNoteToServer(item);
                     renderGrid();
-                    showToast("Catatan dipindahkan!");
+                    showToast("Note moved!");
                 }
             });
         }
@@ -629,7 +636,7 @@ function renderGrid() {
             // Remove image
             card.querySelector('.btn-remove-image').addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (safeConfirm("Hapus gambar dari catatan ini?")) {
+                if (safeConfirm("Delete the image from this note?")) {
                     item.image = null;
                     item.updatedAt = Date.now();
                     forceSaveNoteToServer(item);
@@ -670,10 +677,10 @@ function renderGrid() {
                     item.updatedAt = Date.now();
                     await forceSaveNoteToServer(item);
                     renderGrid();
-                    showToast("Gambar berhasil diunggah!");
+                    showToast("Image uploaded successfully!");
                 } catch (err) {
                     console.error(err);
-                    showToast(err.message || "Gagal mengompres gambar.");
+                    showToast(err.message || "Failed to compress image.");
                     uploadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`;
                     uploadBtn.disabled = false;
                 }
@@ -694,7 +701,7 @@ DOM.btnLock.addEventListener('click', lockApp);
 DOM.btnAddNote.addEventListener('click', async () => {
     if(viewMode === 'archived') {
         viewMode = 'active';
-        DOM.btnToggleViewText.textContent = "Lihat Arsip";
+        DOM.btnToggleViewText.textContent = "View Archive";
     }
     
     const newNoteId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -720,7 +727,7 @@ DOM.btnAddNote.addEventListener('click', async () => {
 
 DOM.btnToggleView.addEventListener('click', () => {
     viewMode = viewMode === 'active' ? 'archived' : 'active';
-    DOM.btnToggleViewText.textContent = viewMode === 'active' ? "Lihat Arsip" : "Kembali ke Aktif";
+    DOM.btnToggleViewText.textContent = viewMode === 'active' ? "View Archive" : "Back to Active";
     DOM.btnToggleView.classList.toggle('btn-primary');
     renderGrid();
 });
@@ -816,7 +823,7 @@ function compressImage(file, maxSizeKB = 256) {
     return new Promise((resolve, reject) => {
         // Validate it's an image file
         if (!file.type.startsWith('image/')) {
-            reject(new Error("File yang dipilih bukan gambar."));
+            reject(new Error("The selected file is not an image."));
             return;
         }
 
@@ -878,14 +885,14 @@ function compressImage(file, maxSizeKB = 256) {
                 }
 
                 if (getKBSize(base64) > maxSizeKB) {
-                    reject(new Error(`Gambar terlalu besar. Kompresi maksimal hanya berhasil menurunkan ukuran ke ${Math.round(getKBSize(base64))} KB.`));
+                    reject(new Error(`Image is too large. Maximum compression only succeeded in reducing size to ${Math.round(getKBSize(base64))} KB.`));
                 } else {
                     resolve(base64);
                 }
             };
-            img.onerror = (err) => reject(new Error("Gagal memuat gambar untuk kompresi."));
+            img.onerror = (err) => reject(new Error("Failed to load image for compression."));
         };
-        reader.onerror = (err) => reject(new Error("Gagal membaca file gambar."));
+        reader.onerror = (err) => reject(new Error("Failed to read image file."));
     });
 }
 

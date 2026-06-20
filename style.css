@@ -345,6 +345,10 @@ header {
 }
 
 #btnMobileMenu {
+    display: none;
+}
+
+.sidebar.collapsed ~ .main-content #btnMobileMenu {
     display: inline-flex;
 }
 
@@ -432,6 +436,26 @@ header {
 .badge:hover { background: var(--bg-hover); border-color: var(--border); }
 .badge.active-pin { background: var(--warning); color: #fff; box-shadow: 0 2px 5px rgba(245, 158, 11, 0.4); }
 .badge.active-arc { background: var(--text-muted); color: #fff; }
+
+select.badge {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-right: 20px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    background-size: 8px;
+    border: 1px solid transparent;
+    outline: none;
+    color: var(--text-muted);
+    font-family: inherit;
+}
+
+select.badge option {
+    background: var(--bg-surface);
+    color: var(--text-main);
+}
 
 .card-body {
     background: transparent;
