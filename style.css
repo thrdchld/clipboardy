@@ -201,6 +201,10 @@ h1, h2, h3 { color: var(--text-main); }
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.sidebar-content, .brand, .sidebar-footer {
+    width: 260px; /* Keep children at fixed width so layout doesn't squash during collapse */
+}
+
 /* Sidebar Collapsed State (Desktop) */
 @media (min-width: 769px) {
     .sidebar.collapsed {
@@ -341,7 +345,7 @@ header {
 }
 
 #btnMobileMenu {
-    display: none;
+    display: inline-flex;
 }
 
 .header-title h2 { font-size: 1.2em; font-weight: 700; }
@@ -446,24 +450,31 @@ header {
 
 .card-footer {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 15px;
-    padding-top: 15px;
+    flex-direction: column;
+    margin-top: auto; /* Push footer to bottom of card */
+    padding-top: 12px;
     border-top: 1px solid var(--border);
-    flex-wrap: wrap;
-    gap: 10px;
+    gap: 12px;
 }
 
 .card-stats {
-    font-size: 0.7em;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75em;
     color: var(--text-muted);
     font-weight: 500;
-    display: flex;
-    flex-direction: column;
+    width: 100%;
 }
 
-.card-actions { display: flex; gap: 8px;}
+.card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 100%;
+    flex-wrap: wrap;
+}
 .action-btn {
     background: var(--bg-base);
     border: none;
@@ -614,29 +625,44 @@ header {
     transform: scale(1.03);
 }
 
-.btn-remove-image {
+.btn-remove-image, .btn-download-image {
     position: absolute;
     top: 8px;
-    right: 8px;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(15, 23, 42, 0.75); /* Modern dark slate backdrop */
     color: white;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    font-size: 16px;
-    line-height: 22px;
-    text-align: center;
+    width: 32px;
+    height: 32px;
     cursor: pointer;
-    backdrop-filter: blur(2px);
-    transition: background 0.2s, transform 0.2s;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: var(--shadow-sm);
+    z-index: 10;
+}
+
+.btn-remove-image {
+    right: 8px;
+}
+
+.btn-download-image {
+    left: 8px;
 }
 
 .btn-remove-image:hover {
     background: var(--danger);
+    color: white;
+    border-color: var(--danger);
+    transform: scale(1.1);
+}
+
+.btn-download-image:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
     transform: scale(1.1);
 }
 
@@ -647,3 +673,24 @@ header {
 #lightboxModal:not(.hidden) #lightboxImage {
     transform: scale(1) !important;
 }
+
+/* WCAG Accessible Focus Outlines */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.badge:focus-visible,
+.folder-item:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Spinner Animation for Uploading state */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+.spinner {
+    animation: spin 1s linear infinite;
+}
+

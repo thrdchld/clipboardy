@@ -165,7 +165,7 @@ function lockApp() {
         DOM.passwordInput.value = '';
     }, 100);
     
-    showToast("🔒 Terkunci");
+    showToast("Aplikasi dikunci");
     closeMobileSidebar();
 }
 
@@ -313,16 +313,35 @@ function renderFolders() {
     folders.forEach(f => {
         const li = document.createElement('li');
         li.className = `folder-item ${f.id === currentFolderId ? 'active' : ''}`;
+        li.setAttribute('tabindex', '0');
+        li.setAttribute('role', 'button');
+        li.setAttribute('aria-label', `Folder ${f.name}`);
+        
+        const folderNameWrapper = document.createElement('div');
+        folderNameWrapper.style.display = 'flex';
+        folderNameWrapper.style.alignItems = 'center';
+        folderNameWrapper.style.gap = '8px';
+        
+        const folderIcon = document.createElement('span');
+        folderIcon.className = 'folder-icon-wrapper';
+        folderIcon.style.display = 'inline-flex';
+        folderIcon.style.alignItems = 'center';
+        folderIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+        folderNameWrapper.appendChild(folderIcon);
         
         const nameSpan = document.createElement('span');
         nameSpan.textContent = f.name;
-        li.appendChild(nameSpan);
+        folderNameWrapper.appendChild(nameSpan);
+        li.appendChild(folderNameWrapper);
         
         if (f.id !== 'default') {
             const actions = document.createElement('div');
             actions.className = 'folder-actions';
             const btnDel = document.createElement('button');
-            btnDel.innerHTML = '🗑️';
+            btnDel.className = 'btn-delete-folder';
+            btnDel.setAttribute('title', 'Hapus Folder');
+            btnDel.setAttribute('aria-label', `Hapus Folder ${f.name}`);
+            btnDel.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
             btnDel.onclick = (e) => {
                 e.stopPropagation();
                 deleteFolder(f.id);
@@ -332,6 +351,12 @@ function renderFolders() {
         }
         
         li.onclick = () => switchFolder(f.id);
+        li.onkeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                switchFolder(f.id);
+            }
+        };
         DOM.folderList.appendChild(li);
     });
 }
@@ -415,33 +440,33 @@ function renderGrid() {
         const imageHtml = item.image ? `
             <div class="card-image-wrapper">
                 <img src="${item.image}" class="card-image" alt="Catatan Gambar">
-                <button class="btn-remove-image" title="Hapus Gambar">&times;</button>
+                <button class="btn-download-image" title="Download Gambar" aria-label="Download Gambar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                </button>
+                <button class="btn-remove-image" title="Hapus Gambar" aria-label="Hapus Gambar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
         ` : '';
 
-        const downloadBtnHtml = item.image ? `
-            <button class="action-btn download-btn" title="Download Gambar" style="display:inline-flex; align-items:center; gap:4px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Download
-            </button>
-        ` : '';
+        const downloadBtnHtml = '';
 
         const uploadBtnHtml = item.image ? '' : `
-            <button class="action-btn upload-btn" title="Unggah Gambar" style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px;">
+            <button class="action-btn upload-btn" title="Unggah Gambar" aria-label="Unggah Gambar" style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             </button>
-            <input type="file" class="card-file-input" accept="image/*" style="display: none;">
+            <input type="file" class="card-file-input" accept="image/*" style="display: none;" aria-label="Unggah Gambar">
         `;
 
         let moveOptions = `<option value="" disabled selected>Pindahkan...</option>`;
         folders.forEach(f => {
             if (f.id !== currentFolderId) {
-                moveOptions += `<option value="${f.id}">📁 ${f.name}</option>`;
+                moveOptions += `<option value="${f.id}">${f.name}</option>`;
             }
         });
 
         const moveSelectHtml = folders.length > 1 ? `
-            <select class="action-btn move-select" title="Pindahkan Catatan" style="max-width: 95px; text-overflow: ellipsis; cursor: pointer;">
+            <select class="action-btn move-select" title="Pindahkan Catatan" aria-label="Pindahkan Catatan" style="max-width: 95px; text-overflow: ellipsis; cursor: pointer;">
                 ${moveOptions}
             </select>
         ` : '';
@@ -449,18 +474,18 @@ function renderGrid() {
         card.innerHTML = `
             <div class="card-header">
                 <div class="card-badges">
-                    <span class="badge pin-btn ${item.pinned ? 'active-pin' : ''}" style="display:inline-flex; align-items:center; gap:4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A.5.5 0 0 0 6.36 14h11.28a.5.5 0 0 0 .25-.56l-1.78-.89a2 2 0 0 1-1.11-1.79V4H9v6.76zM8 4h8M10 2h4"/></svg>
+                    <span class="badge pin-btn ${item.pinned ? 'active-pin' : ''}" role="button" tabindex="0" aria-label="${item.pinned ? 'Lepas Pin Catatan' : 'Pin Catatan'}" style="display:inline-flex; align-items:center; gap:4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A.5.5 0 0 0 6.36 14h11.28a.5.5 0 0 0 .25-.56l-1.78-.89a2 2 0 0 1-1.11-1.79V4H9v6.76zM8 4h8M10 2h4"/></svg>
                         ${item.pinned ? 'Pinned' : 'Pin'}
                     </span>
-                    <span class="badge arc-btn ${item.archived ? 'active-arc' : ''}" style="display:inline-flex; align-items:center; gap:4px;">
+                    <span class="badge arc-btn ${item.archived ? 'active-arc' : ''}" role="button" tabindex="0" aria-label="${item.archived ? 'Kembalikan dari Arsip' : 'Arsipkan Catatan'}" style="display:inline-flex; align-items:center; gap:4px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
                         ${item.archived ? 'Unarchive' : 'Archive'}
                     </span>
                 </div>
             </div>
             ${imageHtml}
-            <textarea class="card-body" placeholder="Ketik sesuatu...">${item.text}</textarea>
+            <textarea class="card-body" placeholder="Ketik sesuatu..." aria-label="Isi Catatan">${item.text}</textarea>
             <div class="card-footer">
                 <div class="card-stats">
                     <span class="card-date">${dateStr}</span>
@@ -468,13 +493,12 @@ function renderGrid() {
                 </div>
                 <div class="card-actions">
                     ${uploadBtnHtml}
-                    ${downloadBtnHtml}
                     ${moveSelectHtml}
-                    <button class="action-btn copy-btn" style="display:inline-flex; align-items:center; gap:4px;">
+                    <button class="action-btn copy-btn" title="Salin Catatan" aria-label="Salin Catatan" style="display:inline-flex; align-items:center; gap:4px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                         Copy
                     </button>
-                    <button class="action-btn del del-btn" style="display:inline-flex; align-items:center; gap:4px;">
+                    <button class="action-btn del del-btn" title="Hapus Catatan" aria-label="Hapus Catatan" style="display:inline-flex; align-items:center; gap:4px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         Hapus
                     </button>
@@ -504,7 +528,7 @@ function renderGrid() {
                     const file = items[i].getAsFile();
                     if (!file) continue;
 
-                    showToast("⏳ Mengompres gambar dari clipboard...");
+                    showToast("Mengompres gambar dari clipboard...");
                     
                     try {
                         const compressedBase64 = await compressImage(file, 256);
@@ -522,30 +546,49 @@ function renderGrid() {
             }
         });
 
-        card.querySelector('.pin-btn').addEventListener('click', () => {
+        const pinBtn = card.querySelector('.pin-btn');
+        const togglePin = () => {
             item.pinned = !item.pinned;
             item.updatedAt = Date.now();
             forceSaveNoteToServer(item);
             renderGrid();
+        };
+        pinBtn.addEventListener('click', togglePin);
+        pinBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                togglePin();
+            }
         });
 
-        card.querySelector('.arc-btn').addEventListener('click', () => {
+        const arcBtn = card.querySelector('.arc-btn');
+        const toggleArc = () => {
             item.archived = !item.archived;
             if (item.archived) item.pinned = false; 
             item.updatedAt = Date.now();
             forceSaveNoteToServer(item);
             renderGrid();
+        };
+        arcBtn.addEventListener('click', toggleArc);
+        arcBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleArc();
+            }
         });
 
         const copyBtn = card.querySelector('.copy-btn');
         copyBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(textInput.value).then(() => {
                 // Micro-animation
-                const originalText = copyBtn.textContent;
-                copyBtn.textContent = "Copied! ✅";
+                const originalContent = copyBtn.innerHTML;
+                copyBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Copied!
+                `;
                 copyBtn.classList.add('copied');
                 setTimeout(() => {
-                    copyBtn.textContent = originalText;
+                    copyBtn.innerHTML = originalContent;
                     copyBtn.classList.remove('copied');
                 }, 2000);
             });
@@ -594,8 +637,8 @@ function renderGrid() {
                 }
             });
 
-            // Download image
-            card.querySelector('.download-btn').addEventListener('click', (e) => {
+            // Download image overlay
+            card.querySelector('.btn-download-image').addEventListener('click', (e) => {
                 e.stopPropagation();
                 downloadImage(item.image, `image-${item.id}`);
             });
@@ -618,7 +661,7 @@ function renderGrid() {
                 const file = e.target.files[0];
                 if (!file) return;
 
-                uploadBtn.textContent = "⏳...";
+                uploadBtn.innerHTML = `<svg class="spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>`;
                 uploadBtn.disabled = true;
 
                 try {
@@ -741,6 +784,7 @@ DOM.btnDownloadLightbox.addEventListener('click', () => {
 
 // Utility
 function downloadImage(base64Data, baseFilename = 'image') {
+    ignoreBlur = true;
     const link = document.createElement('a');
     link.href = base64Data;
     
@@ -755,6 +799,10 @@ function downloadImage(base64Data, baseFilename = 'image') {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    
+    setTimeout(() => {
+        ignoreBlur = false;
+    }, 1000);
 }
 
 function showToast(msg) {
