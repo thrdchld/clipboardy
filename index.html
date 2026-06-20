@@ -4,90 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clipboardy Pro</title>
-    <style>
-        :root {
-            --bg: #f4f6f8;
-            --card: #ffffff;
-            --text: #1f2937;
-            --muted: #6b7280;
-            --primary: #3b82f6;
-            --primary-hover: #2563eb;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --border: #e5e7eb;
-            --radius: 12px;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #111827;
-                --card: #1f2937;
-                --text: #f9fafb;
-                --muted: #9ca3af;
-                --primary: #3b82f6;
-                --primary-hover: #60a5fa;
-                --border: #374151;
-                --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-            }
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: var(--bg); color: var(--text); line-height: 1.5; overflow-x: hidden; transition: background-color 0.3s; }
-        .hidden { display: none !important; }
-
-        /* Login Screen */
-        #authScreen { position: fixed; inset: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
-        .auth-box { background: var(--card); padding: 40px; border-radius: var(--radius); box-shadow: var(--shadow); width: 100%; max-width: 400px; text-align: center; border: 1px solid var(--border); }
-        .auth-box h1 { margin-bottom: 10px; font-size: 1.8em; }
-        .auth-box p { color: var(--muted); margin-bottom: 25px; font-size: 0.95em; }
-        .auth-box input { width: 100%; padding: 14px; margin-bottom: 20px; border: 2px solid var(--border); border-radius: var(--radius); font-size: 1.2em; text-align: center; background: var(--bg); color: var(--text); outline: none; transition: 0.2s; }
-        .auth-box input:focus { border-color: var(--primary); }
-        .auth-box button { width: 100%; padding: 14px; border: none; border-radius: var(--radius); background: var(--primary); color: white; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .auth-box button:hover { background: var(--primary-hover); }
-
-        /* Main App Header */
-        header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 15px 25px; background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; gap: 15px;}
-        .brand { font-size: 1.4em; font-weight: 800; display: flex; align-items: center; gap: 10px; }
-        .status-dot { width: 10px; height: 10px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #10b981;}
-        .saving-dot { background: var(--warning); box-shadow: 0 0 8px var(--warning); animation: pulse 1s infinite;}
-        
-        .header-actions { display: flex; gap: 10px; flex-wrap: wrap; flex-grow: 1; justify-content: flex-end; align-items: center;}
-        .search-bar { padding: 10px 15px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none; width: 100%; max-width: 250px;}
-        .search-bar:focus { border-color: var(--primary); }
-        
-        .btn { background: var(--bg); border: 1px solid var(--border); padding: 8px 14px; border-radius: 20px; color: var(--text); font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 0.9em;}
-        .btn:hover { background: var(--border); }
-        .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
-        .btn-primary:hover { background: var(--primary-hover); }
-
-        /* Grid */
-        main { padding: 25px; max-width: 1400px; margin: 0 auto; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        
-        .card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; border: 1px solid var(--border); transition: 0.2s; position: relative;}
-        .card:focus-within { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
-        .card.pinned { border-left: 4px solid var(--warning); }
-        
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .card-badges { display: flex; gap: 5px; }
-        .badge { background: var(--bg); color: var(--muted); font-size: 0.75em; padding: 3px 8px; border-radius: 10px; font-weight: bold; cursor: pointer; user-select: none;}
-        .badge.active-pin { background: var(--warning); color: #fff; }
-        .badge.active-arc { background: var(--muted); color: #fff; }
-        
-        .card-body { background: transparent; border: none; color: var(--text); width: 100%; resize: none; outline: none; flex-grow: 1; min-height: 150px; font-size: 1em; line-height: 1.6; }
-        
-        .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); }
-        .card-date { font-size: 0.75em; color: var(--muted); }
-        .card-actions button { background: transparent; border: none; cursor: pointer; color: var(--primary); font-weight: 600; margin-left: 12px; font-size: 0.9em; transition: 0.2s;}
-        .card-actions button:hover { opacity: 0.7; }
-        .card-actions button.del { color: var(--danger); }
-
-        /* Toast & Animations */
-        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #222; color: white; padding: 12px 24px; border-radius: 30px; font-weight: 500; z-index: 2000; box-shadow: 0 5px 15px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s; pointer-events: none;}
-        #toast.show { opacity: 1; }
-        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
-    </style>
+    <!-- Modern Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -95,372 +16,79 @@
     <div id="authScreen">
         <div class="auth-box">
             <h1>📋 Clipboardy Pro</h1>
-            <p>Masukkan password rahasia Anda.</p>
-            <!-- Anda cukup mengetik 'tc' di sini saat aplikasi dijalankan -->
-            <input type="password" id="passwordInput" placeholder="Password Ruangan" autofocus>
-            <button id="loginBtn">Buka Ruangan</button>
+            <p class="text-muted">Masukkan password rahasia Anda.</p>
+            <input type="password" id="passwordInput" class="input-field" placeholder="Password Ruangan" autofocus>
+            <button id="loginBtn" class="btn btn-primary">Buka Ruangan</button>
         </div>
     </div>
 
-    <!-- Main App -->
+    <!-- Main App Layout -->
     <div id="appScreen" class="hidden">
-        <header>
+        
+        <!-- Sidebar for Folders -->
+        <aside class="sidebar">
             <div class="brand">
                 📋 Clipboardy
-                <div style="display: flex; align-items: center; gap: 5px;">
-                    <span id="syncIndicator" class="status-dot" title="Live Sync Active"></span>
+                <span id="syncIndicator" class="status-dot" title="Live Sync Active"></span>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="section-title">
+                    <span>Folders</span>
+                    <button id="btnAddFolder" class="add-folder-btn" title="Tambah Folder Baru">+</button>
                 </div>
+                <ul id="folderList" class="folder-list">
+                    <!-- Folders render here via JS -->
+                </ul>
             </div>
-            <div class="header-actions">
-                <input type="text" id="searchInput" class="search-bar" placeholder="Cari catatan...">
-                <button id="btnToggleView" class="btn">Lihat Arsip</button>
-                <button id="btnAdd" class="btn btn-primary">+ Catatan Baru</button>
-                <button id="btnLock" class="btn">🔒 Kunci</button>
-            </div>
-        </header>
+        </aside>
 
-        <main>
-            <div id="clipGrid" class="grid">
-                <!-- Cards render here -->
-            </div>
-            <div id="emptyState" class="hidden" style="text-align: center; color: var(--muted); margin-top: 50px;">
-                Belum ada catatan. Klik "+ Catatan Baru" untuk mulai.
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header>
+                <div class="header-title">
+                    <!-- Optional: we can update this via JS but static is fine -->
+                </div>
+                <div class="header-actions">
+                    <div class="search-container">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="searchInput" placeholder="Cari catatan...">
+                    </div>
+                    <button id="btnToggleView" class="btn">Lihat Arsip</button>
+                    <button id="btnAddNote" class="btn btn-primary">+ Catatan Baru</button>
+                    <button id="btnLock" class="btn btn-danger">🔒 Kunci</button>
+                </div>
+            </header>
+
+            <div class="main-scroll">
+                <div id="clipGrid" class="grid">
+                    <!-- Cards render here via JS -->
+                </div>
+                <div id="emptyState" class="empty-state hidden">
+                    <div class="empty-state-icon">📝</div>
+                    <h3>Belum ada catatan</h3>
+                    <p>Klik "+ Catatan Baru" untuk mulai menulis di folder ini.</p>
+                </div>
             </div>
         </main>
     </div>
 
+    <!-- Folder Creation Modal -->
+    <div id="folderModal" class="modal-overlay hidden">
+        <div class="modal">
+            <h3>Buat Folder Baru</h3>
+            <input type="text" id="folderNameInput" class="input-field" placeholder="Nama Folder (cth: Pekerjaan)" autocomplete="off">
+            <div class="modal-actions">
+                <button id="btnCancelFolder" class="btn">Batal</button>
+                <button id="btnSaveFolder" class="btn btn-primary">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
     <div id="toast"></div>
 
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // ==========================================
-        // 🔧 KONFIGURASI FIREBASE ANDA
-        // ==========================================
-        const firebaseConfig = {
-            apiKey: "AIzaSyAIkIoF6iT4LfUbt0C03053vfyDpm3YsuA",
-            authDomain: "my-clipboardy.firebaseapp.com",
-            projectId: "my-clipboardy",
-            storageBucket: "my-clipboardy.firebasestorage.app",
-            messagingSenderId: "302329908136",
-            appId: "1:302329908136:web:32f057d0e82a136c91eb9d"
-        };
-        
-        // Init Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // ==========================================
-        // 💾 STATE MANAGEMENT
-        // ==========================================
-        let currentUser = null;
-        let currentRoomHash = null;
-        let unsubscribeSnapshot = null;
-        let notesArray = []; 
-        let autoSaveTimeout = null;
-        let isAppLocked = true;
-        let viewMode = 'active'; // 'active' atau 'archived'
-        let searchQuery = '';
-
-        // DOM Elements
-        const DOM = {
-            authScreen: document.getElementById('authScreen'),
-            appScreen: document.getElementById('appScreen'),
-            passwordInput: document.getElementById('passwordInput'),
-            loginBtn: document.getElementById('loginBtn'),
-            clipGrid: document.getElementById('clipGrid'),
-            emptyState: document.getElementById('emptyState'),
-            btnAdd: document.getElementById('btnAdd'),
-            btnLock: document.getElementById('btnLock'),
-            btnToggleView: document.getElementById('btnToggleView'),
-            searchInput: document.getElementById('searchInput'),
-            syncIndicator: document.getElementById('syncIndicator'),
-            toast: document.getElementById('toast')
-        };
-
-        // ==========================================
-        // 🔒 AUTHENTICATION & SECURITY
-        // ==========================================
-        
-        // Connect Anonymous Auth
-        signInAnonymously(auth).catch(err => alert("Gagal koneksi: " + err.message));
-        onAuthStateChanged(auth, user => currentUser = user);
-
-        // Hashing Password -> Room ID
-        async function hashPassword(password) {
-            const msgUint8 = new TextEncoder().encode(password);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        function lockApp() {
-            if (isAppLocked) return;
-            isAppLocked = true;
-            
-            // 🚨 SECURITY: Bersihkan memori secara paksa
-            currentRoomHash = null;
-            notesArray = [];
-            sessionStorage.clear();
-            DOM.clipGrid.innerHTML = ''; 
-            
-            if (unsubscribeSnapshot) {
-                unsubscribeSnapshot();
-                unsubscribeSnapshot = null;
-            }
-            
-            DOM.appScreen.classList.add('hidden');
-            DOM.authScreen.classList.remove('hidden');
-            DOM.passwordInput.value = '';
-            DOM.passwordInput.focus();
-            showToast("🔒 Terkunci");
-        }
-
-        async function login() {
-            const pwd = DOM.passwordInput.value.trim();
-            if (!pwd) return;
-            if (!currentUser) return showToast("Menunggu koneksi server...");
-
-            DOM.loginBtn.textContent = "Membuka...";
-            DOM.loginBtn.disabled = true;
-
-            try {
-                // Di sinilah password 'tc' Anda diproses menjadi kode unik database
-                currentRoomHash = await hashPassword(pwd);
-                startLiveSync();
-                
-                isAppLocked = false;
-                DOM.authScreen.classList.add('hidden');
-                DOM.appScreen.classList.remove('hidden');
-                DOM.passwordInput.value = ''; // Hapus dari UI memori
-                
-            } catch (err) {
-                showToast("Terjadi kesalahan.");
-            } finally {
-                DOM.loginBtn.textContent = "Buka Ruangan";
-                DOM.loginBtn.disabled = false;
-            }
-        }
-
-        // ==========================================
-        // 📡 DATABASE SYNC & AUTOSAVE
-        // ==========================================
-        
-        function getRoomDocRef() {
-            // Path langsung ke project Firebase Anda
-            return doc(db, 'clipboards', currentRoomHash);
-        }
-
-        function startLiveSync() {
-            if (!currentRoomHash) return;
-            
-            unsubscribeSnapshot = onSnapshot(getRoomDocRef(), (docSnap) => {
-                if (docSnap.exists()) {
-                    notesArray = docSnap.data().notes || [];
-                } else {
-                    notesArray = [];
-                }
-                renderGrid();
-                
-                // Indikator sync sukses
-                DOM.syncIndicator.classList.remove('saving-dot');
-            }, (error) => {
-                console.error("Sync Error", error);
-                if (error.code === 'permission-denied') {
-                    showToast("Error: Cek Rules Firestore Anda!");
-                } else {
-                    showToast("Terputus dari sinkronisasi");
-                }
-            });
-        }
-
-        async function forceSaveToServer() {
-            if (!currentRoomHash || isAppLocked) return;
-            
-            DOM.syncIndicator.classList.add('saving-dot'); // UI Feedback saving
-            
-            try {
-                await setDoc(getRoomDocRef(), { 
-                    notes: notesArray,
-                    lastUpdate: serverTimestamp() 
-                }, { merge: true });
-            } catch (error) {
-                console.error(error);
-                showToast("Gagal menyimpan ke cloud");
-            }
-        }
-
-        // Debounce Autosave (Tunggu 1.5 detik setelah ketik berhenti)
-        function triggerAutoSave() {
-            DOM.syncIndicator.classList.add('saving-dot');
-            clearTimeout(autoSaveTimeout);
-            autoSaveTimeout = setTimeout(() => {
-                forceSaveToServer();
-            }, 1500);
-        }
-
-        // ==========================================
-        // 🎨 UI RENDERING & LOGIC
-        // ==========================================
-
-        function renderGrid() {
-            if (isAppLocked) return;
-            DOM.clipGrid.innerHTML = "";
-            
-            // 1. Filtering
-            let filtered = notesArray.filter(n => {
-                const matchesView = viewMode === 'archived' ? n.archived : !n.archived;
-                const matchesSearch = n.text.toLowerCase().includes(searchQuery);
-                return matchesView && matchesSearch;
-            });
-
-            // 2. Sorting
-            filtered.sort((a, b) => {
-                if (a.pinned === b.pinned) return b.updatedAt - a.updatedAt;
-                return a.pinned ? -1 : 1;
-            });
-
-            if (filtered.length === 0) {
-                DOM.emptyState.classList.remove('hidden');
-            } else {
-                DOM.emptyState.classList.add('hidden');
-            }
-
-            // 3. Render Cards
-            filtered.forEach(item => {
-                const card = document.createElement('div');
-                card.className = `card ${item.pinned ? 'pinned' : ''}`;
-                
-                const dateStr = new Date(item.updatedAt).toLocaleString('id-ID', {day:'numeric', month:'short', hour: '2-digit', minute:'2-digit'});
-
-                card.innerHTML = `
-                    <div class="card-header">
-                        <div class="card-badges">
-                            <span class="badge pin-btn ${item.pinned ? 'active-pin' : ''}">${item.pinned ? '📌 Pinned' : '📌 Pin'}</span>
-                            <span class="badge arc-btn ${item.archived ? 'active-arc' : ''}">${item.archived ? '📦 Unarchive' : '📦 Archive'}</span>
-                        </div>
-                    </div>
-                    <textarea class="card-body" placeholder="Ketik sesuatu...">${item.text}</textarea>
-                    <div class="card-footer">
-                        <span class="card-date">${dateStr}</span>
-                        <div class="card-actions">
-                            <button class="copy-btn">Copy</button>
-                            <button class="del-btn del">Hapus</button>
-                        </div>
-                    </div>
-                `;
-                
-                // Edit Text -> Autosave
-                const textInput = card.querySelector('.card-body');
-                textInput.addEventListener('input', (e) => {
-                    const idx = notesArray.findIndex(n => n.id === item.id);
-                    if(idx > -1) {
-                        notesArray[idx].text = e.target.value;
-                        notesArray[idx].updatedAt = Date.now();
-                        triggerAutoSave();
-                    }
-                });
-
-                // Toggle Pin
-                card.querySelector('.pin-btn').addEventListener('click', () => {
-                    const idx = notesArray.findIndex(n => n.id === item.id);
-                    notesArray[idx].pinned = !notesArray[idx].pinned;
-                    notesArray[idx].updatedAt = Date.now(); 
-                    renderGrid(); 
-                    triggerAutoSave();
-                });
-
-                // Toggle Archive
-                card.querySelector('.arc-btn').addEventListener('click', () => {
-                    const idx = notesArray.findIndex(n => n.id === item.id);
-                    notesArray[idx].archived = !notesArray[idx].archived;
-                    if (notesArray[idx].archived) notesArray[idx].pinned = false; 
-                    renderGrid(); 
-                    triggerAutoSave();
-                });
-
-                // Copy Text
-                card.querySelector('.copy-btn').addEventListener('click', () => {
-                    navigator.clipboard.writeText(textInput.value).then(() => {
-                        showToast("Tersalin ke Clipboard!");
-                    });
-                });
-
-                // Delete Note
-                card.querySelector('.del-btn').addEventListener('click', () => {
-                    if (confirm("Hapus catatan ini selamanya?")) {
-                        notesArray = notesArray.filter(n => n.id !== item.id);
-                        renderGrid();
-                        forceSaveToServer(); 
-                    }
-                });
-
-                DOM.clipGrid.appendChild(card);
-            });
-        }
-
-        // ==========================================
-        // 🎮 GLOBAL EVENT LISTENERS
-        // ==========================================
-
-        DOM.loginBtn.addEventListener('click', login);
-        DOM.passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
-        DOM.btnLock.addEventListener('click', lockApp);
-
-        DOM.btnAdd.addEventListener('click', () => {
-            if(viewMode === 'archived') {
-                viewMode = 'active';
-                DOM.btnToggleView.textContent = "Lihat Arsip";
-            }
-            
-            const newNote = {
-                id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
-                text: "",
-                pinned: false,
-                archived: false,
-                updatedAt: Date.now()
-            };
-            
-            notesArray.unshift(newNote); 
-            renderGrid();
-            forceSaveToServer(); 
-            
-            setTimeout(() => {
-                const firstInput = DOM.clipGrid.querySelector('.card-body');
-                if (firstInput) firstInput.focus();
-            }, 50);
-        });
-
-        DOM.btnToggleView.addEventListener('click', () => {
-            viewMode = viewMode === 'active' ? 'archived' : 'active';
-            DOM.btnToggleView.textContent = viewMode === 'active' ? "Lihat Arsip" : "Lihat Aktif";
-            DOM.btnToggleView.classList.toggle('btn-primary');
-            renderGrid();
-        });
-
-        DOM.searchInput.addEventListener('input', (e) => {
-            searchQuery = e.target.value.toLowerCase();
-            renderGrid();
-        });
-
-        // 🚨 SECURITY: Auto-Lock
-        document.addEventListener("visibilitychange", () => {
-            if (document.hidden && !isAppLocked) lockApp();
-        });
-        window.addEventListener("blur", () => {
-            if (!isAppLocked) lockApp();
-        });
-
-        function showToast(msg) {
-            DOM.toast.textContent = msg;
-            DOM.toast.classList.add('show');
-            setTimeout(() => DOM.toast.classList.remove('show'), 2500);
-        }
-
-    </script>
+    <!-- Scripts -->
+    <script type="module" src="app.js"></script>
 </body>
 </html>
