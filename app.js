@@ -635,8 +635,6 @@ function renderGrid() {
                     uploadBtn.disabled = false;
                 }
             });
-        }           }
-            });
         }
 
         DOM.clipGrid.appendChild(card);
@@ -842,3 +840,6 @@ function compressImage(file, maxSizeKB = 256) {
         reader.onerror = (err) => reject(new Error("Gagal membaca file gambar."));
     });
 }
+
+// Exports for unit testing
+export { hashPassword, countWordsAndChars, login, lockApp, isAppLocked, currentUser, currentRoomHash, ignoreBlur, safeConfirm };
