@@ -85,11 +85,31 @@
             </div>
             
             <div class="sidebar-footer">
-                <label class="toggle-container" title="Lock application instantly when switching tabs">
-                    <input type="checkbox" id="strictLockToggle" checked>
-                    <span class="slider"></span>
-                    <span class="toggle-label">Strict Auto-Lock</span>
-                </label>
+                <div class="footer-setting" style="margin-bottom: 12px;">
+                    <label class="toggle-container" title="Lock application instantly when switching tabs or minimizing">
+                        <input type="checkbox" id="strictLockToggle" checked>
+                        <span class="slider"></span>
+                        <span class="toggle-label">Strict Lock</span>
+                    </label>
+                </div>
+                <div class="footer-setting" style="margin-bottom: 8px;">
+                    <label class="toggle-container" title="Lock application after a period of inactivity">
+                        <input type="checkbox" id="idleLockToggle">
+                        <span class="slider"></span>
+                        <span class="toggle-label">Idle Auto-Lock</span>
+                    </label>
+                </div>
+                <div id="idleTimeoutContainer" class="idle-timeout-container" style="display: none; align-items: center; gap: 8px; margin-top: 4px; padding-left: 46px;">
+                    <span style="font-size: 0.8em; color: var(--text-muted);">Timeout:</span>
+                    <select id="idleTimeoutSelect" style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-main); font-size: 0.8em; outline: none; cursor: pointer;">
+                        <option value="1">1 minute</option>
+                        <option value="2">2 minutes</option>
+                        <option value="5" selected>5 minutes</option>
+                        <option value="10">10 minutes</option>
+                        <option value="30">30 minutes</option>
+                        <option value="60">60 minutes</option>
+                    </select>
+                </div>
             </div>
         </aside>
 

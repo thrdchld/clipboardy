@@ -37,7 +37,9 @@ let searchQuery = '';
 let ignoreBlur = false;
 
 let autoLockTimer = null;
-const AUTO_LOCK_TIMEOUT = 5 * 60 * 1000; // 5 menit
+let strictLockEnabled = localStorage.getItem('strictLockEnabled') !== 'false';
+let idleLockEnabled = localStorage.getItem('idleLockEnabled') === 'true';
+let idleLockMinutes = parseInt(localStorage.getItem('idleLockMinutes')) || 5;
 
 const saveTimeouts = new Map(); // Debounce map per note ID
 
@@ -53,6 +55,9 @@ const DOM = {
     btnMobileMenu: document.getElementById('btnMobileMenu'),
     
     strictLockToggle: document.getElementById('strictLockToggle'),
+    idleLockToggle: document.getElementById('idleLockToggle'),
+    idleTimeoutSelect: document.getElementById('idleTimeoutSelect'),
+    idleTimeoutContainer: document.getElementById('idleTimeoutContainer'),
     
     clipGrid: document.getElementById('clipGrid'),
     emptyState: document.getElementById('emptyState'),
@@ -81,6 +86,20 @@ const DOM = {
     btnToggleViewText: document.getElementById('btnToggleViewText')
 };
 
+// Initialize settings state in DOM
+DOM.strictLockToggle.checked = strictLockEnabled;
+DOM.idleLockToggle.checked = idleLockEnabled;
+DOM.idleTimeoutSelect.value = idleLockMinutes.toString();
+updateIdleTimeoutVisibility();
+
+function updateIdleTimeoutVisibility() {
+    if (idleLockEnabled) {
+        DOM.idleTimeoutContainer.style.display = 'flex';
+    } else {
+        DOM.idleTimeoutContainer.style.display = 'none';
+    }
+}
+
 // ==========================================
 // 🔒 AUTH & AUTO-LOCK
 // ==========================================
@@ -94,12 +113,13 @@ async function hashPassword(password) {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Activity based auto-lock (5 mins)
+// Activity based auto-lock
 function resetAutoLockTimer() {
     if (isAppLocked) return;
-    if (DOM.strictLockToggle.checked) return; // Ignore timer if strict mode
     clearTimeout(autoLockTimer);
-    autoLockTimer = setTimeout(lockApp, AUTO_LOCK_TIMEOUT);
+    if (!idleLockEnabled) return;
+    const timeoutMs = idleLockMinutes * 60 * 1000;
+    autoLockTimer = setTimeout(lockApp, timeoutMs);
 }
 
 ['mousemove', 'keydown', 'scroll', 'click'].forEach(evt => {
@@ -109,7 +129,7 @@ function resetAutoLockTimer() {
 // Instant strict lock
 function checkStrictLock() {
     if (ignoreBlur) return;
-    if (!isAppLocked && DOM.strictLockToggle.checked) {
+    if (!isAppLocked && strictLockEnabled) {
         lockApp();
     }
 }
@@ -117,7 +137,6 @@ function checkStrictLock() {
 document.addEventListener("visibilitychange", () => {
     if (document.hidden) checkStrictLock();
 });
-window.addEventListener("blur", checkStrictLock);
 window.addEventListener("pagehide", checkStrictLock);
 
 // Helper safe confirm dialog to avoid blur auto-lock
@@ -142,6 +161,7 @@ window.addEventListener("focus", () => {
 function lockApp() {
     if (isAppLocked) return;
     isAppLocked = true;
+    clearTimeout(autoLockTimer);
     
     DOM.appScreen.classList.add('app-blur');
     
@@ -414,7 +434,14 @@ function countWordsAndChars(text) {
 
 function resizeTextarea(textarea) {
     textarea.style.height = 'auto';
-    textarea.style.height = (textarea.scrollHeight) + 'px';
+    const limit = 220; // limit height to 220px to look neat like Google Keep
+    if (textarea.scrollHeight > limit) {
+        textarea.style.height = limit + 'px';
+        textarea.style.overflowY = 'auto';
+    } else {
+        textarea.style.height = textarea.scrollHeight + 'px';
+        textarea.style.overflowY = 'hidden';
+    }
 }
 
 function renderGrid() {
@@ -750,12 +777,23 @@ DOM.btnClearSearch.addEventListener('click', () => {
     renderGrid();
 });
 
-// Strict Lock Toggle handling
+// Settings Event Handlers
 DOM.strictLockToggle.addEventListener('change', () => {
-    if (!DOM.strictLockToggle.checked) {
-        // If turned off, start the 5 min timer immediately
-        resetAutoLockTimer();
-    }
+    strictLockEnabled = DOM.strictLockToggle.checked;
+    localStorage.setItem('strictLockEnabled', strictLockEnabled);
+});
+
+DOM.idleLockToggle.addEventListener('change', () => {
+    idleLockEnabled = DOM.idleLockToggle.checked;
+    localStorage.setItem('idleLockEnabled', idleLockEnabled);
+    updateIdleTimeoutVisibility();
+    resetAutoLockTimer();
+});
+
+DOM.idleTimeoutSelect.addEventListener('change', () => {
+    idleLockMinutes = parseInt(DOM.idleTimeoutSelect.value) || 5;
+    localStorage.setItem('idleLockMinutes', idleLockMinutes);
+    resetAutoLockTimer();
 });
 
 // Modal Events

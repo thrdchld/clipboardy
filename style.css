@@ -389,24 +389,25 @@ header {
 
 /* Grid & Cards */
 .grid {
-    display: grid;
-    /* Responsive grid: min 280px on desktop, adapts dynamically */
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
-    align-items: start;
+    column-width: 280px;
+    column-gap: 20px;
+    display: block;
 }
 
 .card {
     background: var(--bg-surface);
     border-radius: var(--radius-md);
-    padding: 20px;
+    padding: 16px;
     box-shadow: var(--shadow-sm);
-    display: flex;
+    display: inline-flex;
     flex-direction: column;
+    width: 100%;
     border: 1px solid var(--border);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    min-height: 200px;
+    break-inside: avoid;
+    margin-bottom: 20px;
+    box-sizing: border-box;
 }
 
 .card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
@@ -463,14 +464,30 @@ select.badge option {
     color: var(--text-main);
     width: 100%;
     resize: none; /* Removed manual resize */
-    overflow: hidden; /* Removed scrollbar */
     outline: none;
     flex-grow: 1;
     font-size: 1.05em;
     line-height: 1.6;
-    min-height: 100px; /* Minimum height */
+    min-height: 60px; /* Minimum height */
+    max-height: 220px;
+    overflow-y: auto;
 }
 .card-body::placeholder { color: var(--text-muted); opacity: 0.6; }
+
+/* Custom scrollbar for card body */
+.card-body::-webkit-scrollbar {
+    width: 6px;
+}
+.card-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+.card-body::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+.card-body::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
 
 .card-footer {
     display: flex;
@@ -618,7 +635,7 @@ select.badge option {
     .fab-mobile .fab-text { display: none; }
     .fab-mobile .fab-icon { display: block !important; }
     
-    .grid { grid-template-columns: 1fr; }
+    .grid { column-count: 1; }
 }
 
 .fab-icon { display: none; }
