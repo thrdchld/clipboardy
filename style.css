@@ -362,16 +362,16 @@ header {
 
 .search-container { position: relative; display: flex; align-items: center;}
 .search-container input {
-    padding: 8px 36px 8px 36px;
+    padding: 8px 32px 8px 36px;
     border-radius: 20px;
     border: 1px solid var(--border);
     background: var(--bg-base);
     color: var(--text-main);
     outline: none;
-    width: 250px;
+    width: 280px;
     transition: border-color 0.2s, width 0.3s;
 }
-.search-container input:focus { border-color: var(--primary); width: 300px; }
+.search-container input:focus { border-color: var(--primary); width: 320px; }
 .search-icon { position: absolute; left: 12px; color: var(--text-muted); }
 .btn-clear {
     position: absolute; right: 8px; background: none; border: none;
@@ -379,6 +379,11 @@ header {
     border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
 }
 .btn-clear:hover { background: var(--bg-hover); color: var(--text-main); }
+
+#btnToggleView {
+    min-width: 150px;
+    justify-content: center;
+}
 
 .main-scroll {
     flex-grow: 1;
@@ -613,8 +618,8 @@ select.badge option {
     
     .header-actions { gap: 8px; }
     
-    .search-container input { width: 140px; }
-    .search-container input:focus { width: 200px; }
+    .search-container input { width: 180px; }
+    .search-container input:focus { width: 210px; }
 
     /* FAB for Mobile */
     .fab-mobile {
