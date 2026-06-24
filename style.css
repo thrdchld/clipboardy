@@ -678,6 +678,17 @@ select.badge option {
 @keyframes slideDown { from { opacity: 0; transform: translateY(-20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+.fab-mobile { display: none; }
+.btn-danger-confirm {
+    background: var(--danger) !important;
+    border-color: var(--danger) !important;
+    color: white !important;
+}
+.btn-danger-confirm:hover {
+    background: var(--danger-hover) !important;
+    border-color: var(--danger-hover) !important;
+}
+
 /* ==========================================
    MOBILE SUPPORT 
    ========================================== */
@@ -747,7 +758,6 @@ select.badge option {
     .grid { column-count: 1; }
 }
 
-.fab-mobile { display: none; }
 .fab-icon { display: none; }
 
 /* ==========================================

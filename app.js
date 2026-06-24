@@ -153,6 +153,50 @@ function safeConfirm(message) {
     return result;
 }
 
+function showCustomConfirm(title, message, isDangerous = false) {
+    ignoreBlur = true;
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        const titleEl = document.getElementById('confirmTitle');
+        const msgEl = document.getElementById('confirmMessage');
+        const cancelBtn = document.getElementById('confirmCancelBtn');
+        const confirmBtn = document.getElementById('confirmConfirmBtn');
+        const iconEl = document.getElementById('confirmIcon');
+        
+        titleEl.textContent = title;
+        msgEl.textContent = message;
+        
+        if (isDangerous) {
+            confirmBtn.className = 'btn btn-primary btn-danger-confirm';
+            iconEl.style.color = 'var(--danger)';
+        } else {
+            confirmBtn.className = 'btn btn-primary';
+            iconEl.style.color = 'var(--primary)';
+        }
+        
+        const cleanUp = () => {
+            modal.classList.add('hidden');
+            cancelBtn.removeEventListener('click', onCancel);
+            confirmBtn.removeEventListener('click', onConfirm);
+            document.removeEventListener('keydown', onKeyDown);
+            setTimeout(() => { ignoreBlur = false; }, 300);
+        };
+        const onCancel = () => { cleanUp(); resolve(false); };
+        const onConfirm = () => { cleanUp(); resolve(true); };
+        const onKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                onCancel();
+            }
+        };
+        
+        cancelBtn.addEventListener('click', onCancel);
+        confirmBtn.addEventListener('click', onConfirm);
+        document.addEventListener('keydown', onKeyDown);
+        modal.classList.remove('hidden');
+    });
+}
+
 // Reset ignoreBlur when window gains focus back
 window.addEventListener("focus", () => {
     if (ignoreBlur) {
@@ -326,7 +370,9 @@ function startNotesSync() {
     if (unsubscribeNotes) unsubscribeNotes();
     
     const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
-    const q = query(notesRef, where('folderId', '==', currentFolderId));
+    const q = viewMode === 'trash'
+        ? query(notesRef)
+        : query(notesRef, where('folderId', '==', currentFolderId));
     
     unsubscribeNotes = onSnapshot(q, (snapshot) => {
         notesArray = [];
@@ -350,6 +396,9 @@ function updateViewArchiveUI() {
     if (viewMode === 'archived') {
         DOM.btnToggleViewText.textContent = "Back to Active";
         DOM.btnToggleView.classList.add('active');
+        if (DOM.btnToggleTrash) {
+            DOM.btnToggleTrashText.textContent = "Trash";
+        }
     } else if (viewMode === 'trash') {
         DOM.btnToggleViewText.textContent = "View Archive";
         if (DOM.btnToggleTrash) {
@@ -481,7 +530,7 @@ async function saveNewFolder() {
 }
 
 async function deleteFolder(folderId) {
-    if (!safeConfirm("Move this folder to Trash? Notes inside it will also be archived and moved to Trash.")) return;
+    if (!await showCustomConfirm("Move Folder to Trash", "Move this folder and its notes to Trash?", true)) return;
     
     folders = folders.map(f => f.id === folderId ? { ...f, deleted: true, deletedAt: Date.now() } : f);
     try {
@@ -572,7 +621,7 @@ function renderGrid() {
                             Restore
                         </button>
                         <button class="action-btn del delete-folder-perm-btn" style="display:inline-flex; align-items:center; gap:4px;">
-                            Delete Perm
+                            Delete
                         </button>
                     </div>
                 </div>
@@ -616,7 +665,7 @@ function renderGrid() {
                             Restore
                         </button>
                         <button class="action-btn del delete-note-perm-btn" style="display:inline-flex; align-items:center; gap:4px;">
-                            Delete Perm
+                            Delete
                         </button>
                     </div>
                 </div>
@@ -818,7 +867,7 @@ function renderGrid() {
         });
 
         card.querySelector('.del-btn').addEventListener('click', async () => {
-            if (safeConfirm("Move this note to Trash?")) {
+            if (await showCustomConfirm("Move to Trash", "Move this note to Trash? It will be automatically deleted after 30 days.", false)) {
                 const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', item.id);
                 try {
                     await setDoc(noteRef, {
@@ -853,9 +902,9 @@ function renderGrid() {
             });
 
             // Remove image
-            card.querySelector('.btn-remove-image').addEventListener('click', (e) => {
+            card.querySelector('.btn-remove-image').addEventListener('click', async (e) => {
                 e.stopPropagation();
-                if (safeConfirm("Delete the image from this note?")) {
+                if (await showCustomConfirm("Delete Image", "Remove this image from the note permanently?", true)) {
                     item.image = null;
                     item.updatedAt = Date.now();
                     forceSaveNoteToServer(item);
@@ -918,9 +967,13 @@ DOM.passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') l
 DOM.btnLock.addEventListener('click', lockApp);
 
 const handleAddNote = async () => {
-    if(viewMode === 'archived') {
+    if (viewMode === 'archived' || viewMode === 'trash') {
+        const oldMode = viewMode;
         viewMode = 'active';
         updateViewArchiveUI();
+        if (oldMode === 'trash') {
+            startNotesSync();
+        }
     }
     
     const newNoteId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -953,16 +1006,16 @@ if (DOM.btnAddNoteHeader) {
 }
 
 DOM.btnToggleView.addEventListener('click', () => {
-    viewMode = viewMode === 'active' ? 'archived' : 'active';
+    viewMode = viewMode === 'archived' ? 'active' : 'archived';
     updateViewArchiveUI();
-    renderGrid();
+    startNotesSync();
 });
 
 if (DOM.btnToggleTrash) {
     DOM.btnToggleTrash.addEventListener('click', () => {
         viewMode = viewMode === 'trash' ? 'active' : 'trash';
         updateViewArchiveUI();
-        renderGrid();
+        startNotesSync();
     });
 }
 
@@ -1146,6 +1199,18 @@ async function restoreFolder(folderId) {
     try {
         const roomRef = doc(db, 'clipboards', currentRoomHash);
         await setDoc(roomRef, { folders }, { merge: true });
+        
+        // Also restore notes in this folder that are deleted
+        const notesInFolder = notesArray.filter(n => n.folderId === folderId && n.deleted);
+        for (const note of notesInFolder) {
+            const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
+            await setDoc(noteRef, {
+                deleted: false,
+                deletedAt: null,
+                updatedAt: Date.now()
+            }, { merge: true });
+        }
+        
         showToast("Folder restored");
         renderGrid();
     } catch(err) {
@@ -1154,7 +1219,7 @@ async function restoreFolder(folderId) {
 }
 
 async function deleteFolderPermanently(folderId) {
-    if (!safeConfirm("Permanently delete this folder and all notes inside it? This action cannot be undone.")) return;
+    if (!await showCustomConfirm("Delete Permanently", "Delete this folder and its notes forever? This action cannot be undone.", true)) return;
     
     folders = folders.filter(f => f.id !== folderId);
     try {
@@ -1200,7 +1265,7 @@ async function restoreNote(noteId) {
 }
 
 async function deleteNotePermanently(noteId) {
-    if (!safeConfirm("Permanently delete this note? This action cannot be undone.")) return;
+    if (!await showCustomConfirm("Delete Permanently", "Delete this note forever? This action cannot be undone.", true)) return;
     
     const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', noteId);
     try {
