@@ -27,6 +27,7 @@ let currentRoomHash = null;
 let folders = [{ id: 'default', name: 'General' }];
 let currentFolderId = 'default';
 let notesArray = []; 
+let editingFolderId = null;
 
 let unsubscribeNotes = null;
 let unsubscribeFolders = null;
@@ -69,6 +70,7 @@ const DOM = {
     btnAddNote: document.getElementById('btnAddNote'),
     btnAddNoteMobile: document.getElementById('btnAddNoteMobile'),
     btnAddNoteHeader: document.getElementById('btnAddNoteHeader'),
+    btnEmptyTrashMobile: document.getElementById('btnEmptyTrashMobile'),
     btnLock: document.getElementById('btnLock'),
     btnToggleView: document.getElementById('btnToggleView'),
     btnToggleTrash: document.getElementById('btnToggleTrash'),
@@ -430,14 +432,29 @@ function updateViewArchiveUI() {
         if (viewMode === 'trash') {
             DOM.btnEmptyTrash.classList.remove('hidden');
             DOM.btnEmptyTrash.style.display = 'inline-flex';
-            if (DOM.btnAddNoteHeader) {
-                DOM.btnAddNoteHeader.style.display = 'none';
+            if (DOM.btnAddNoteHeader) DOM.btnAddNoteHeader.style.display = 'none';
+            if (DOM.btnAddNoteMobile) DOM.btnAddNoteMobile.style.display = 'none';
+            if (DOM.btnEmptyTrashMobile) {
+                DOM.btnEmptyTrashMobile.classList.remove('hidden');
+                DOM.btnEmptyTrashMobile.style.display = 'flex';
+            }
+        } else if (viewMode === 'archived') {
+            DOM.btnEmptyTrash.classList.add('hidden');
+            DOM.btnEmptyTrash.style.display = 'none';
+            if (DOM.btnAddNoteHeader) DOM.btnAddNoteHeader.style.display = 'none';
+            if (DOM.btnAddNoteMobile) DOM.btnAddNoteMobile.style.display = 'none';
+            if (DOM.btnEmptyTrashMobile) {
+                DOM.btnEmptyTrashMobile.classList.add('hidden');
+                DOM.btnEmptyTrashMobile.style.display = 'none';
             }
         } else {
             DOM.btnEmptyTrash.classList.add('hidden');
             DOM.btnEmptyTrash.style.display = 'none';
-            if (DOM.btnAddNoteHeader) {
-                DOM.btnAddNoteHeader.style.display = '';
+            if (DOM.btnAddNoteHeader) DOM.btnAddNoteHeader.style.display = '';
+            if (DOM.btnAddNoteMobile) DOM.btnAddNoteMobile.style.display = '';
+            if (DOM.btnEmptyTrashMobile) {
+                DOM.btnEmptyTrashMobile.classList.add('hidden');
+                DOM.btnEmptyTrashMobile.style.display = 'none';
             }
         }
     }
@@ -514,16 +531,52 @@ function renderFolders() {
         if (f.id !== 'default') {
             const actions = document.createElement('div');
             actions.className = 'folder-actions';
+            
+            const btnOptions = document.createElement('button');
+            btnOptions.className = 'btn-folder-options';
+            btnOptions.setAttribute('title', 'Folder Options');
+            btnOptions.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
+            
+            const dropdown = document.createElement('div');
+            dropdown.className = 'folder-dropdown';
+            
+            const btnEdit = document.createElement('button');
+            btnEdit.className = 'folder-dropdown-item';
+            btnEdit.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Edit Name`;
+            btnEdit.onclick = (e) => {
+                e.stopPropagation();
+                dropdown.classList.remove('show');
+                actions.classList.remove('open');
+                editFolder(f.id, f.name);
+            };
+            
             const btnDel = document.createElement('button');
-            btnDel.className = 'btn-delete-folder';
-            btnDel.setAttribute('title', 'Delete Folder');
-            btnDel.setAttribute('aria-label', `Delete Folder ${f.name}`);
-            btnDel.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+            btnDel.className = 'folder-dropdown-item danger';
+            btnDel.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete`;
             btnDel.onclick = (e) => {
                 e.stopPropagation();
+                dropdown.classList.remove('show');
+                actions.classList.remove('open');
                 deleteFolder(f.id);
             };
-            actions.appendChild(btnDel);
+            
+            dropdown.appendChild(btnEdit);
+            dropdown.appendChild(btnDel);
+            
+            btnOptions.onclick = (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.folder-dropdown.show').forEach(d => {
+                    if (d !== dropdown) {
+                        d.classList.remove('show');
+                        if (d.parentElement) d.parentElement.classList.remove('open');
+                    }
+                });
+                const isShowing = dropdown.classList.toggle('show');
+                actions.classList.toggle('open', isShowing);
+            };
+            
+            actions.appendChild(btnOptions);
+            actions.appendChild(dropdown);
             li.appendChild(actions);
         }
         
@@ -538,25 +591,49 @@ function renderFolders() {
     });
 }
 
+function editFolder(folderId, currentName) {
+    editingFolderId = folderId;
+    DOM.folderModal.querySelector('h3').textContent = "Edit Folder";
+    DOM.folderModal.classList.remove('hidden');
+    DOM.folderNameInput.value = currentName;
+    DOM.folderNameInput.focus();
+}
+
 async function saveNewFolder() {
     const name = DOM.folderNameInput.value.trim();
     if (!name) return;
     
-    const newFolder = {
-        id: 'f_' + Date.now().toString(36),
-        name: name
-    };
-    
-    folders.push(newFolder);
-    DOM.folderModal.classList.add('hidden');
-    DOM.folderNameInput.value = '';
-    
-    try {
-        const roomRef = doc(db, 'clipboards', currentRoomHash);
-        await setDoc(roomRef, { folders }, { merge: true });
-        switchFolder(newFolder.id);
-    } catch(err) {
-        showToast("Failed to create folder");
+    if (editingFolderId) {
+        folders = folders.map(f => f.id === editingFolderId ? { ...f, name } : f);
+        DOM.folderModal.classList.add('hidden');
+        DOM.folderNameInput.value = '';
+        
+        try {
+            const roomRef = doc(db, 'clipboards', currentRoomHash);
+            await setDoc(roomRef, { folders }, { merge: true });
+            if (currentFolderId === editingFolderId) updateViewArchiveUI();
+            else renderFolders();
+        } catch(err) {
+            showToast("Failed to edit folder");
+        }
+        editingFolderId = null;
+    } else {
+        const newFolder = {
+            id: 'f_' + Date.now().toString(36),
+            name: name
+        };
+        
+        folders.push(newFolder);
+        DOM.folderModal.classList.add('hidden');
+        DOM.folderNameInput.value = '';
+        
+        try {
+            const roomRef = doc(db, 'clipboards', currentRoomHash);
+            await setDoc(roomRef, { folders }, { merge: true });
+            switchFolder(newFolder.id);
+        } catch(err) {
+            showToast("Failed to create folder");
+        }
     }
 }
 
@@ -1124,12 +1201,23 @@ DOM.idleTimeoutModal.querySelectorAll('.btn-timeout-option').forEach(btn => {
     });
 });
 
+// Close dropdowns on outside click
+document.addEventListener('click', () => {
+    document.querySelectorAll('.folder-dropdown.show').forEach(d => {
+        d.classList.remove('show');
+        if (d.parentElement) d.parentElement.classList.remove('open');
+    });
+});
+
 // Modal Events
 DOM.btnAddFolder.addEventListener('click', () => {
+    editingFolderId = null;
+    DOM.folderModal.querySelector('h3').textContent = "Create New Folder";
     DOM.folderModal.classList.remove('hidden');
     DOM.folderNameInput.focus();
 });
 DOM.btnCancelFolder.addEventListener('click', () => {
+    editingFolderId = null;
     DOM.folderModal.classList.add('hidden');
     DOM.folderNameInput.value = '';
 });
@@ -1373,6 +1461,9 @@ async function emptyTrash() {
 
 if (DOM.btnEmptyTrash) {
     DOM.btnEmptyTrash.addEventListener('click', emptyTrash);
+}
+if (DOM.btnEmptyTrashMobile) {
+    DOM.btnEmptyTrashMobile.addEventListener('click', emptyTrash);
 }
 
 // Exports for unit testing
