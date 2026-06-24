@@ -348,7 +348,7 @@ function startFoldersSync() {
             if (!activeFolders.find(f => f.id === currentFolderId)) {
                 currentFolderId = activeFolders[0] ? activeFolders[0].id : 'default';
             }
-            renderFolders();
+            updateViewArchiveUI();
         }
     });
 }
@@ -392,6 +392,19 @@ function startNotesSync() {
 function updateViewArchiveUI() {
     DOM.btnToggleView.classList.remove('active');
     if (DOM.btnToggleTrash) DOM.btnToggleTrash.classList.remove('active');
+    
+    // Update dynamic header title
+    const headerTitleEl = document.getElementById('headerTitleText');
+    if (headerTitleEl) {
+        if (viewMode === 'archived') {
+            headerTitleEl.textContent = "Archive";
+        } else if (viewMode === 'trash') {
+            headerTitleEl.textContent = "Trash";
+        } else {
+            const currentFolder = folders.find(f => f.id === currentFolderId);
+            headerTitleEl.textContent = currentFolder ? currentFolder.name : "Notes";
+        }
+    }
     
     if (viewMode === 'archived') {
         DOM.btnToggleViewText.textContent = "Back to Last Folder";
@@ -1009,6 +1022,7 @@ DOM.btnToggleView.addEventListener('click', () => {
     viewMode = viewMode === 'archived' ? 'active' : 'archived';
     updateViewArchiveUI();
     startNotesSync();
+    closeMobileSidebar();
 });
 
 if (DOM.btnToggleTrash) {
@@ -1016,6 +1030,7 @@ if (DOM.btnToggleTrash) {
         viewMode = viewMode === 'trash' ? 'active' : 'trash';
         updateViewArchiveUI();
         startNotesSync();
+        closeMobileSidebar();
     });
 }
 
