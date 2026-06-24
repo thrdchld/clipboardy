@@ -945,12 +945,7 @@ textarea:focus-visible,
     opacity: 1;
     pointer-events: auto;
 }
-@media (max-width: 768px) {
-    .folder-actions {
-        opacity: 1 !important;
-        pointer-events: auto !important;
-    }
-}
+
 .btn-folder-options {
     background: transparent;
     border: none;

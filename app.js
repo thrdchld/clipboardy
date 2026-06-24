@@ -28,6 +28,8 @@ let folders = [{ id: 'default', name: 'General' }];
 let currentFolderId = 'default';
 let notesArray = []; 
 let editingFolderId = null;
+let isSelectingFolders = false;
+let selectedFoldersForDeletion = new Set();
 
 let unsubscribeNotes = null;
 let unsubscribeFolders = null;
@@ -66,6 +68,7 @@ const DOM = {
     
     folderList: document.getElementById('folderList'),
     btnAddFolder: document.getElementById('btnAddFolder'),
+    btnSelectFolders: document.getElementById('btnSelectFolders'),
     
     btnAddNote: document.getElementById('btnAddNote'),
     btnAddNoteMobile: document.getElementById('btnAddNoteMobile'),
@@ -528,7 +531,17 @@ function renderFolders() {
         folderNameWrapper.appendChild(nameSpan);
         li.appendChild(folderNameWrapper);
         
-        if (f.id !== 'default') {
+        if (isSelectingFolders && f.id !== 'default') {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = selectedFoldersForDeletion.has(f.id);
+            checkbox.style.pointerEvents = 'none'; // let the li handle click
+            checkbox.style.marginRight = '8px';
+            folderNameWrapper.prepend(checkbox);
+            folderIcon.style.display = 'none';
+        }
+
+        if (f.id !== 'default' && !isSelectingFolders) {
             const actions = document.createElement('div');
             actions.className = 'folder-actions';
             
@@ -542,7 +555,7 @@ function renderFolders() {
             
             const btnEdit = document.createElement('button');
             btnEdit.className = 'folder-dropdown-item';
-            btnEdit.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Edit Name`;
+            btnEdit.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Rename`;
             btnEdit.onclick = (e) => {
                 e.stopPropagation();
                 dropdown.classList.remove('show');
@@ -578,9 +591,36 @@ function renderFolders() {
             actions.appendChild(btnOptions);
             actions.appendChild(dropdown);
             li.appendChild(actions);
+
+            // Touch-and-hold (long press) logic
+            let pressTimer;
+            const clearTimer = () => clearTimeout(pressTimer);
+            li.addEventListener('touchstart', (e) => {
+                pressTimer = setTimeout(() => {
+                    document.querySelectorAll('.folder-dropdown.show').forEach(d => {
+                        d.classList.remove('show');
+                        if (d.parentElement) d.parentElement.classList.remove('open');
+                    });
+                    dropdown.classList.add('show');
+                    actions.classList.add('open');
+                }, 500); // 500ms long press
+            });
+            li.addEventListener('touchend', clearTimer);
+            li.addEventListener('touchmove', clearTimer);
+            li.addEventListener('touchcancel', clearTimer);
         }
         
-        li.onclick = () => switchFolder(f.id);
+        if (isSelectingFolders && f.id !== 'default') {
+            li.onclick = (e) => {
+                e.preventDefault();
+                if (selectedFoldersForDeletion.has(f.id)) selectedFoldersForDeletion.delete(f.id);
+                else selectedFoldersForDeletion.add(f.id);
+                renderFolders();
+            };
+        } else {
+            li.onclick = () => switchFolder(f.id);
+        }
+        
         li.onkeydown = (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -1210,11 +1250,65 @@ document.addEventListener('click', () => {
 });
 
 // Modal Events
-DOM.btnAddFolder.addEventListener('click', () => {
-    editingFolderId = null;
-    DOM.folderModal.querySelector('h3').textContent = "Create New Folder";
-    DOM.folderModal.classList.remove('hidden');
-    DOM.folderNameInput.focus();
+DOM.btnSelectFolders.addEventListener('click', () => {
+    isSelectingFolders = !isSelectingFolders;
+    selectedFoldersForDeletion.clear();
+    
+    if (isSelectingFolders) {
+        DOM.btnSelectFolders.style.color = 'var(--primary)';
+        DOM.btnAddFolder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+        DOM.btnAddFolder.style.color = 'var(--danger)';
+        DOM.btnAddFolder.setAttribute('title', 'Delete Selected Folders');
+    } else {
+        DOM.btnSelectFolders.style.color = 'var(--text-muted)';
+        DOM.btnAddFolder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+        DOM.btnAddFolder.style.color = '';
+        DOM.btnAddFolder.setAttribute('title', 'Add New Folder');
+    }
+    renderFolders();
+});
+
+DOM.btnAddFolder.addEventListener('click', async () => {
+    if (isSelectingFolders) {
+        if (selectedFoldersForDeletion.size === 0) return;
+        if (!await showCustomConfirm("Delete Selected Folders", `Move ${selectedFoldersForDeletion.size} folder(s) and their notes to Trash?`, true)) return;
+        
+        let foldersChanged = false;
+        for (const folderId of selectedFoldersForDeletion) {
+            folders = folders.map(f => f.id === folderId ? { ...f, deleted: true, deletedAt: Date.now() } : f);
+            
+            const notesInFolder = notesArray.filter(n => n.folderId === folderId);
+            for (const note of notesInFolder) {
+                const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
+                await setDoc(noteRef, { deleted: true, deletedAt: Date.now() }, { merge: true });
+            }
+            foldersChanged = true;
+        }
+        if (foldersChanged) {
+            const roomRef = doc(db, 'clipboards', currentRoomHash);
+            await setDoc(roomRef, { folders }, { merge: true });
+        }
+        
+        if (selectedFoldersForDeletion.has(currentFolderId)) {
+            switchFolder('default');
+        } else {
+            renderFolders();
+        }
+        
+        // Reset selection mode after deletion
+        isSelectingFolders = false;
+        selectedFoldersForDeletion.clear();
+        DOM.btnSelectFolders.style.color = 'var(--text-muted)';
+        DOM.btnAddFolder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+        DOM.btnAddFolder.style.color = '';
+        DOM.btnAddFolder.setAttribute('title', 'Add New Folder');
+        renderFolders();
+    } else {
+        editingFolderId = null;
+        DOM.folderModal.querySelector('h3').textContent = "Create New Folder";
+        DOM.folderModal.classList.remove('hidden');
+        DOM.folderNameInput.focus();
+    }
 });
 DOM.btnCancelFolder.addEventListener('click', () => {
     editingFolderId = null;
