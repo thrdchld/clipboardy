@@ -56,8 +56,9 @@ const DOM = {
     
     strictLockToggle: document.getElementById('strictLockToggle'),
     idleLockToggle: document.getElementById('idleLockToggle'),
-    idleTimeoutSelect: document.getElementById('idleTimeoutSelect'),
-    idleTimeoutContainer: document.getElementById('idleTimeoutContainer'),
+    btnIdleTimeout: document.getElementById('btnIdleTimeout'),
+    idleTimeoutModal: document.getElementById('idleTimeoutModal'),
+    btnCancelIdleTimeout: document.getElementById('btnCancelIdleTimeout'),
     
     clipGrid: document.getElementById('clipGrid'),
     emptyState: document.getElementById('emptyState'),
@@ -93,14 +94,13 @@ const DOM = {
 // Initialize settings state in DOM
 DOM.strictLockToggle.checked = strictLockEnabled;
 DOM.idleLockToggle.checked = idleLockEnabled;
-DOM.idleTimeoutSelect.value = idleLockMinutes.toString();
 updateIdleTimeoutVisibility();
 
 function updateIdleTimeoutVisibility() {
     if (idleLockEnabled) {
-        DOM.idleTimeoutContainer.style.display = 'flex';
+        DOM.btnIdleTimeout.style.display = 'inline-flex';
     } else {
-        DOM.idleTimeoutContainer.style.display = 'none';
+        DOM.btnIdleTimeout.style.display = 'none';
     }
 }
 
@@ -394,7 +394,7 @@ function updateViewArchiveUI() {
     if (DOM.btnToggleTrash) DOM.btnToggleTrash.classList.remove('active');
     
     if (viewMode === 'archived') {
-        DOM.btnToggleViewText.textContent = "Back to Active";
+        DOM.btnToggleViewText.textContent = "Back to Last Folder";
         DOM.btnToggleView.classList.add('active');
         if (DOM.btnToggleTrash) {
             DOM.btnToggleTrashText.textContent = "Trash";
@@ -402,7 +402,7 @@ function updateViewArchiveUI() {
     } else if (viewMode === 'trash') {
         DOM.btnToggleViewText.textContent = "View Archive";
         if (DOM.btnToggleTrash) {
-            DOM.btnToggleTrashText.textContent = "Back to Active";
+            DOM.btnToggleTrashText.textContent = "Back to Last Folder";
             DOM.btnToggleTrash.classList.add('active');
         }
     } else {
@@ -1050,10 +1050,40 @@ DOM.idleLockToggle.addEventListener('change', () => {
     resetAutoLockTimer();
 });
 
-DOM.idleTimeoutSelect.addEventListener('change', () => {
-    idleLockMinutes = parseInt(DOM.idleTimeoutSelect.value) || 5;
-    localStorage.setItem('idleLockMinutes', idleLockMinutes);
-    resetAutoLockTimer();
+DOM.btnIdleTimeout.addEventListener('click', () => {
+    const options = DOM.idleTimeoutModal.querySelectorAll('.btn-timeout-option');
+    options.forEach(opt => {
+        const val = parseInt(opt.getAttribute('data-value'));
+        const check = opt.querySelector('.checkmark');
+        if (val === idleLockMinutes) {
+            opt.classList.add('active');
+            if (check) check.classList.remove('hidden');
+        } else {
+            opt.classList.remove('active');
+            if (check) check.classList.add('hidden');
+        }
+    });
+    DOM.idleTimeoutModal.classList.remove('hidden');
+});
+
+DOM.btnCancelIdleTimeout.addEventListener('click', () => {
+    DOM.idleTimeoutModal.classList.add('hidden');
+});
+
+DOM.idleTimeoutModal.addEventListener('click', (e) => {
+    if (e.target === DOM.idleTimeoutModal) {
+        DOM.idleTimeoutModal.classList.add('hidden');
+    }
+});
+
+DOM.idleTimeoutModal.querySelectorAll('.btn-timeout-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+        idleLockMinutes = parseInt(btn.getAttribute('data-value')) || 5;
+        localStorage.setItem('idleLockMinutes', idleLockMinutes);
+        resetAutoLockTimer();
+        DOM.idleTimeoutModal.classList.add('hidden');
+        showToast(`Auto-lock set to ${idleLockMinutes} min`);
+    });
 });
 
 // Modal Events

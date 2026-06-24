@@ -255,8 +255,8 @@ h1, h2, h3 { color: var(--text-main); }
     display: flex;
     align-items: center;
     gap: 10px;
-    height: 70px;
-    padding: 0 20px;
+    height: 64px;
+    padding: 0 24px;
     box-sizing: border-box;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
@@ -408,12 +408,12 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px 30px;
+    padding: 0 24px;
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
     z-index: 30;
     gap: 15px;
-    height: 70px;
+    height: 64px;
     box-sizing: border-box;
 }
 
@@ -433,18 +433,33 @@ header {
     align-items: center;
 }
 
-.search-container { position: relative; display: flex; align-items: center;}
-.search-container input {
-    padding: 8px 32px 8px 36px;
+.search-container {
+    position: relative;
+    display: flex;
+    align-items: center;
     border-radius: var(--radius-md);
     border: 1px solid var(--border);
     background: var(--bg-base);
+    width: 280px;
+    transition: border-color 0.2s, width 0.3s, box-shadow 0.2s;
+    height: 38px;
+    box-sizing: border-box;
+}
+.search-container:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    width: 320px;
+}
+.search-container input {
+    border: none;
+    background: transparent;
     color: var(--text-main);
     outline: none;
-    width: 280px;
-    transition: border-color 0.2s, width 0.3s;
+    width: 100%;
+    height: 100%;
+    padding: 8px 32px 8px 36px;
+    box-sizing: border-box;
 }
-.search-container input:focus { border-color: var(--primary); width: 320px; }
 .search-icon { position: absolute; left: 12px; color: var(--text-muted); }
 .btn-clear {
     position: absolute; right: 8px; background: none; border: none;
@@ -733,8 +748,8 @@ select.badge option {
     
     .header-actions { gap: 8px; }
     
-    .search-container input { width: 180px; }
-    .search-container input:focus { width: 210px; }
+    .search-container { width: 180px; }
+    .search-container:focus-within { width: 210px; }
 
     /* FAB for Mobile */
     .fab-mobile {
@@ -853,5 +868,51 @@ textarea:focus-visible,
 }
 .spinner {
     animation: spin 1s linear infinite;
+}
+
+/* Custom Timeout Modal Styles */
+.btn-icon-small {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+.btn-icon-small:hover {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+.btn-timeout-option {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 0.95em;
+    transition: all 0.2s;
+}
+.btn-timeout-option.active {
+    background: var(--primary-light) !important;
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+    font-weight: 600;
+}
+@media (prefers-color-scheme: dark) {
+    .btn-timeout-option.active {
+        background: var(--primary-light) !important;
+        color: #fff !important;
+        border-color: var(--primary) !important;
+    }
+}
+.btn-timeout-option .checkmark {
+    font-weight: bold;
+}
+.btn-timeout-option .checkmark.hidden {
+    display: none;
 }
 
