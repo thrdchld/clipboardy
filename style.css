@@ -205,11 +205,18 @@ h1, h2, h3 { color: var(--text-main); }
     width: 260px; /* Keep children at fixed width so layout doesn't squash during collapse */
 }
 
+.btn-add-note-header {
+    display: none;
+}
+
 /* Sidebar Collapsed State (Desktop) */
 @media (min-width: 769px) {
     .sidebar.collapsed {
         width: 0;
         border-right-color: transparent;
+    }
+    .sidebar.collapsed ~ .main-content .btn-add-note-header {
+        display: inline-flex;
     }
 }
 

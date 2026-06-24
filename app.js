@@ -67,6 +67,7 @@ const DOM = {
     
     btnAddNote: document.getElementById('btnAddNote'),
     btnAddNoteMobile: document.getElementById('btnAddNoteMobile'),
+    btnAddNoteHeader: document.getElementById('btnAddNoteHeader'),
     btnLock: document.getElementById('btnLock'),
     btnToggleView: document.getElementById('btnToggleView'),
     btnToggleTrash: document.getElementById('btnToggleTrash'),
@@ -988,6 +989,9 @@ const handleAddNote = async () => {
 DOM.btnAddNote.addEventListener('click', handleAddNote);
 if (DOM.btnAddNoteMobile) {
     DOM.btnAddNoteMobile.addEventListener('click', handleAddNote);
+}
+if (DOM.btnAddNoteHeader) {
+    DOM.btnAddNoteHeader.addEventListener('click', handleAddNote);
 }
 
 DOM.btnToggleView.addEventListener('click', () => {
