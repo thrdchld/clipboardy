@@ -695,8 +695,13 @@ function renderGrid() {
         return;
     }
     
-    DOM.emptyState.querySelector('h3').textContent = "No notes yet";
-    DOM.emptyState.querySelector('p').textContent = 'Click "+ New Note" to start writing in this folder.';
+    if (viewMode === 'archived') {
+        DOM.emptyState.querySelector('h3').textContent = "Archive is empty";
+        DOM.emptyState.querySelector('p').textContent = "Notes you archive will appear here.";
+    } else {
+        DOM.emptyState.querySelector('h3').textContent = "No notes yet";
+        DOM.emptyState.querySelector('p').textContent = 'Click "+ New Note" to start writing in this folder.';
+    }
     
     let filtered = notesArray.filter(n => {
         const matchesFolder = n.folderId === currentFolderId;
