@@ -89,17 +89,22 @@
             </div>
             
             <div class="sidebar-footer">
-                <div class="footer-buttons" style="display: flex; gap: 8px; margin-bottom: 16px;">
-                    <button id="btnToggleView" class="btn" title="Toggle archive/active view" aria-label="Toggle archive/active view" style="flex-grow: 1; justify-content: center;">
-                        <span class="btn-svg" style="display:inline-flex; align-items:center; color:currentColor;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-                        </span>
-                        <span id="btnToggleViewText">View Archive</span>
-                    </button>
-                    <button id="btnLock" class="btn btn-danger" title="Lock Application" aria-label="Lock Application" style="display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; flex-shrink: 0;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    </button>
-                </div>
+                <!-- View Archive Button -->
+                <button id="btnToggleView" class="btn" title="Toggle archive/active view" aria-label="Toggle archive/active view" style="width: 100%; justify-content: center; margin-bottom: 8px;">
+                    <span class="btn-svg" style="display:inline-flex; align-items:center; color:currentColor;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                    </span>
+                    <span id="btnToggleViewText">View Archive</span>
+                </button>
+                
+                <!-- Trash Button -->
+                <button id="btnToggleTrash" class="btn" title="View Trash" aria-label="View Trash" style="width: 100%; justify-content: center; margin-bottom: 16px;">
+                    <span class="btn-svg" style="display:inline-flex; align-items:center; color:currentColor;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </span>
+                    <span id="btnToggleTrashText">Trash</span>
+                </button>
+                
                 <div class="footer-setting" style="margin-bottom: 12px;">
                     <label class="toggle-container" title="Lock application instantly when switching tabs or minimizing">
                         <input type="checkbox" id="strictLockToggle" checked>
@@ -125,6 +130,12 @@
                         <option value="60">60 minutes</option>
                     </select>
                 </div>
+
+                <!-- Lock Application Button at the very bottom -->
+                <button id="btnLock" class="btn btn-danger" title="Lock Application" aria-label="Lock Application" style="width: 100%; justify-content: center; margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; padding: 10px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    Lock Application
+                </button>
             </div>
         </aside>
 

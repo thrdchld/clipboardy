@@ -69,6 +69,8 @@ const DOM = {
     btnAddNoteMobile: document.getElementById('btnAddNoteMobile'),
     btnLock: document.getElementById('btnLock'),
     btnToggleView: document.getElementById('btnToggleView'),
+    btnToggleTrash: document.getElementById('btnToggleTrash'),
+    btnToggleTrashText: document.getElementById('btnToggleTrashText'),
     searchInput: document.getElementById('searchInput'),
     btnClearSearch: document.getElementById('btnClearSearch'),
     syncIndicator: document.getElementById('syncIndicator'),
@@ -310,11 +312,105 @@ function updateViewArchiveUI() {
     renderFolders();
 }
 
+async function cleanupExpiredFolders() {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    let updatedFolders = [...folders];
+    let changed = false;
+    updatedFolders = updatedFolders.filter(f => {
+        if (f.deleted && f.deletedAt && f.deletedAt < thirtyDaysAgo) {
+            changed = true;
+            return false;
+        }
+        return true;
+    });
+    if (changed) {
+        folders = updatedFolders;
+        try {
+            const roomRef = doc(db, 'clipboards', currentRoomHash);
+            await setDoc(roomRef, { folders }, { merge: true });
+        } catch (err) {
+            console.error("Failed to clean up expired folders", err);
+        }
+    }
+}
+
+function startFoldersSync() {
+    const roomRef = doc(db, 'clipboards', currentRoomHash);
+    unsubscribeFolders = onSnapshot(roomRef, (docSnap) => {
+        if (docSnap.exists() && docSnap.data().folders) {
+            folders = docSnap.data().folders;
+            cleanupExpiredFolders();
+            
+            const activeFolders = folders.filter(f => !f.deleted);
+            if (!activeFolders.find(f => f.id === currentFolderId)) {
+                currentFolderId = activeFolders[0] ? activeFolders[0].id : 'default';
+            }
+            renderFolders();
+        }
+    });
+}
+
+async function cleanupExpiredNotes() {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const expiredNotes = notesArray.filter(n => n.deleted && n.deletedAt && n.deletedAt < thirtyDaysAgo);
+    for (const note of expiredNotes) {
+        const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
+        try {
+            await deleteDoc(noteRef);
+        } catch (err) {
+            console.error("Failed to delete expired note", note.id, err);
+        }
+    }
+}
+
+function startNotesSync() {
+    if (unsubscribeNotes) unsubscribeNotes();
+    
+    const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
+    const q = query(notesRef);
+    
+    unsubscribeNotes = onSnapshot(q, (snapshot) => {
+        notesArray = [];
+        snapshot.forEach(docSnap => {
+            notesArray.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        
+        cleanupExpiredNotes();
+        DOM.syncIndicator.classList.remove('saving');
+        renderGrid();
+    }, (error) => {
+        console.error("Sync Error", error);
+        showToast("Disconnected from note sync");
+    });
+}
+
+function updateViewArchiveUI() {
+    DOM.btnToggleView.classList.remove('active');
+    if (DOM.btnToggleTrash) DOM.btnToggleTrash.classList.remove('active');
+    
+    if (viewMode === 'archived') {
+        DOM.btnToggleViewText.textContent = "Back to Active";
+        DOM.btnToggleView.classList.add('active');
+    } else if (viewMode === 'trash') {
+        DOM.btnToggleViewText.textContent = "View Archive";
+        if (DOM.btnToggleTrash) {
+            DOM.btnToggleTrashText.textContent = "Back to Active";
+            DOM.btnToggleTrash.classList.add('active');
+        }
+    } else {
+        DOM.btnToggleViewText.textContent = "View Archive";
+        if (DOM.btnToggleTrash) {
+            DOM.btnToggleTrashText.textContent = "Trash";
+        }
+    }
+    renderFolders();
+}
+
 function switchFolder(folderId) {
     currentFolderId = folderId;
     viewMode = 'active';
     updateViewArchiveUI();
-    startNotesSync();
+    renderGrid();
     closeMobileSidebar(); // Auto-close on mobile when folder selected
 }
 
@@ -351,6 +447,8 @@ function triggerNoteAutoSave(note) {
 function renderFolders() {
     DOM.folderList.innerHTML = '';
     folders.forEach(f => {
+        if (f.deleted) return;
+        
         const li = document.createElement('li');
         li.className = `folder-item ${f.id === currentFolderId && viewMode === 'active' ? 'active' : ''}`;
         li.setAttribute('tabindex', '0');
@@ -424,13 +522,25 @@ async function saveNewFolder() {
 }
 
 async function deleteFolder(folderId) {
-    if (!safeConfirm("Delete this folder? Notes inside it will not be deleted from the server, but will be removed from this view.")) return;
+    if (!safeConfirm("Move this folder to Trash? Notes inside it will also be archived and moved to Trash.")) return;
     
-    folders = folders.filter(f => f.id !== folderId);
+    folders = folders.map(f => f.id === folderId ? { ...f, deleted: true, deletedAt: Date.now() } : f);
     try {
         const roomRef = doc(db, 'clipboards', currentRoomHash);
         await setDoc(roomRef, { folders }, { merge: true });
+        
+        // Also soft-delete all notes in this folder
+        const notesInFolder = notesArray.filter(n => n.folderId === folderId);
+        for (const note of notesInFolder) {
+            const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
+            await setDoc(noteRef, {
+                deleted: true,
+                deletedAt: Date.now()
+            }, { merge: true });
+        }
+        
         if (currentFolderId === folderId) switchFolder('default');
+        showToast("Folder moved to Trash");
     } catch(err) {
         showToast("Failed to delete folder");
     }
@@ -461,10 +571,117 @@ function renderGrid() {
     if (isAppLocked) return;
     DOM.clipGrid.innerHTML = "";
     
+    if (viewMode === 'trash') {
+        const trashFolders = folders.filter(f => f.deleted && f.name.toLowerCase().includes(searchQuery));
+        const trashNotes = notesArray.filter(n => n.deleted && n.text.toLowerCase().includes(searchQuery));
+        
+        if (trashFolders.length === 0 && trashNotes.length === 0) {
+            DOM.emptyState.classList.remove('hidden');
+            DOM.emptyState.querySelector('h3').textContent = "Trash is empty";
+            DOM.emptyState.querySelector('p').textContent = "Deleted notes and folders will appear here for 30 days.";
+            return;
+        } else {
+            DOM.emptyState.classList.add('hidden');
+        }
+        
+        trashFolders.forEach(f => {
+            const card = document.createElement('div');
+            card.className = 'card trash-card';
+            
+            const msRemaining = (f.deletedAt + 30 * 24 * 60 * 60 * 1000) - Date.now();
+            const daysRemaining = Math.max(1, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+            
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="card-badges">
+                        <span class="badge" style="background: var(--danger); color: white; display: inline-flex; align-items: center; gap: 4px;">
+                            Folder
+                        </span>
+                        <span class="badge" style="display: inline-flex; align-items: center; gap: 4px;">
+                            ${daysRemaining} days left
+                        </span>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; margin: 15px 0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    <span style="font-weight: 700; font-size: 1.1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.name}</span>
+                </div>
+                <div class="card-footer">
+                    <div class="card-actions" style="justify-content: space-between; width: 100%;">
+                        <button class="action-btn restore-folder-btn" style="display:inline-flex; align-items:center; gap:4px; font-weight: 600;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                            Restore
+                        </button>
+                        <button class="action-btn del delete-folder-perm-btn" style="display:inline-flex; align-items:center; gap:4px;">
+                            Delete Perm
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            card.querySelector('.restore-folder-btn').onclick = () => restoreFolder(f.id);
+            card.querySelector('.delete-folder-perm-btn').onclick = () => deleteFolderPermanently(f.id);
+            DOM.clipGrid.appendChild(card);
+        });
+        
+        trashNotes.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'card trash-card';
+            
+            const msRemaining = (item.deletedAt + 30 * 24 * 60 * 60 * 1000) - Date.now();
+            const daysRemaining = Math.max(1, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+            
+            const imageHtml = item.image ? `
+                <div class="card-image-wrapper">
+                    <img src="${item.image}" class="card-image" alt="Note Image">
+                </div>
+            ` : '';
+            
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="card-badges">
+                        <span class="badge" style="background: var(--warning); color: white; display: inline-flex; align-items: center; gap: 4px;">
+                            Note
+                        </span>
+                        <span class="badge" style="display: inline-flex; align-items: center; gap: 4px;">
+                            ${daysRemaining} days left
+                        </span>
+                    </div>
+                </div>
+                ${imageHtml}
+                <textarea class="card-body" readonly aria-label="Note Content" style="opacity: 0.8; cursor: not-allowed;">${item.text}</textarea>
+                <div class="card-footer">
+                    <div class="card-actions" style="justify-content: space-between; width: 100%;">
+                        <button class="action-btn restore-note-btn" style="display:inline-flex; align-items:center; gap:4px; font-weight: 600;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                            Restore
+                        </button>
+                        <button class="action-btn del delete-note-perm-btn" style="display:inline-flex; align-items:center; gap:4px;">
+                            Delete Perm
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            const textInput = card.querySelector('.card-body');
+            setTimeout(() => resizeTextarea(textInput), 0);
+            
+            card.querySelector('.restore-note-btn').onclick = () => restoreNote(item.id);
+            card.querySelector('.delete-note-perm-btn').onclick = () => deleteNotePermanently(item.id);
+            DOM.clipGrid.appendChild(card);
+        });
+        
+        return;
+    }
+    
+    DOM.emptyState.querySelector('h3').textContent = "No notes yet";
+    DOM.emptyState.querySelector('p').textContent = 'Click "+ New Note" to start writing in this folder.';
+    
     let filtered = notesArray.filter(n => {
-        const matchesView = viewMode === 'archived' ? n.archived : !n.archived;
+        const matchesFolder = n.folderId === currentFolderId;
+        const matchesView = viewMode === 'archived' ? (n.archived && !n.deleted) : (!n.archived && !n.deleted);
         const matchesSearch = n.text.toLowerCase().includes(searchQuery);
-        return matchesView && matchesSearch;
+        return matchesFolder && matchesView && matchesSearch;
     });
 
     filtered.sort((a, b) => {
@@ -642,13 +859,16 @@ function renderGrid() {
         });
 
         card.querySelector('.del-btn').addEventListener('click', async () => {
-            if (safeConfirm("Delete this note permanently?")) {
+            if (safeConfirm("Move this note to Trash?")) {
                 const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', item.id);
                 try {
-                    await deleteDoc(noteRef);
-                    showToast("Note deleted");
+                    await setDoc(noteRef, {
+                        deleted: true,
+                        deletedAt: Date.now()
+                    }, { merge: true });
+                    showToast("Note moved to Trash");
                 } catch(err) {
-                    showToast("Failed to delete note");
+                    showToast("Failed to move note to Trash");
                 }
             }
         });
@@ -775,6 +995,14 @@ DOM.btnToggleView.addEventListener('click', () => {
     updateViewArchiveUI();
     renderGrid();
 });
+
+if (DOM.btnToggleTrash) {
+    DOM.btnToggleTrash.addEventListener('click', () => {
+        viewMode = viewMode === 'trash' ? 'active' : 'trash';
+        updateViewArchiveUI();
+        renderGrid();
+    });
+}
 
 // Search and Clear Search
 DOM.searchInput.addEventListener('input', (e) => {
@@ -949,6 +1177,76 @@ function compressImage(file, maxSizeKB = 256) {
         };
         reader.onerror = (err) => reject(new Error("Failed to read image file."));
     });
+}
+
+async function restoreFolder(folderId) {
+    folders = folders.map(f => f.id === folderId ? { ...f, deleted: false, deletedAt: null } : f);
+    try {
+        const roomRef = doc(db, 'clipboards', currentRoomHash);
+        await setDoc(roomRef, { folders }, { merge: true });
+        showToast("Folder restored");
+        renderGrid();
+    } catch(err) {
+        showToast("Failed to restore folder");
+    }
+}
+
+async function deleteFolderPermanently(folderId) {
+    if (!safeConfirm("Permanently delete this folder and all notes inside it? This action cannot be undone.")) return;
+    
+    folders = folders.filter(f => f.id !== folderId);
+    try {
+        const roomRef = doc(db, 'clipboards', currentRoomHash);
+        await setDoc(roomRef, { folders }, { merge: true });
+        
+        const notesInFolder = notesArray.filter(n => n.folderId === folderId);
+        for (const note of notesInFolder) {
+            const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
+            await deleteDoc(noteRef);
+        }
+        
+        showToast("Folder and notes permanently deleted");
+        renderGrid();
+    } catch(err) {
+        showToast("Failed to delete folder permanently");
+    }
+}
+
+async function restoreNote(noteId) {
+    const note = notesArray.find(n => n.id === noteId);
+    if (!note) return;
+    
+    const parentFolder = folders.find(f => f.id === note.folderId);
+    let targetFolderId = note.folderId;
+    if (parentFolder && parentFolder.deleted) {
+        targetFolderId = 'default';
+        showToast("Note's original folder is deleted. Note restored to General folder.");
+    }
+    
+    const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', noteId);
+    try {
+        await setDoc(noteRef, {
+            deleted: false,
+            deletedAt: null,
+            folderId: targetFolderId,
+            updatedAt: Date.now()
+        }, { merge: true });
+        showToast("Note restored");
+    } catch(err) {
+        showToast("Failed to restore note");
+    }
+}
+
+async function deleteNotePermanently(noteId) {
+    if (!safeConfirm("Permanently delete this note? This action cannot be undone.")) return;
+    
+    const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', noteId);
+    try {
+        await deleteDoc(noteRef);
+        showToast("Note permanently deleted");
+    } catch(err) {
+        showToast("Failed to delete note");
+    }
 }
 
 // Exports for unit testing

@@ -74,7 +74,7 @@ h1, h2, h3 { color: var(--text-main); }
     background: var(--bg-surface);
     border: 1px solid var(--border);
     padding: 8px 16px;
-    border-radius: 20px;
+    border-radius: var(--radius-md);
     color: var(--text-main);
     font-weight: 600;
     cursor: pointer;
@@ -87,7 +87,7 @@ h1, h2, h3 { color: var(--text-main); }
 
 .btn-icon {
     padding: 8px;
-    border-radius: 50%;
+    border-radius: var(--radius-sm);
     width: 40px;
     height: 40px;
     justify-content: center;
@@ -400,7 +400,7 @@ header {
 .search-container { position: relative; display: flex; align-items: center;}
 .search-container input {
     padding: 8px 32px 8px 36px;
-    border-radius: 20px;
+    border-radius: var(--radius-md);
     border: 1px solid var(--border);
     background: var(--bg-base);
     color: var(--text-main);
@@ -417,19 +417,18 @@ header {
 }
 .btn-clear:hover { background: var(--bg-hover); color: var(--text-main); }
 
-#btnToggleView {
-    min-width: 150px;
+#btnToggleView, #btnToggleTrash {
     justify-content: center;
 }
 
-#btnToggleView.active {
+#btnToggleView.active, #btnToggleTrash.active {
     background: var(--primary-light) !important;
     color: var(--primary) !important;
     border-color: var(--primary) !important;
     font-weight: 600;
 }
 @media (prefers-color-scheme: dark) {
-    #btnToggleView.active {
+    #btnToggleView.active, #btnToggleTrash.active {
         background: var(--primary-light) !important;
         color: #fff !important;
         border-color: var(--primary) !important;
@@ -483,7 +482,7 @@ header {
     color: var(--text-muted);
     font-size: 0.75em;
     padding: 4px 10px;
-    border-radius: 12px;
+    border-radius: var(--radius-sm);
     font-weight: 600;
     cursor: pointer;
     user-select: none;
@@ -663,7 +662,25 @@ select.badge option {
         transform: translateX(0);
     }
 
-    header { padding: 10px 15px; }
+    header {
+        height: 64px !important;
+        padding: 0 16px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    .brand {
+        height: 64px !important;
+        padding: 0 16px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+    }
+
+    .btn-add-note-sidebar {
+        display: none !important;
+    }
+
     #btnMobileMenu { display: inline-flex; }
     .main-scroll { padding: 15px; }
     
@@ -679,7 +696,7 @@ select.badge option {
         right: 24px;
         width: 56px;
         height: 56px;
-        border-radius: 50%;
+        border-radius: var(--radius-lg);
         padding: 0;
         display: flex;
         align-items: center;
