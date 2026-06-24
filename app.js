@@ -610,6 +610,19 @@ function renderFolders() {
             li.addEventListener('touchcancel', clearTimer);
         }
         
+        if (f.id === 'default' && !isSelectingFolders) {
+            let pressTimer;
+            const clearTimer = () => clearTimeout(pressTimer);
+            li.addEventListener('touchstart', (e) => {
+                pressTimer = setTimeout(() => {
+                    showToast("General folder cannot be renamed or deleted");
+                }, 500);
+            });
+            li.addEventListener('touchend', clearTimer);
+            li.addEventListener('touchmove', clearTimer);
+            li.addEventListener('touchcancel', clearTimer);
+        }
+        
         if (isSelectingFolders && f.id !== 'default') {
             li.onclick = (e) => {
                 e.preventDefault();
