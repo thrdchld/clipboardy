@@ -415,6 +415,8 @@ header {
     z-index: 30;
     gap: 15px;
     height: 56px;
+    min-height: 56px;
+    max-height: 56px;
     box-sizing: border-box;
     flex-shrink: 0;
 }

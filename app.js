@@ -72,6 +72,7 @@ const DOM = {
     btnLock: document.getElementById('btnLock'),
     btnToggleView: document.getElementById('btnToggleView'),
     btnToggleTrash: document.getElementById('btnToggleTrash'),
+    btnEmptyTrash: document.getElementById('btnEmptyTrash'),
     btnToggleTrashText: document.getElementById('btnToggleTrashText'),
     searchInput: document.getElementById('searchInput'),
     btnClearSearch: document.getElementById('btnClearSearch'),
@@ -424,6 +425,23 @@ function updateViewArchiveUI() {
             DOM.btnToggleTrashText.textContent = "Trash";
         }
     }
+
+    if (DOM.btnEmptyTrash) {
+        if (viewMode === 'trash') {
+            DOM.btnEmptyTrash.classList.remove('hidden');
+            DOM.btnEmptyTrash.style.display = 'inline-flex';
+            if (DOM.btnAddNoteHeader) {
+                DOM.btnAddNoteHeader.style.display = 'none';
+            }
+        } else {
+            DOM.btnEmptyTrash.classList.add('hidden');
+            DOM.btnEmptyTrash.style.display = 'none';
+            if (DOM.btnAddNoteHeader) {
+                DOM.btnAddNoteHeader.style.display = '';
+            }
+        }
+    }
+
     renderFolders();
 }
 
@@ -697,7 +715,7 @@ function renderGrid() {
     
     if (viewMode === 'archived') {
         DOM.emptyState.querySelector('h3').textContent = "Archive is empty";
-        DOM.emptyState.querySelector('p').textContent = "Notes you archive will appear here.";
+        DOM.emptyState.querySelector('p').textContent = "Archived notes are hidden from your main folders but safely stored here. Click the archive icon on any note to move it here.";
     } else {
         DOM.emptyState.querySelector('h3').textContent = "No notes yet";
         DOM.emptyState.querySelector('p').textContent = 'Click "+ New Note" to start writing in this folder.';
@@ -1324,6 +1342,37 @@ async function deleteNotePermanently(noteId) {
     } catch(err) {
         showToast("Failed to delete note");
     }
+}
+
+async function emptyTrash() {
+    if (!await showCustomConfirm("Empty Trash", "Delete all items in trash permanently? This action cannot be undone.", true)) return;
+    
+    try {
+        const trashFolders = folders.filter(f => f.deleted);
+        const trashNotes = notesArray.filter(n => n.deleted);
+        
+        // Delete all notes
+        for (const note of trashNotes) {
+            const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
+            await deleteDoc(noteRef);
+        }
+        
+        // Delete all folders
+        if (trashFolders.length > 0) {
+            const newFolders = folders.filter(f => !f.deleted);
+            const roomRef = doc(db, 'clipboards', currentRoomHash);
+            await setDoc(roomRef, { folders: newFolders }, { merge: true });
+            folders = newFolders;
+        }
+        
+        showToast("Trash emptied successfully");
+    } catch(err) {
+        showToast("Failed to empty trash");
+    }
+}
+
+if (DOM.btnEmptyTrash) {
+    DOM.btnEmptyTrash.addEventListener('click', emptyTrash);
 }
 
 // Exports for unit testing
