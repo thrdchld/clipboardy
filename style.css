@@ -258,6 +258,7 @@ h1, h2, h3 { color: var(--text-main); }
     height: 64px;
     padding: 0 24px;
     box-sizing: border-box;
+    background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
@@ -860,6 +861,13 @@ textarea:focus-visible,
 .folder-item:focus-visible {
     outline: 3px solid var(--primary);
     outline-offset: 2px;
+}
+
+/* Disable focus outline on input areas with custom focus border/shadow to prevent double borders */
+.input-field:focus-visible,
+.search-container input:focus-visible,
+.card-body:focus-visible {
+    outline: none !important;
 }
 
 /* Spinner Animation for Uploading state */
