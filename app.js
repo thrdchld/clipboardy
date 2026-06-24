@@ -218,7 +218,7 @@ async function login() {
         
     } catch (err) {
         console.error(err);
-        showToast("An error occurred.");
+        showToast("Error: " + err.message);
     } finally {
         DOM.loginBtn.textContent = "Unlock Room";
         DOM.loginBtn.disabled = false;
@@ -269,49 +269,7 @@ async function ensureRoomMetadata() {
     }
 }
 
-function startFoldersSync() {
-    const roomRef = doc(db, 'clipboards', currentRoomHash);
-    unsubscribeFolders = onSnapshot(roomRef, (docSnap) => {
-        if (docSnap.exists() && docSnap.data().folders) {
-            folders = docSnap.data().folders;
-            if (!folders.find(f => f.id === currentFolderId)) {
-                currentFolderId = folders[0] ? folders[0].id : 'default';
-            }
-            renderFolders();
-        }
-    });
-}
 
-function startNotesSync() {
-    if (unsubscribeNotes) unsubscribeNotes();
-    
-    const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
-    const q = query(notesRef, where('folderId', '==', currentFolderId));
-    
-    unsubscribeNotes = onSnapshot(q, (snapshot) => {
-        notesArray = [];
-        snapshot.forEach(docSnap => {
-            notesArray.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        
-        DOM.syncIndicator.classList.remove('saving');
-        renderGrid();
-    }, (error) => {
-        console.error("Sync Error", error);
-        showToast("Disconnected from note sync");
-    });
-}
-
-function updateViewArchiveUI() {
-    if (viewMode === 'archived') {
-        DOM.btnToggleViewText.textContent = "Back to Active";
-        DOM.btnToggleView.classList.add('active');
-    } else {
-        DOM.btnToggleViewText.textContent = "View Archive";
-        DOM.btnToggleView.classList.remove('active');
-    }
-    renderFolders();
-}
 
 async function cleanupExpiredFolders() {
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -368,7 +326,7 @@ function startNotesSync() {
     if (unsubscribeNotes) unsubscribeNotes();
     
     const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
-    const q = query(notesRef);
+    const q = query(notesRef, where('folderId', '==', currentFolderId));
     
     unsubscribeNotes = onSnapshot(q, (snapshot) => {
         notesArray = [];
@@ -411,7 +369,7 @@ function switchFolder(folderId) {
     currentFolderId = folderId;
     viewMode = 'active';
     updateViewArchiveUI();
-    renderGrid();
+    startNotesSync();
     closeMobileSidebar(); // Auto-close on mobile when folder selected
 }
 
