@@ -255,7 +255,7 @@ h1, h2, h3 { color: var(--text-main); }
     display: flex;
     align-items: center;
     gap: 10px;
-    height: 64px;
+    height: 56px;
     padding: 0 24px;
     box-sizing: border-box;
     background: var(--bg-surface);
@@ -414,7 +414,7 @@ header {
     border-bottom: 1px solid var(--border);
     z-index: 30;
     gap: 15px;
-    height: 64px;
+    height: 56px;
     box-sizing: border-box;
 }
 
@@ -726,14 +726,14 @@ select.badge option {
     }
 
     header {
-        height: 64px !important;
+        height: 56px !important;
         padding: 0 16px !important;
         display: flex !important;
         align-items: center !important;
     }
     
     .brand {
-        height: 64px !important;
+        height: 56px !important;
         padding: 0 16px !important;
         display: flex !important;
         align-items: center !important;
