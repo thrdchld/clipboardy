@@ -239,8 +239,21 @@ h1, h2, h3 { color: var(--text-main); }
 
 .sidebar-content {
     flex-grow: 1;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding: 20px;
+}
+
+.btn-add-note-sidebar {
+    width: 100%;
+    justify-content: center;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    font-size: 0.95em;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
 .section-title {
@@ -255,7 +268,31 @@ h1, h2, h3 { color: var(--text-main); }
     align-items: center;
 }
 
-.folder-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.folder-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    flex-grow: 1;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+/* Custom scrollbar for folders list */
+.folder-list::-webkit-scrollbar {
+    width: 6px;
+}
+.folder-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.folder-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+.folder-list::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
 
 .folder-item {
     display: flex;
@@ -383,6 +420,20 @@ header {
 #btnToggleView {
     min-width: 150px;
     justify-content: center;
+}
+
+#btnToggleView.active {
+    background: var(--primary-light) !important;
+    color: var(--primary) !important;
+    border-color: var(--primary) !important;
+    font-weight: 600;
+}
+@media (prefers-color-scheme: dark) {
+    #btnToggleView.active {
+        background: var(--primary-light) !important;
+        color: #fff !important;
+        border-color: var(--primary) !important;
+    }
 }
 
 .main-scroll {
@@ -643,6 +694,7 @@ select.badge option {
     .grid { column-count: 1; }
 }
 
+.fab-mobile { display: none; }
 .fab-icon { display: none; }
 
 /* ==========================================

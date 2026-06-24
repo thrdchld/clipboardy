@@ -66,6 +66,7 @@ const DOM = {
     btnAddFolder: document.getElementById('btnAddFolder'),
     
     btnAddNote: document.getElementById('btnAddNote'),
+    btnAddNoteMobile: document.getElementById('btnAddNoteMobile'),
     btnLock: document.getElementById('btnLock'),
     btnToggleView: document.getElementById('btnToggleView'),
     searchInput: document.getElementById('searchInput'),
@@ -298,9 +299,21 @@ function startNotesSync() {
     });
 }
 
+function updateViewArchiveUI() {
+    if (viewMode === 'archived') {
+        DOM.btnToggleViewText.textContent = "Back to Active";
+        DOM.btnToggleView.classList.add('active');
+    } else {
+        DOM.btnToggleViewText.textContent = "View Archive";
+        DOM.btnToggleView.classList.remove('active');
+    }
+    renderFolders();
+}
+
 function switchFolder(folderId) {
     currentFolderId = folderId;
-    renderFolders();
+    viewMode = 'active';
+    updateViewArchiveUI();
     startNotesSync();
     closeMobileSidebar(); // Auto-close on mobile when folder selected
 }
@@ -339,7 +352,7 @@ function renderFolders() {
     DOM.folderList.innerHTML = '';
     folders.forEach(f => {
         const li = document.createElement('li');
-        li.className = `folder-item ${f.id === currentFolderId ? 'active' : ''}`;
+        li.className = `folder-item ${f.id === currentFolderId && viewMode === 'active' ? 'active' : ''}`;
         li.setAttribute('tabindex', '0');
         li.setAttribute('role', 'button');
         li.setAttribute('aria-label', `Folder ${f.name}`);
@@ -725,10 +738,10 @@ DOM.loginBtn.addEventListener('click', login);
 DOM.passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
 DOM.btnLock.addEventListener('click', lockApp);
 
-DOM.btnAddNote.addEventListener('click', async () => {
+const handleAddNote = async () => {
     if(viewMode === 'archived') {
         viewMode = 'active';
-        DOM.btnToggleViewText.textContent = "View Archive";
+        updateViewArchiveUI();
     }
     
     const newNoteId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -750,12 +763,16 @@ DOM.btnAddNote.addEventListener('click', async () => {
             resizeTextarea(firstInput);
         }
     }, 100);
-});
+};
+
+DOM.btnAddNote.addEventListener('click', handleAddNote);
+if (DOM.btnAddNoteMobile) {
+    DOM.btnAddNoteMobile.addEventListener('click', handleAddNote);
+}
 
 DOM.btnToggleView.addEventListener('click', () => {
     viewMode = viewMode === 'active' ? 'archived' : 'active';
-    DOM.btnToggleViewText.textContent = viewMode === 'active' ? "View Archive" : "Back to Active";
-    DOM.btnToggleView.classList.toggle('btn-primary');
+    updateViewArchiveUI();
     renderGrid();
 });
 
