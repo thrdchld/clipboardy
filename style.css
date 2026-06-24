@@ -1000,3 +1000,17 @@ textarea:focus-visible,
 .folder-dropdown-item.danger:hover {
     background: rgba(239, 68, 68, 0.1);
 }
+
+/* Fix mobile long-press highlight and hide 3 dots */
+.folder-item {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+@media (max-width: 768px) {
+    .btn-folder-options {
+        display: none !important;
+    }
+}
