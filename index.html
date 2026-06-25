@@ -100,7 +100,10 @@
             <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
                 <input type="password" id="lockPasswordInput" class="input-field" placeholder="Enter Lock Password" style="box-sizing: border-box; text-align: center; font-size: 1.2em; letter-spacing: 2px; margin-bottom: 8px;">
                 <button id="btnUnlockGoogle" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">Unlock Screen</button>
-                <button id="btnSwitchAccount" class="btn" style="width: 100%; justify-content: center; padding: 10px; font-size: 0.9em; margin-top: 8px; background: transparent; border: none; color: var(--text-muted); cursor: pointer;">Sign Out / Switch Account</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; box-sizing: border-box; width: 100%;">
+                    <button id="btnForgotPassword" class="btn" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.85em; font-weight: 500; padding: 6px 10px;">Forgot Password?</button>
+                    <button id="btnSwitchAccount" class="btn" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85em; font-weight: 500; padding: 6px 10px;">Sign Out / Switch Account</button>
+                </div>
             </div>
         </div>
     </div>
@@ -180,8 +183,17 @@
                     </button>
                 </div>
 
-                <!-- Profile Card Button -->
-                <div id="sidebarProfileCard" class="sidebar-profile-card" style="margin-top: 16px; padding: 10px; border-radius: var(--radius-md); background: rgba(0,0,0,0.03); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.2s;">
+                <button id="btnOpenChangePassword" class="btn" style="width: 100%; justify-content: center; margin-top: 8px; font-size: 0.85rem; padding: 8px; display: none; align-items: center; gap: 6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    Change Lock Password
+                </button>
+                
+                <button id="btnResetData" class="btn btn-danger" style="width: 100%; justify-content: center; margin-top: 8px; font-size: 0.85rem; padding: 8px; display: none; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--danger); color: var(--danger);">
+                    Reset Room Data
+                </button>
+                
+                <!-- Profile Card Button (Google only) -->
+                <div id="sidebarProfileCard" class="sidebar-profile-card" style="margin-top: 16px; padding: 10px; border-radius: var(--radius-md); background: rgba(0,0,0,0.03); border: 1px solid var(--border-color); display: none; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.2s;">
                     <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; width: calc(100% - 20px);">
                         <img id="sidebarAvatar" src="https://via.placeholder.com/32" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;">
                         <div style="display: flex; flex-direction: column; overflow: hidden; line-height: 1.2; text-align: left;">
@@ -191,8 +203,18 @@
                     </div>
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
-                <!-- Guest Lock Button (only visible in Guest Mode) -->
-                <button id="btnGuestLock" class="btn btn-danger" title="Lock Application" aria-label="Lock Application" style="width: 100%; justify-content: center; margin-top: 16px; display: none; align-items: center; gap: 8px; padding: 10px;">
+                
+                <!-- Guest Warning Sidebar Widget (Guest only) -->
+                <div id="sidebarGuestWarning" style="margin-top: 16px; padding: 10px; border-radius: var(--radius-md); background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.18); color: #b45309; text-align: left; font-size: 0.75rem; cursor: pointer; display: none; align-items: center; gap: 8px; transition: all 0.2s;">
+                    <span>⚠️</span>
+                    <div style="flex-grow: 1; overflow: hidden;">
+                        <strong style="display: block; font-weight: 700;">Guest Mode (24h)</strong>
+                        <span style="font-size: 0.7rem; color: #d97706;">Click to Connect Google & Import</span>
+                    </div>
+                </div>
+
+                <!-- Lock Application Button -->
+                <button id="btnLock" class="btn btn-danger" title="Lock Application" aria-label="Lock Application" style="width: 100%; justify-content: center; margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; padding: 10px;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                     Lock Application
                 </button>
@@ -201,14 +223,6 @@
 
         <!-- Main Content Area -->
         <main class="main-content">
-            <!-- Warning Banner (Guest Mode Only) -->
-            <div id="guestWarningBanner" style="display: none; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; background: #fffbeb; border-bottom: 1px solid #fef3c7; color: #b45309; font-size: 0.85rem; z-index: 50; box-sizing: border-box; width: 100%;">
-                <div style="display: flex; align-items: center; gap: 8px; text-align: left;">
-                    <span>⚠️</span>
-                    <span><strong>Guest Mode Warning:</strong> Notes in this room are temporary and will be deleted after 24 hours.</span>
-                </div>
-                <button id="btnUpgradeGoogle" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: #d97706; border-color: #d97706; color: white; cursor: pointer; border-radius: var(--radius-sm); white-space: nowrap;">Connect Google</button>
-            </div>
             <header>
                 <div class="header-title" style="display:flex; align-items:center; gap:12px;">
                     <button id="btnMobileMenu" class="btn btn-icon" title="Toggle Sidebar" aria-label="Toggle Sidebar">
@@ -292,18 +306,8 @@
                     <span id="profileModalAuthType" style="font-weight: 600; color: var(--text);">Google Sign-In</span>
                 </div>
             </div>
-
-            <!-- Change Password Section -->
-            <div id="changePasswordSection" style="display: none; flex-direction: column; gap: 8px; margin-bottom: 16px; border-top: 1px solid var(--border-color); padding-top: 16px; text-align: left; box-sizing: border-box; width: 100%;">
-                <div style="font-size: 0.8em; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Change Lock Password</div>
-                <input type="password" id="changeOldPassword" class="input-field" placeholder="Current Lock Password" style="padding: 8px; font-size: 0.9em; box-sizing: border-box; text-align: center; margin-bottom: 4px;">
-                <input type="password" id="changeNewPassword" class="input-field" placeholder="New Lock Password" style="padding: 8px; font-size: 0.9em; box-sizing: border-box; text-align: center; margin-bottom: 4px;">
-                <button id="btnSubmitChangePassword" class="btn btn-primary" style="padding: 8px; justify-content: center; font-size: 0.9em; width: 100%;">Update Password</button>
-            </div>
             
             <div class="modal-actions" style="flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;">
-                <button id="btnToggleChangePassword" class="btn" style="width: 100%; justify-content: center; padding: 10px; box-sizing: border-box;">Change Lock Password</button>
-                <button id="btnResetData" class="btn btn-danger" style="width: 100%; justify-content: center; padding: 10px; box-sizing: border-box; background: transparent; border: 1px solid var(--danger); color: var(--danger);">Reset Room Data</button>
                 <button id="btnSignOut" class="btn btn-danger" style="width: 100%; justify-content: center; padding: 10px; box-sizing: border-box; display: inline-flex; align-items: center;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     Logout & Lock
@@ -330,6 +334,26 @@
             <button id="btnSaveLockPassword" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight: 600;">Save & Unlock</button>
         </div>
     </div>
+
+    <!-- Change Lock Password Modal -->
+    <div id="changeLockPasswordModal" class="modal-overlay hidden" style="z-index: 2800;">
+        <div class="modal" style="max-width: 360px; padding: 24px; border-radius: var(--radius-lg);">
+            <h3 style="margin-bottom: 12px; font-weight: 700; font-size: 1.15em; display: flex; align-items: center; gap: 8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                Change Lock Password
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; width: 100%; box-sizing: border-box;">
+                <input type="password" id="changeOldPassword" class="input-field" placeholder="Current Lock Password" style="box-sizing: border-box; text-align: center; font-size: 1.1em;">
+                <input type="password" id="changeNewPassword" class="input-field" placeholder="New Lock Password" style="box-sizing: border-box; text-align: center; font-size: 1.1em;">
+                <input type="password" id="changeConfirmPassword" class="input-field" placeholder="Confirm New Password" style="box-sizing: border-box; text-align: center; font-size: 1.1em;">
+            </div>
+            <div class="modal-actions" style="flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;">
+                <button id="btnSubmitChangePassword" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight: 600;">Update Password</button>
+                <button id="btnCancelChangePassword" class="btn" style="width: 100%; justify-content: center; padding: 10px; box-sizing: border-box;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Folder Creation Modal -->
     <div id="folderModal" class="modal-overlay hidden">

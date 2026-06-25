@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp, collection, query, where, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp, collection, query, where, deleteDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // ==========================================
 // 🔧 KONFIGURASI FIREBASE
@@ -90,16 +90,17 @@ const DOM = {
     confirmLockPassword: document.getElementById('confirmLockPassword'),
     btnSaveLockPassword: document.getElementById('btnSaveLockPassword'),
     
-    guestWarningBanner: document.getElementById('guestWarningBanner'),
-    btnUpgradeGoogle: document.getElementById('btnUpgradeGoogle'),
-    btnGuestLock: document.getElementById('btnGuestLock'),
-    
-    btnToggleChangePassword: document.getElementById('btnToggleChangePassword'),
-    changePasswordSection: document.getElementById('changePasswordSection'),
+    btnLock: document.getElementById('btnLock'),
+    btnOpenChangePassword: document.getElementById('btnOpenChangePassword'),
+    changeLockPasswordModal: document.getElementById('changeLockPasswordModal'),
+    btnCancelChangePassword: document.getElementById('btnCancelChangePassword'),
+    changeConfirmPassword: document.getElementById('changeConfirmPassword'),
+    sidebarGuestWarning: document.getElementById('sidebarGuestWarning'),
+    btnForgotPassword: document.getElementById('btnForgotPassword'),
+    btnResetData: document.getElementById('btnResetData'),
     changeOldPassword: document.getElementById('changeOldPassword'),
     changeNewPassword: document.getElementById('changeNewPassword'),
     btnSubmitChangePassword: document.getElementById('btnSubmitChangePassword'),
-    btnResetData: document.getElementById('btnResetData'),
 
     sidebarProfileCard: document.getElementById('sidebarProfileCard'),
     sidebarAvatar: document.getElementById('sidebarAvatar'),
@@ -153,17 +154,91 @@ function updateIdleTimeoutVisibility() {
 // 🔒 AUTH & AUTO-LOCK
 // ==========================================
 let bypassLockChallenge = false;
+let isImportingFromGuest = false;
+let guestRoomHashToImport = null;
+
+// Import guest notes/folders to Google Room
+async function importGuestNotesToGoogle(googleUid) {
+    if (!guestRoomHashToImport) return;
+    
+    try {
+        const guestRoomHash = guestRoomHashToImport;
+        const googleRoomHash = "google_" + googleUid;
+        
+        // 1. Fetch guest folders
+        const guestRoomRef = doc(db, 'clipboards', guestRoomHash);
+        const guestSnap = await getDoc(guestRoomRef);
+        let guestFolders = [];
+        if (guestSnap.exists() && guestSnap.data().folders) {
+            guestFolders = guestSnap.data().folders;
+        }
+        
+        // 2. Fetch guest notes
+        const guestNotesRef = collection(db, 'clipboards', guestRoomHash, 'notes');
+        const guestNotesSnap = await getDocs(guestNotesRef);
+        
+        if (guestFolders.length <= 1 && guestNotesSnap.empty) {
+            guestRoomHashToImport = null;
+            isImportingFromGuest = false;
+            return;
+        }
+        
+        const confirmImport = await showCustomConfirm(
+            "Import Guest Notes",
+            "We found folders/notes in your guest room. Would you like to import and merge them into your Google Account?",
+            false
+        );
+        
+        if (confirmImport) {
+            showToast("Importing notes...");
+            
+            // 3. Merge folders
+            const googleRoomRef = doc(db, 'clipboards', googleRoomHash);
+            const googleSnap = await getDoc(googleRoomRef);
+            let googleFolders = [{ id: 'default', name: 'General' }];
+            if (googleSnap.exists() && googleSnap.data().folders) {
+                googleFolders = googleSnap.data().folders;
+            }
+            
+            guestFolders.forEach(guestFolder => {
+                if (guestFolder.id === 'default') return;
+                if (!googleFolders.find(f => f.name.toLowerCase() === guestFolder.name.toLowerCase())) {
+                    googleFolders.push({
+                        id: guestFolder.id,
+                        name: guestFolder.name,
+                        createdAt: guestFolder.createdAt || Date.now()
+                    });
+                }
+            });
+            
+            await setDoc(googleRoomRef, { folders: googleFolders }, { merge: true });
+            
+            // 4. Copy notes
+            for (const noteDoc of guestNotesSnap.docs) {
+                const noteData = noteDoc.data();
+                const newNoteRef = doc(db, 'clipboards', googleRoomHash, 'notes', noteDoc.id);
+                await setDoc(newNoteRef, noteData);
+            }
+            
+            showToast("Import successful! Notes transferred.");
+        }
+    } catch (err) {
+        console.error("Failed to import notes", err);
+        showToast("Import failed: " + err.message);
+    } finally {
+        guestRoomHashToImport = null;
+        isImportingFromGuest = false;
+    }
+}
 
 // Profile Update Logic
 function updateProfileUI(user) {
     if (user && !user.isAnonymous) {
         // Google User
         if (DOM.sidebarProfileCard) DOM.sidebarProfileCard.style.display = 'flex';
-        if (DOM.btnGuestLock) DOM.btnGuestLock.style.display = 'none';
-        if (DOM.guestWarningBanner) {
-            DOM.guestWarningBanner.style.display = 'none';
-            DOM.guestWarningBanner.classList.add('hidden');
-        }
+        if (DOM.sidebarGuestWarning) DOM.sidebarGuestWarning.style.display = 'none';
+        if (DOM.btnOpenChangePassword) DOM.btnOpenChangePassword.style.display = 'inline-flex';
+        if (DOM.btnResetData) DOM.btnResetData.style.display = 'inline-flex';
 
         if (DOM.sidebarAvatar) DOM.sidebarAvatar.src = user.photoURL || 'https://via.placeholder.com/32';
         if (DOM.sidebarUserName) DOM.sidebarUserName.textContent = user.displayName || 'Google User';
@@ -185,18 +260,13 @@ function updateProfileUI(user) {
     } else {
         // Guest User / Anonymous
         if (DOM.sidebarProfileCard) DOM.sidebarProfileCard.style.display = 'none';
-        if (DOM.btnGuestLock) DOM.btnGuestLock.style.display = 'inline-flex';
+        if (DOM.btnOpenChangePassword) DOM.btnOpenChangePassword.style.display = 'none';
+        if (DOM.btnResetData) DOM.btnResetData.style.display = 'none';
         
         if (currentRoomHash && !isAppLocked) {
-            if (DOM.guestWarningBanner) {
-                DOM.guestWarningBanner.style.display = 'flex';
-                DOM.guestWarningBanner.classList.remove('hidden');
-            }
+            if (DOM.sidebarGuestWarning) DOM.sidebarGuestWarning.style.display = 'flex';
         } else {
-            if (DOM.guestWarningBanner) {
-                DOM.guestWarningBanner.style.display = 'none';
-                DOM.guestWarningBanner.classList.add('hidden');
-            }
+            if (DOM.sidebarGuestWarning) DOM.sidebarGuestWarning.style.display = 'none';
         }
     }
 }
@@ -217,6 +287,10 @@ async function loginWithGoogle() {
         currentRoomHash = "google_" + user.uid;
         
         await ensureRoomMetadata();
+        
+        if (isImportingFromGuest) {
+            await importGuestNotesToGoogle(user.uid);
+        }
         
         if (!appLockPasswordHash) {
             DOM.setupLockPasswordModal.classList.remove('hidden');
@@ -277,6 +351,10 @@ onAuthStateChanged(auth, async (user) => {
         currentRoomHash = "google_" + user.uid;
         try {
             await ensureRoomMetadata();
+            
+            if (isImportingFromGuest) {
+                await importGuestNotesToGoogle(user.uid);
+            }
             
             if (bypassLockChallenge) {
                 bypassLockChallenge = false;
@@ -527,6 +605,18 @@ document.getElementById('btnSidebarCollapse').addEventListener('click', () => {
 
 async function ensureRoomMetadata() {
     const roomRef = doc(db, 'clipboards', currentRoomHash);
+    
+    // Handle pending lock password reset
+    if (localStorage.getItem('resetLockPasswordPending') === 'true') {
+        try {
+            await setDoc(roomRef, { lockPasswordHash: null }, { merge: true });
+            localStorage.removeItem('resetLockPasswordPending');
+            showToast("Lock password reset triggered");
+        } catch (err) {
+            console.error("Failed to reset lock password in Firestore:", err);
+        }
+    }
+    
     const snap = await getDoc(roomRef);
     if (!snap.exists()) {
         const initialData = {
@@ -737,6 +827,24 @@ function triggerNoteAutoSave(note) {
 // 🎨 UI RENDERING - FOLDERS
 // ==========================================
 function renderFolders() {
+    const activeFolders = folders.filter(f => !f.deleted);
+    if (activeFolders.length <= 1) {
+        isSelectingFolders = false;
+        if (DOM.btnSelectFolders) {
+            DOM.btnSelectFolders.style.color = 'var(--text-muted)';
+            DOM.btnSelectFolders.style.display = 'none';
+        }
+        if (DOM.btnAddFolder) {
+            DOM.btnAddFolder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+            DOM.btnAddFolder.style.color = '';
+            DOM.btnAddFolder.setAttribute('title', 'Add New Folder');
+        }
+    } else {
+        if (DOM.btnSelectFolders) {
+            DOM.btnSelectFolders.style.display = 'inline-flex';
+        }
+    }
+
     DOM.folderList.innerHTML = '';
     folders.forEach(f => {
         if (f.deleted) return;
@@ -1418,10 +1526,15 @@ async function saveLockPassword() {
     }
 }
 
+
+
 async function submitChangePassword() {
     const oldPwd = DOM.changeOldPassword.value.trim();
     const newPwd = DOM.changeNewPassword.value.trim();
-    if (!oldPwd || !newPwd) return showToast("Fields cannot be empty");
+    const confPwd = DOM.changeConfirmPassword.value.trim();
+    
+    if (!oldPwd || !newPwd || !confPwd) return showToast("Fields cannot be empty");
+    if (newPwd !== confPwd) return showToast("New passwords do not match");
     
     const oldHash = await hashPassword(oldPwd);
     if (oldHash !== appLockPasswordHash) {
@@ -1436,11 +1549,34 @@ async function submitChangePassword() {
         appLockPasswordHash = newHash;
         DOM.changeOldPassword.value = '';
         DOM.changeNewPassword.value = '';
-        DOM.changePasswordSection.style.display = 'none';
+        DOM.changeConfirmPassword.value = '';
+        DOM.changeLockPasswordModal.classList.add('hidden');
         showToast("Password updated successfully!");
     } catch (err) {
         console.error(err);
         showToast("Failed to update password: " + err.message);
+    }
+}
+
+async function handleForgotPassword() {
+    if (!currentUser || currentUser.isAnonymous) return;
+    
+    const confirmReset = await showCustomConfirm(
+        "Reset Lock Password",
+        "Forgot your lock password? To reset it, we will send a password reset email to your address and sign you out. You can then log back in with Google to create a new lock password.",
+        false
+    );
+    
+    if (confirmReset) {
+        try {
+            await sendPasswordResetEmail(auth, currentUser.email);
+            showToast("Password reset email sent to " + currentUser.email);
+        } catch (err) {
+            console.error("Failed to send reset email:", err);
+        }
+        
+        localStorage.setItem('resetLockPasswordPending', 'true');
+        await handleSignOut();
     }
 }
 
@@ -1471,6 +1607,7 @@ async function resetRoomData() {
     }
 }
 
+
 DOM.loginBtn.addEventListener('click', login);
 DOM.passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
 if (DOM.btnGoogleLogin) {
@@ -1488,16 +1625,27 @@ if (DOM.btnSwitchAccount) {
 if (DOM.btnSaveLockPassword) {
     DOM.btnSaveLockPassword.addEventListener('click', saveLockPassword);
 }
-if (DOM.btnUpgradeGoogle) {
-    DOM.btnUpgradeGoogle.addEventListener('click', loginWithGoogle);
+if (DOM.btnLock) {
+    DOM.btnLock.addEventListener('click', lockApp);
 }
-if (DOM.btnGuestLock) {
-    DOM.btnGuestLock.addEventListener('click', lockApp);
+if (DOM.btnOpenChangePassword) {
+    DOM.btnOpenChangePassword.addEventListener('click', () => {
+        DOM.changeOldPassword.value = '';
+        DOM.changeNewPassword.value = '';
+        DOM.changeConfirmPassword.value = '';
+        DOM.changeLockPasswordModal.classList.remove('hidden');
+    });
 }
-if (DOM.btnToggleChangePassword) {
-    DOM.btnToggleChangePassword.addEventListener('click', () => {
-        const sec = DOM.changePasswordSection;
-        sec.style.display = sec.style.display === 'none' ? 'flex' : 'none';
+if (DOM.btnCancelChangePassword) {
+    DOM.btnCancelChangePassword.addEventListener('click', () => {
+        DOM.changeLockPasswordModal.classList.add('hidden');
+    });
+}
+if (DOM.changeLockPasswordModal) {
+    DOM.changeLockPasswordModal.addEventListener('click', (e) => {
+        if (e.target === DOM.changeLockPasswordModal) {
+            DOM.changeLockPasswordModal.classList.add('hidden');
+        }
     });
 }
 if (DOM.btnSubmitChangePassword) {
@@ -1506,13 +1654,22 @@ if (DOM.btnSubmitChangePassword) {
 if (DOM.btnResetData) {
     DOM.btnResetData.addEventListener('click', resetRoomData);
 }
+if (DOM.btnForgotPassword) {
+    DOM.btnForgotPassword.addEventListener('click', handleForgotPassword);
+}
+if (DOM.sidebarGuestWarning) {
+    DOM.sidebarGuestWarning.addEventListener('click', () => {
+        if (currentRoomHash && !currentRoomHash.startsWith('google_')) {
+            guestRoomHashToImport = currentRoomHash;
+            isImportingFromGuest = true;
+        }
+        loginWithGoogle();
+    });
+}
 
 if (DOM.sidebarProfileCard) {
     DOM.sidebarProfileCard.addEventListener('click', () => {
         DOM.profileModal.classList.remove('hidden');
-        if (DOM.changePasswordSection) DOM.changePasswordSection.style.display = 'none';
-        if (DOM.changeOldPassword) DOM.changeOldPassword.value = '';
-        if (DOM.changeNewPassword) DOM.changeNewPassword.value = '';
     });
 }
 if (DOM.btnCloseProfile) {
@@ -1520,6 +1677,7 @@ if (DOM.btnCloseProfile) {
         DOM.profileModal.classList.add('hidden');
     });
 }
+
 if (DOM.profileModal) {
     DOM.profileModal.addEventListener('click', (e) => {
         if (e.target === DOM.profileModal) {
