@@ -1648,20 +1648,29 @@ async function handleForgotPassword() {
     
     const confirmReset = await showCustomConfirm(
         "Reset Lock Password",
-        "Forgot your lock password? To reset it, we will send a password reset email to your address and sign you out. You can then log back in with Google to create a new lock password.",
+        "Forgot your lock password? We will send a verification email to " + currentUser.email + " to help you reset it.",
         false
     );
     
     if (confirmReset) {
         try {
             await sendPasswordResetEmail(auth, currentUser.email);
-            showToast("Password reset email sent to " + currentUser.email);
+            
+            // Show successful email confirmation modal before logout
+            await showCustomConfirm(
+                "Email Sent",
+                "A recovery link has been sent to " + currentUser.email + ". Please click the link inside the email to confirm, then return here to log in and set your new code.",
+                false
+            );
+            
+            await handleSignOut();
         } catch (err) {
             console.error("Failed to send reset email:", err);
+            showToast("Failed to send email: " + err.message);
+            if (isChangePwdOpen) {
+                DOM.changeLockPasswordModal.classList.remove('hidden');
+            }
         }
-        
-        localStorage.setItem('resetLockPasswordPending', 'true');
-        await handleSignOut();
     } else {
         if (isChangePwdOpen) {
             DOM.changeLockPasswordModal.classList.remove('hidden');
