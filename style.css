@@ -1032,3 +1032,48 @@ textarea:focus-visible,
     border-color: var(--border-color) !important;
 }
 
+/* Custom Minimal Dropdown Menu for Timeout Settings */
+.dropdown-menu {
+    position: absolute;
+    right: 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    z-index: 2600;
+    display: none;
+    flex-direction: column;
+    min-width: 120px;
+    margin-top: 4px;
+    overflow: hidden;
+    animation: slideDown 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dropdown-menu.show {
+    display: flex;
+}
+.dropdown-item {
+    background: transparent;
+    border: none;
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    color: var(--text-main);
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.15s;
+}
+.dropdown-item:hover {
+    background: var(--bg-hover);
+}
+.dropdown-item.active {
+    background: var(--primary-light) !important;
+    color: var(--primary) !important;
+    font-weight: 600;
+}
+@media (prefers-color-scheme: dark) {
+    .dropdown-item.active {
+        color: #fff !important;
+        background: var(--primary-light) !important;
+    }
+}
+

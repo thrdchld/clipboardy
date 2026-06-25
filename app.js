@@ -62,8 +62,7 @@ const DOM = {
     strictLockToggle: document.getElementById('strictLockToggle'),
     idleLockToggle: document.getElementById('idleLockToggle'),
     btnIdleTimeout: document.getElementById('btnSettingsIdleTimeout'),
-    idleTimeoutModal: document.getElementById('idleTimeoutModal'),
-    btnCancelIdleTimeout: document.getElementById('btnCancelIdleTimeout'),
+    timeoutDropdown: document.getElementById('timeoutDropdown'),
     btnOpenLockSettings: document.getElementById('btnOpenLockSettings'),
     appLockSettingsModal: document.getElementById('appLockSettingsModal'),
     btnCloseLockSettings: document.getElementById('btnCloseLockSettings'),
@@ -101,6 +100,7 @@ const DOM = {
     changeConfirmPassword: document.getElementById('changeConfirmPassword'),
     sidebarGuestWarning: document.getElementById('sidebarGuestWarning'),
     btnForgotPassword: document.getElementById('btnForgotPassword'),
+    btnChangeModalForgotPassword: document.getElementById('btnChangeModalForgotPassword'),
     btnResetData: document.getElementById('btnResetData'),
     changeOldPassword: document.getElementById('changeOldPassword'),
     changeNewPassword: document.getElementById('changeNewPassword'),
@@ -1094,6 +1094,19 @@ function resizeTextarea(textarea) {
 
 function renderGrid() {
     if (isAppLocked) return;
+    
+    // Save active note textarea focus & caret state
+    let activeNoteId = null;
+    let caretStart = 0;
+    let caretEnd = 0;
+    if (document.activeElement && 
+        document.activeElement.classList.contains('card-body') && 
+        document.activeElement.dataset.noteId) {
+        activeNoteId = document.activeElement.dataset.noteId;
+        caretStart = document.activeElement.selectionStart;
+        caretEnd = document.activeElement.selectionEnd;
+    }
+    
     DOM.clipGrid.innerHTML = "";
     
     if (viewMode === 'trash') {
@@ -1280,7 +1293,7 @@ function renderGrid() {
                 </div>
             </div>
             ${imageHtml}
-            <textarea class="card-body" placeholder="Type something..." aria-label="Note Content">${item.text}</textarea>
+            <textarea class="card-body" data-note-id="${item.id}" placeholder="Type something..." aria-label="Note Content">${item.text}</textarea>
             <div class="card-footer">
                 <div class="card-stats">
                     <span class="card-date">${dateStr}</span>
@@ -1479,6 +1492,15 @@ function renderGrid() {
 
         DOM.clipGrid.appendChild(card);
     });
+
+    // Restore active note textarea focus & caret state
+    if (activeNoteId) {
+        const textInput = DOM.clipGrid.querySelector(`textarea[data-note-id="${activeNoteId}"]`);
+        if (textInput) {
+            textInput.focus();
+            textInput.setSelectionRange(caretStart, caretEnd);
+        }
+    }
 }
 
 // ==========================================
@@ -1576,6 +1598,11 @@ async function submitChangePassword() {
 async function handleForgotPassword() {
     if (!currentUser || currentUser.isAnonymous) return;
     
+    const isChangePwdOpen = !DOM.changeLockPasswordModal.classList.contains('hidden');
+    if (isChangePwdOpen) {
+        DOM.changeLockPasswordModal.classList.add('hidden');
+    }
+    
     const confirmReset = await showCustomConfirm(
         "Reset Lock Password",
         "Forgot your lock password? To reset it, we will send a password reset email to your address and sign you out. You can then log back in with Google to create a new lock password.",
@@ -1592,6 +1619,10 @@ async function handleForgotPassword() {
         
         localStorage.setItem('resetLockPasswordPending', 'true');
         await handleSignOut();
+    } else {
+        if (isChangePwdOpen) {
+            DOM.changeLockPasswordModal.classList.remove('hidden');
+        }
     }
 }
 
@@ -1673,6 +1704,9 @@ if (DOM.btnResetData) {
 }
 if (DOM.btnForgotPassword) {
     DOM.btnForgotPassword.addEventListener('click', handleForgotPassword);
+}
+if (DOM.btnChangeModalForgotPassword) {
+    DOM.btnChangeModalForgotPassword.addEventListener('click', handleForgotPassword);
 }
 if (DOM.sidebarGuestWarning) {
     DOM.sidebarGuestWarning.addEventListener('click', () => {
@@ -1817,39 +1851,38 @@ if (DOM.appLockSettingsModal) {
     });
 }
 
-DOM.btnIdleTimeout.addEventListener('click', () => {
-    const options = DOM.idleTimeoutModal.querySelectorAll('.btn-timeout-option');
-    options.forEach(opt => {
-        const val = parseInt(opt.getAttribute('data-value'));
-        const check = opt.querySelector('.checkmark');
-        if (val === idleLockMinutes) {
-            opt.classList.add('active');
-            if (check) check.classList.remove('hidden');
-        } else {
-            opt.classList.remove('active');
-            if (check) check.classList.add('hidden');
-        }
+DOM.btnIdleTimeout.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = DOM.timeoutDropdown.classList.contains('show');
+    
+    // Close other dropdowns
+    document.querySelectorAll('.dropdown-menu.show, .folder-dropdown.show').forEach(d => {
+        if (d !== DOM.timeoutDropdown) d.classList.remove('show');
     });
-    DOM.idleTimeoutModal.classList.remove('hidden');
-});
-
-DOM.btnCancelIdleTimeout.addEventListener('click', () => {
-    DOM.idleTimeoutModal.classList.add('hidden');
-});
-
-DOM.idleTimeoutModal.addEventListener('click', (e) => {
-    if (e.target === DOM.idleTimeoutModal) {
-        DOM.idleTimeoutModal.classList.add('hidden');
+    
+    if (isOpen) {
+        DOM.timeoutDropdown.classList.remove('show');
+    } else {
+        DOM.timeoutDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+            const val = parseInt(item.getAttribute('data-value'));
+            if (val === idleLockMinutes) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+        DOM.timeoutDropdown.classList.add('show');
     }
 });
 
-DOM.idleTimeoutModal.querySelectorAll('.btn-timeout-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-        idleLockMinutes = parseInt(btn.getAttribute('data-value')) || 5;
+DOM.timeoutDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        idleLockMinutes = parseInt(item.getAttribute('data-value')) || 5;
         localStorage.setItem('idleLockMinutes', idleLockMinutes);
         resetAutoLockTimer();
         updateIdleTimeoutVisibility();
-        DOM.idleTimeoutModal.classList.add('hidden');
+        DOM.timeoutDropdown.classList.remove('show');
         showToast(`Auto-lock set to ${idleLockMinutes} min`);
     });
 });
@@ -1860,6 +1893,9 @@ document.addEventListener('click', () => {
         d.classList.remove('show');
         if (d.parentElement) d.parentElement.classList.remove('open');
     });
+    if (DOM.timeoutDropdown) {
+        DOM.timeoutDropdown.classList.remove('show');
+    }
 });
 
 // Modal Events
