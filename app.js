@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp, collection, query, where, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // ==========================================
@@ -74,7 +74,20 @@ const DOM = {
     btnAddNoteMobile: document.getElementById('btnAddNoteMobile'),
     btnAddNoteHeader: document.getElementById('btnAddNoteHeader'),
     btnEmptyTrashMobile: document.getElementById('btnEmptyTrashMobile'),
-    btnLock: document.getElementById('btnLock'),
+    btnGoogleLogin: document.getElementById('btnGoogleLogin'),
+    sidebarProfileCard: document.getElementById('sidebarProfileCard'),
+    sidebarAvatar: document.getElementById('sidebarAvatar'),
+    sidebarUserName: document.getElementById('sidebarUserName'),
+    sidebarUserEmail: document.getElementById('sidebarUserEmail'),
+    profileModal: document.getElementById('profileModal'),
+    profileModalAvatar: document.getElementById('profileModalAvatar'),
+    profileModalName: document.getElementById('profileModalName'),
+    profileModalEmail: document.getElementById('profileModalEmail'),
+    profileModalBadge: document.getElementById('profileModalBadge'),
+    profileModalRoomId: document.getElementById('profileModalRoomId'),
+    profileModalAuthType: document.getElementById('profileModalAuthType'),
+    btnSignOut: document.getElementById('btnSignOut'),
+    btnCloseProfile: document.getElementById('btnCloseProfile'),
     btnToggleView: document.getElementById('btnToggleView'),
     btnToggleTrash: document.getElementById('btnToggleTrash'),
     btnEmptyTrash: document.getElementById('btnEmptyTrash'),
@@ -113,8 +126,138 @@ function updateIdleTimeoutVisibility() {
 // ==========================================
 // 🔒 AUTH & AUTO-LOCK
 // ==========================================
-signInAnonymously(auth).catch(err => alert("Connection failed: " + err.message));
-onAuthStateChanged(auth, user => currentUser = user);
+// Profile Update Logic
+function updateProfileUI(user) {
+    if (user && !user.isAnonymous) {
+        // Google User
+        if (DOM.sidebarAvatar) DOM.sidebarAvatar.src = user.photoURL || 'https://via.placeholder.com/32';
+        if (DOM.sidebarUserName) DOM.sidebarUserName.textContent = user.displayName || 'Google User';
+        if (DOM.sidebarUserEmail) DOM.sidebarUserEmail.textContent = user.email || 'Connected';
+        
+        if (DOM.profileModalAvatar) DOM.profileModalAvatar.src = user.photoURL || 'https://via.placeholder.com/64';
+        if (DOM.profileModalName) DOM.profileModalName.textContent = user.displayName || 'Google User';
+        if (DOM.profileModalEmail) DOM.profileModalEmail.textContent = user.email || 'Connected';
+        if (DOM.profileModalBadge) {
+            DOM.profileModalBadge.textContent = "Google Account";
+            DOM.profileModalBadge.style.background = "var(--primary)";
+            DOM.profileModalBadge.style.color = "white";
+        }
+        if (DOM.profileModalRoomId) {
+            DOM.profileModalRoomId.textContent = user.uid.substring(0, 12) + "...";
+            DOM.profileModalRoomId.title = user.uid;
+        }
+        if (DOM.profileModalAuthType) DOM.profileModalAuthType.textContent = "Google Sign-In";
+    } else {
+        // Guest User / Anonymous
+        if (DOM.sidebarAvatar) DOM.sidebarAvatar.src = 'https://via.placeholder.com/32';
+        if (DOM.sidebarUserName) DOM.sidebarUserName.textContent = 'Guest Mode';
+        if (DOM.sidebarUserEmail) DOM.sidebarUserEmail.textContent = 'Room Workspace';
+        
+        if (DOM.profileModalAvatar) DOM.profileModalAvatar.src = 'https://via.placeholder.com/64';
+        if (DOM.profileModalName) DOM.profileModalName.textContent = 'Guest User';
+        if (DOM.profileModalEmail) DOM.profileModalEmail.textContent = 'Temporary workspace via Room Code';
+        if (DOM.profileModalBadge) {
+            DOM.profileModalBadge.textContent = "Guest Mode";
+            DOM.profileModalBadge.style.background = "var(--bg-hover)";
+            DOM.profileModalBadge.style.color = "var(--text-muted)";
+        }
+        if (DOM.profileModalRoomId) {
+            DOM.profileModalRoomId.textContent = currentRoomHash ? currentRoomHash.substring(0, 12) + "..." : "None";
+            if (currentRoomHash) DOM.profileModalRoomId.title = currentRoomHash;
+        }
+        if (DOM.profileModalAuthType) DOM.profileModalAuthType.textContent = "Room Password";
+    }
+}
+
+// Sign in with Google
+async function loginWithGoogle() {
+    if (!currentUser) return showToast("Waiting for Firebase initialization...");
+    
+    DOM.btnGoogleLogin.disabled = true;
+    const originalText = DOM.btnGoogleLogin.innerHTML;
+    DOM.btnGoogleLogin.textContent = "Signing in...";
+    
+    const provider = new GoogleAuthProvider();
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        currentRoomHash = "google_" + user.uid;
+        
+        await ensureRoomMetadata();
+        
+        startFoldersSync();
+        startNotesSync();
+        
+        isAppLocked = false;
+        DOM.authScreen.classList.add('hidden');
+        DOM.appScreen.classList.remove('hidden');
+        
+        updateProfileUI(user);
+        resetAutoLockTimer();
+        showToast("Logged in as " + user.displayName);
+    } catch (err) {
+        console.error(err);
+        showToast("Google login failed: " + err.message);
+    } finally {
+        DOM.btnGoogleLogin.disabled = false;
+        DOM.btnGoogleLogin.innerHTML = originalText;
+    }
+}
+
+// Log out and lock
+async function handleSignOut() {
+    if (currentUser && !currentUser.isAnonymous) {
+        try {
+            await signOut(auth);
+            currentRoomHash = null;
+            lockApp();
+            updateProfileUI(null);
+        } catch (err) {
+            console.error(err);
+            showToast("Sign out failed: " + err.message);
+        }
+    } else {
+        // Guest mode simply locks the workspace
+        currentRoomHash = null;
+        lockApp();
+        updateProfileUI(null);
+        showToast("Guest session closed & locked");
+    }
+}
+
+onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+        currentUser = null;
+        signInAnonymously(auth).catch(err => console.error("Anonymous authentication failed", err));
+        updateProfileUI(null);
+        return;
+    }
+    
+    currentUser = user;
+    if (!user.isAnonymous) {
+        // Persistent Google User session detected on load -> auto unlock
+        currentRoomHash = "google_" + user.uid;
+        try {
+            await ensureRoomMetadata();
+            startFoldersSync();
+            startNotesSync();
+            
+            isAppLocked = false;
+            DOM.authScreen.classList.add('hidden');
+            DOM.appScreen.classList.remove('hidden');
+            
+            updateProfileUI(user);
+            resetAutoLockTimer();
+            showToast("Welcome back, " + user.displayName);
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to load user space: " + err.message);
+        }
+    } else {
+        // Anonymous (guest browser context)
+        updateProfileUI(null);
+    }
+});
 
 async function hashPassword(password) {
     const msgUint8 = new TextEncoder().encode(password);
@@ -1130,7 +1273,32 @@ function renderGrid() {
 // ==========================================
 DOM.loginBtn.addEventListener('click', login);
 DOM.passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
-DOM.btnLock.addEventListener('click', lockApp);
+if (DOM.btnGoogleLogin) {
+    DOM.btnGoogleLogin.addEventListener('click', loginWithGoogle);
+}
+if (DOM.sidebarProfileCard) {
+    DOM.sidebarProfileCard.addEventListener('click', () => {
+        DOM.profileModal.classList.remove('hidden');
+    });
+}
+if (DOM.btnCloseProfile) {
+    DOM.btnCloseProfile.addEventListener('click', () => {
+        DOM.profileModal.classList.add('hidden');
+    });
+}
+if (DOM.profileModal) {
+    DOM.profileModal.addEventListener('click', (e) => {
+        if (e.target === DOM.profileModal) {
+            DOM.profileModal.classList.add('hidden');
+        }
+    });
+}
+if (DOM.btnSignOut) {
+    DOM.btnSignOut.addEventListener('click', () => {
+        DOM.profileModal.classList.add('hidden');
+        handleSignOut();
+    });
+}
 
 const handleAddNote = async () => {
     if (viewMode === 'archived' || viewMode === 'trash') {

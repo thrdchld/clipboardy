@@ -1017,3 +1017,18 @@ textarea:focus-visible,
         display: none !important;
     }
 }
+
+/* Google Login Button & Profile Card Hover Styles */
+.btn-google:hover {
+    background: #f9fafb !important;
+    border-color: #cbd5e1 !important;
+    transform: translateY(-1px);
+}
+.btn-google:active {
+    transform: translateY(0);
+}
+.sidebar-profile-card:hover {
+    background: var(--bg-hover) !important;
+    border-color: var(--border-color) !important;
+}
+
