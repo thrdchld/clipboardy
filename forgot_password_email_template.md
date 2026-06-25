@@ -1,25 +1,25 @@
-# Template Email Reset Lock Password - Clipboardy
+# Reset Lock Password Email Template - Clipboardy
 
-Berikut adalah draf template email yang telah dioptimalkan untuk pengiriman email transaksional agar terhindar dari folder **Spam/Promosi** (Anti-Spam Friendly). Template ini siap disalin ke Firebase Console atau layanan SMTP pengirim email Anda.
-
----
-
-### Detail Konfigurasi Email
-- **Nama Pengirim (Sender Name):** `Clipboardy Support`
-- **Email Pengirim (Sender Email):** `noreply@clipboardy.my.id` (Pastikan record SPF, DKIM, dan DMARC domain Anda telah terkonfigurasi di DNS)
-- **Subject Email:** `Reset Kode Pengunci Akun Clipboardy Anda`
+Below is the transactional email template optimized to prevent spam filters (Anti-Spam Friendly), translated completely into English. You can copy this directly to your Firebase Console or custom SMTP mailer settings.
 
 ---
 
-### Template HTML (Untuk Firebase Console / Email Editor)
+### Email Configuration Details
+- **Sender Name:** `Clipboardy Support`
+- **Sender Email:** `noreply@clipboardy.my.id` (Ensure SPF, DKIM, and DMARC records are configured in your DNS for this domain)
+- **Subject:** `Reset your Clipboardy lock code`
+
+---
+
+### HTML Template (For Firebase Console / Email Editor)
 
 ```html
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Kode Pengunci - Clipboardy</title>
+    <title>Reset Lock Code - Clipboardy</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f6f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
     <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
@@ -34,24 +34,24 @@ Berikut adalah draf template email yang telah dioptimalkan untuk pengiriman emai
         <!-- Body -->
         <tr>
             <td style="padding: 40px; color: #1f2937;">
-                <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; color: #0f172a;">Halo,</h2>
+                <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; color: #0f172a;">Hello,</h2>
                 <p style="font-size: 15px; line-height: 1.6; color: #4b5563; margin-bottom: 24px;">
-                    Kami menerima permintaan untuk mereset kode pengunci aplikasi Clipboardy Anda. Untuk menyelesaikan permintaan ini dan melakukan konfirmasi email Anda, silakan klik tombol di bawah ini:
+                    We received a request to reset your Clipboardy application lock code. To complete this request and confirm your email ownership, please click the button below:
                 </p>
                 
                 <!-- Action Button -->
                 <div style="text-align: center; margin: 32px 0;">
                     <a href="https://clipboardy.my.id/reset-confirmation.html" style="background-color: #3b82f6; color: #ffffff; padding: 14px 28px; font-weight: 600; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 15px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25); transition: background-color 0.2s;">
-                        Konfirmasi Reset Kode
+                        Confirm Lock Code Reset
                     </a>
                 </div>
                 
                 <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">
-                    Link di atas akan mengarahkan Anda ke halaman khusus konfirmasi reset kode di <strong>clipboardy.my.id</strong>. Setelah email Anda terkonfirmasi di halaman tersebut, Anda dapat mengeklik tautan login kembali untuk masuk dan membuat kode pengunci baru.
+                    This link will direct you to the secure confirmation page on <strong>clipboardy.my.id</strong>. Once confirmed, you can click the login button on that page to return to the app and set up your new lock code.
                 </p>
                 <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
                 <p style="font-size: 12px; line-height: 1.5; color: #9ca3af; margin-bottom: 0;">
-                    Jika tombol di atas tidak berfungsi, silakan salin dan tempel link berikut ke browser Anda:<br>
+                    If the button above does not work, please copy and paste the following URL into your browser:<br>
                     <a href="https://clipboardy.my.id/reset-confirmation.html" style="color: #3b82f6; text-decoration: underline; word-break: break-all;">https://clipboardy.my.id/reset-confirmation.html</a>
                 </p>
             </td>
@@ -60,7 +60,7 @@ Berikut adalah draf template email yang telah dioptimalkan untuk pengiriman emai
         <!-- Footer -->
         <tr>
             <td style="padding: 24px 40px; background-color: #f9fafb; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb;">
-                <p style="margin: 0 0 8px 0;">Email ini dikirim secara otomatis sebagai tanggapan atas aktivitas akun Clipboardy Anda.</p>
+                <p style="margin: 0 0 8px 0;">This email was sent automatically in response to your account activity.</p>
                 <p style="margin: 0;">&copy; 2026 Clipboardy. All rights reserved.</p>
             </td>
         </tr>
@@ -71,20 +71,20 @@ Berikut adalah draf template email yang telah dioptimalkan untuk pengiriman emai
 
 ---
 
-### Versi Plain Text (Cadangan untuk Mail Client yang tidak mendukung HTML)
+### Plain Text Version (Fallback for basic mail clients)
 
 ```text
-Subject: Reset Kode Pengunci Akun Clipboardy Anda
+Subject: Reset your Clipboardy lock code
 
-Halo,
+Hello,
 
-Kami menerima permintaan untuk mereset kode pengunci aplikasi Clipboardy Anda. Silakan buka tautan berikut untuk melakukan konfirmasi email Anda:
+We received a request to reset your Clipboardy application lock code. Please open the link below to confirm your email verification:
 
 https://clipboardy.my.id/reset-confirmation.html
 
-Link tersebut akan mengarahkan Anda ke halaman konfirmasi khusus reset kode. Setelah melakukan konfirmasi, Anda dapat mengeklik tombol kembali di halaman tersebut untuk masuk menggunakan akun Google Anda dan menyetel kode pengunci baru secara otomatis.
+This link will direct you to a secure reset confirmation page. After confirming, you can click the button on that page to return, log in with Google, and automatically set up your new lock code.
 
-Jika Anda tidak meminta pengaturan ulang ini, Anda dapat mengabaikan email ini dengan aman.
+If you did not request this reset, you can safely ignore this email.
 
 --
 Clipboardy Support
@@ -93,12 +93,12 @@ noreply@clipboardy.my.id
 
 ---
 
-### ⚠️ Panduan Konfigurasi di Firebase Console / Custom Mailer
-Agar tautan diarahkan ke halaman konfirmasi kustom Anda, lakukan penyesuaian sebagai berikut:
+### ⚠️ Configuration Guidelines in Firebase Console / Custom Mailer
+To route the link correctly to your custom confirmation page, configure the following:
 
-1. Di **Firebase Console** -> **Authentication** -> tab **Templates**.
-2. Pilih bagian **Password reset** (atau template email kustom Anda).
-3. Klik tombol edit di pojok kanan atas template.
-4. Di bagian **Action URL** (atau di bagian Custom Link), ubah untuk mengarah ke halaman konfirmasi Anda:
+1. In **Firebase Console** -> Go to **Authentication** -> **Templates** tab.
+2. Select **Password reset** (or your custom email template).
+3. Click the edit icon in the top-right corner of the template.
+4. Locate the **Action URL** (or Custom Link) field, and change it to point to your page:
    `https://clipboardy.my.id/reset-confirmation.html`
-5. Jika menggunakan mailer kustom, set link tombol/tautan langsung ke `https://clipboardy.my.id/reset-confirmation.html`.
+5. If you are using a third-party custom mailer (e.g., SMTP/SendGrid), set the button/link URL directly to `https://clipboardy.my.id/reset-confirmation.html`.
