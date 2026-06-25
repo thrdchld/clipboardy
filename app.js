@@ -439,7 +439,7 @@ function updateViewArchiveUI() {
             if (DOM.btnAddNoteMobile) DOM.btnAddNoteMobile.style.display = 'none';
             if (DOM.btnEmptyTrashMobile) {
                 DOM.btnEmptyTrashMobile.classList.remove('hidden');
-                DOM.btnEmptyTrashMobile.style.display = 'flex';
+                DOM.btnEmptyTrashMobile.style.display = '';
             }
         } else if (viewMode === 'archived') {
             DOM.btnEmptyTrash.classList.add('hidden');
