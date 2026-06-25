@@ -58,15 +58,19 @@ const DOM = {
     sidebarBackdrop: document.getElementById('sidebarBackdrop'),
     btnMobileMenu: document.getElementById('btnMobileMenu'),
     
+
     strictLockToggle: document.getElementById('strictLockToggle'),
     idleLockToggle: document.getElementById('idleLockToggle'),
-    btnIdleTimeout: document.getElementById('btnIdleTimeout'),
+    btnIdleTimeout: document.getElementById('btnSettingsIdleTimeout'),
     idleTimeoutModal: document.getElementById('idleTimeoutModal'),
     btnCancelIdleTimeout: document.getElementById('btnCancelIdleTimeout'),
-    
+    btnOpenLockSettings: document.getElementById('btnOpenLockSettings'),
+    appLockSettingsModal: document.getElementById('appLockSettingsModal'),
+    btnCloseLockSettings: document.getElementById('btnCloseLockSettings'),
+
+    settingsIdleTimeoutText: document.getElementById('settingsIdleTimeoutText'),
     clipGrid: document.getElementById('clipGrid'),
     emptyState: document.getElementById('emptyState'),
-    
     folderList: document.getElementById('folderList'),
     btnAddFolder: document.getElementById('btnAddFolder'),
     btnSelectFolders: document.getElementById('btnSelectFolders'),
@@ -143,10 +147,14 @@ DOM.idleLockToggle.checked = idleLockEnabled;
 updateIdleTimeoutVisibility();
 
 function updateIdleTimeoutVisibility() {
-    if (idleLockEnabled) {
-        DOM.btnIdleTimeout.style.display = 'inline-flex';
-    } else {
-        DOM.btnIdleTimeout.style.display = 'none';
+    if (DOM.settingsIdleTimeoutText) {
+        DOM.settingsIdleTimeoutText.textContent = idleLockMinutes >= 60 
+            ? Math.floor(idleLockMinutes / 60) + " Hour" 
+            : idleLockMinutes + " Min";
+    }
+    const durationSetting = document.getElementById('idleLockDurationSetting');
+    if (durationSetting) {
+        durationSetting.style.display = idleLockEnabled ? 'flex' : 'none';
     }
 }
 
@@ -390,8 +398,15 @@ onAuthStateChanged(auth, async (user) => {
             console.error(err);
             showToast("Failed to load user space: " + err.message);
         }
+
     } else {
         updateProfileUI(null);
+        if (isAppLocked || !currentRoomHash) {
+            DOM.initialAuthContainer.classList.remove('hidden');
+            DOM.googleLockedContainer.classList.add('hidden');
+            DOM.authScreen.classList.remove('hidden');
+            DOM.appScreen.classList.add('hidden');
+        }
     }
 });
 
@@ -1540,7 +1555,6 @@ async function submitChangePassword() {
     if (oldHash !== appLockPasswordHash) {
         return showToast("Current password incorrect");
     }
-    
     try {
         const newHash = await hashPassword(newPwd);
         const roomRef = doc(db, 'clipboards', currentRoomHash);
@@ -1551,6 +1565,7 @@ async function submitChangePassword() {
         DOM.changeNewPassword.value = '';
         DOM.changeConfirmPassword.value = '';
         DOM.changeLockPasswordModal.classList.add('hidden');
+        DOM.profileModal.classList.remove('hidden'); // Return to profile modal
         showToast("Password updated successfully!");
     } catch (err) {
         console.error(err);
@@ -1633,12 +1648,14 @@ if (DOM.btnOpenChangePassword) {
         DOM.changeOldPassword.value = '';
         DOM.changeNewPassword.value = '';
         DOM.changeConfirmPassword.value = '';
+        DOM.profileModal.classList.add('hidden');
         DOM.changeLockPasswordModal.classList.remove('hidden');
     });
 }
 if (DOM.btnCancelChangePassword) {
     DOM.btnCancelChangePassword.addEventListener('click', () => {
         DOM.changeLockPasswordModal.classList.add('hidden');
+        DOM.profileModal.classList.remove('hidden');
     });
 }
 if (DOM.changeLockPasswordModal) {
@@ -1778,6 +1795,28 @@ DOM.idleLockToggle.addEventListener('change', () => {
     resetAutoLockTimer();
 });
 
+// App Lock Settings Modal Event Handlers
+if (DOM.btnOpenLockSettings) {
+    DOM.btnOpenLockSettings.addEventListener('click', () => {
+        DOM.strictLockToggle.checked = strictLockEnabled;
+        DOM.idleLockToggle.checked = idleLockEnabled;
+        updateIdleTimeoutVisibility();
+        DOM.appLockSettingsModal.classList.remove('hidden');
+    });
+}
+if (DOM.btnCloseLockSettings) {
+    DOM.btnCloseLockSettings.addEventListener('click', () => {
+        DOM.appLockSettingsModal.classList.add('hidden');
+    });
+}
+if (DOM.appLockSettingsModal) {
+    DOM.appLockSettingsModal.addEventListener('click', (e) => {
+        if (e.target === DOM.appLockSettingsModal) {
+            DOM.appLockSettingsModal.classList.add('hidden');
+        }
+    });
+}
+
 DOM.btnIdleTimeout.addEventListener('click', () => {
     const options = DOM.idleTimeoutModal.querySelectorAll('.btn-timeout-option');
     options.forEach(opt => {
@@ -1809,6 +1848,7 @@ DOM.idleTimeoutModal.querySelectorAll('.btn-timeout-option').forEach(btn => {
         idleLockMinutes = parseInt(btn.getAttribute('data-value')) || 5;
         localStorage.setItem('idleLockMinutes', idleLockMinutes);
         resetAutoLockTimer();
+        updateIdleTimeoutVisibility();
         DOM.idleTimeoutModal.classList.add('hidden');
         showToast(`Auto-lock set to ${idleLockMinutes} min`);
     });
