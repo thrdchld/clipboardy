@@ -45,6 +45,13 @@ let strictLockEnabled = localStorage.getItem('strictLockEnabled') !== 'false';
 let idleLockEnabled = localStorage.getItem('idleLockEnabled') === 'true';
 let idleLockMinutes = parseInt(localStorage.getItem('idleLockMinutes')) || 5;
 
+// URL parameters parsing for resetLockPassword
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('mode') === 'resetLockPassword') {
+    localStorage.setItem('resetLockPasswordPending', 'true');
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
+
 const saveTimeouts = new Map(); // Debounce map per note ID
 
 // DOM Elements
@@ -93,6 +100,9 @@ const DOM = {
     confirmLockPassword: document.getElementById('confirmLockPassword'),
     btnSaveLockPassword: document.getElementById('btnSaveLockPassword'),
     
+    btnThemeToggle: document.getElementById('btnThemeToggle'),
+    themeIconSun: document.getElementById('themeIconSun'),
+    themeIconMoon: document.getElementById('themeIconMoon'),
     btnLock: document.getElementById('btnLock'),
     btnOpenChangePassword: document.getElementById('btnOpenChangePassword'),
     changeLockPasswordModal: document.getElementById('changeLockPasswordModal'),
@@ -145,6 +155,32 @@ const DOM = {
 DOM.strictLockToggle.checked = strictLockEnabled;
 DOM.idleLockToggle.checked = idleLockEnabled;
 updateIdleTimeoutVisibility();
+
+// Initialize theme from localStorage on load
+const currentTheme = localStorage.getItem('theme') || 'dark';
+if (currentTheme === 'light') {
+    document.documentElement.classList.add('light');
+    if (DOM.themeIconSun) DOM.themeIconSun.classList.add('hidden');
+    if (DOM.themeIconMoon) DOM.themeIconMoon.classList.remove('hidden');
+} else {
+    document.documentElement.classList.remove('light');
+    if (DOM.themeIconSun) DOM.themeIconSun.classList.remove('hidden');
+    if (DOM.themeIconMoon) DOM.themeIconMoon.classList.add('hidden');
+}
+
+if (DOM.btnThemeToggle) {
+    DOM.btnThemeToggle.addEventListener('click', () => {
+        const isLight = document.documentElement.classList.toggle('light');
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        if (isLight) {
+            DOM.themeIconSun.classList.add('hidden');
+            DOM.themeIconMoon.classList.remove('hidden');
+        } else {
+            DOM.themeIconSun.classList.remove('hidden');
+            DOM.themeIconMoon.classList.add('hidden');
+        }
+    });
+}
 
 function updateIdleTimeoutVisibility() {
     if (DOM.settingsIdleTimeoutText) {
@@ -611,6 +647,13 @@ document.getElementById('btnSidebarCollapse').addEventListener('click', () => {
         closeMobileSidebar();
     } else {
         DOM.sidebar.classList.add('collapsed');
+    }
+});
+
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) {
+        DOM.sidebar.classList.remove('open');
+        DOM.sidebarBackdrop.classList.add('hidden');
     }
 });
 
