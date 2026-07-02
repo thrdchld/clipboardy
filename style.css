@@ -1,50 +1,56 @@
 :root {
-    --bg-base: #0f172a;
-    --bg-surface: #1e293b;
-    --bg-sidebar: #1e293b;
-    --bg-hover: #334155;
+    --bg-base: #121212;         /* Charcoal Black base */
+    --bg-surface: #1e1e1e;      /* Slightly lighter charcoal */
+    --bg-sidebar: #1e1e1e;
+    --bg-hover: #2d2d2d;
     
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --text: #f8fafc;
+    --text-main: #faf8f5;       /* Warm Ivory White text */
+    --text-muted: #8c8c8c;
+    --text: #faf8f5;
     
-    --primary: #3b82f6;
-    --primary-hover: #60a5fa;
-    --primary-light: #1e3a8a;
+    --primary: #9bb1c9;         /* Muted pastel blue */
+    --primary-hover: #b3c5d7;
+    --primary-light: #252c36;
     
-    --danger: #ef4444;
-    --danger-hover: #dc2626;
-    --warning: #f59e0b;
-    --success: #10b981;
+    --danger: #d99393;          /* Muted pastel red */
+    --danger-hover: #e5b1b1;
+    --warning: #e9c487;         /* Muted pastel yellow/gold */
+    --success: #98c1a1;         /* Muted pastel green */
     
-    --border: #334155;
-    --border-color: #334155;
+    --border: #2d2d2d;
+    --border-color: #2d2d2d;
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
 }
 
 .light {
-    --bg-base: #f4f6f8;
-    --bg-surface: #ffffff;
-    --bg-sidebar: #ffffff;
-    --bg-hover: #f3f4f6;
+    --bg-base: #f5f2e9;         /* Ivory White/warm cream base */
+    --bg-surface: #fdfbf7;      /* Warm Ivory surface */
+    --bg-sidebar: #fdfbf7;
+    --bg-hover: #ebe7dc;
     
-    --text-main: #1f2937;
-    --text-muted: #6b7280;
-    --text: #1f2937;
+    --text-main: #1c1c1c;       /* Charcoal Black text */
+    --text-muted: #5c5c5c;
+    --text: #1c1c1c;
     
-    --primary: #3b82f6;
-    --primary-hover: #2563eb;
-    --primary-light: #eff6ff;
+    --primary: #455a73;         /* Darker muted pastel blue for WCAG contrast */
+    --primary-hover: #334356;
+    --primary-light: #e6edf5;
     
-    --border: #e5e7eb;
-    --border-color: #e5e7eb;
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --danger: #b34a4a;          /* Darker muted pastel red */
+    --danger-hover: #943535;
+    --warning: #aa7424;         /* Darker muted pastel gold */
+    --success: #3c6e47;         /* Darker muted pastel green */
+    
+    --border: #dcd7cb;
+    --border-color: #dcd7cb;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(140, 130, 120, 0.15), 0 2px 4px -1px rgba(140, 130, 120, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(140, 130, 120, 0.2), 0 4px 6px -2px rgba(140, 130, 120, 0.1);
 }
 
 * {
@@ -1084,5 +1090,10 @@ textarea:focus-visible,
 }
 .btn-download-document:hover, .btn-remove-document:hover {
     transform: scale(1.15);
+}
+
+#btnToggleTrash:hover {
+    background: var(--bg-hover) !important;
+    border-color: var(--border-color) !important;
 }
 

@@ -1139,10 +1139,14 @@ function renderGrid() {
             DOM.emptyState.classList.remove('hidden');
             DOM.emptyState.querySelector('h3').textContent = "Trash is empty";
             DOM.emptyState.querySelector('p').textContent = "Deleted notes and folders will appear here for 30 days.";
+            DOM.clipGrid.innerHTML = "";
             return;
         } else {
             DOM.emptyState.classList.add('hidden');
         }
+        
+        DOM.clipGrid.innerHTML = `<div id="trashGrid" class="grid"></div>`;
+        const trashGrid = DOM.clipGrid.querySelector('#trashGrid');
         
         trashFolders.forEach(f => {
             const card = document.createElement('div');
@@ -1181,7 +1185,7 @@ function renderGrid() {
             
             card.querySelector('.restore-folder-btn').onclick = () => restoreFolder(f.id);
             card.querySelector('.delete-folder-perm-btn').onclick = () => deleteFolderPermanently(f.id);
-            DOM.clipGrid.appendChild(card);
+            trashGrid.appendChild(card);
         });
         
         trashNotes.forEach(item => {
@@ -1197,6 +1201,15 @@ function renderGrid() {
                 </div>
             ` : '';
             
+            const documentHtml = item.document ? `
+                <div class="card-document-wrapper" style="margin-top: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-base); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.85em; font-weight: 500;">
+                    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); flex-shrink: 0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                        <span class="document-name" style="overflow: hidden; text-overflow: ellipsis; opacity: 0.8;" title="${item.documentName}">${item.documentName || 'Document'}</span>
+                    </div>
+                </div>
+            ` : '';
+            
             card.innerHTML = `
                 <div class="card-header">
                     <div class="card-badges">
@@ -1209,6 +1222,7 @@ function renderGrid() {
                     </div>
                 </div>
                 ${imageHtml}
+                ${documentHtml}
                 <textarea class="card-body" readonly aria-label="Note Content" style="opacity: 0.8; cursor: not-allowed;">${item.text}</textarea>
                 <div class="card-footer">
                     <div class="card-actions" style="justify-content: space-between; width: 100%;">
@@ -1228,7 +1242,7 @@ function renderGrid() {
             
             card.querySelector('.restore-note-btn').onclick = () => restoreNote(item.id);
             card.querySelector('.delete-note-perm-btn').onclick = () => deleteNotePermanently(item.id);
-            DOM.clipGrid.appendChild(card);
+            trashGrid.appendChild(card);
         });
         
         return;
@@ -1358,17 +1372,22 @@ function renderGrid() {
             <input type="file" class="card-document-input" accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv" style="display: none;" aria-label="Upload Document">
         `;
 
-        let moveOptions = `<option value="" disabled selected>Move...</option>`;
-        folders.forEach(f => {
-            if (f.id !== currentFolderId) {
-                moveOptions += `<option value="${f.id}">${f.name}</option>`;
-            }
-        });
+        const moveDropdownItems = folders.filter(f => f.id !== currentFolderId).map(f => `
+            <button class="dropdown-item opt-move-note" data-folder-id="${f.id}" style="background: none; border: none; padding: 8px 12px; font-size: 0.85em; font-weight: 500; text-align: left; cursor: pointer; color: var(--text-main); width: 100%; transition: background 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${f.name}
+            </button>
+        `).join('');
 
         const moveSelectHtml = folders.length > 1 ? `
-            <select class="badge move-select" title="Move Note" aria-label="Move Note" style="cursor: pointer; max-width: 95px; text-overflow: ellipsis;">
-                ${moveOptions}
-            </select>
+            <div class="move-dropdown-container" style="position: relative; display: inline-block;">
+                <span class="badge move-btn" role="button" tabindex="0" aria-label="Move Note" style="display:inline-flex; align-items:center; gap:4px;">
+                    Move...
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </span>
+                <div class="move-dropdown hidden" style="position: absolute; top: 100%; left: 0; margin-top: 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 110; min-width: 130px; display: flex; flex-direction: column; overflow: hidden; padding: 4px 0;">
+                    ${moveDropdownItems}
+                </div>
+            </div>
         ` : '';
 
         card.innerHTML = `
@@ -1491,15 +1510,30 @@ function renderGrid() {
         });
 
         if (folders.length > 1) {
-            card.querySelector('.move-select').addEventListener('change', async (e) => {
-                const targetFolderId = e.target.value;
-                if (targetFolderId) {
-                    item.folderId = targetFolderId;
-                    item.updatedAt = Date.now();
-                    await forceSaveNoteToServer(item);
-                    renderGrid();
-                    showToast("Note moved!");
-                }
+            const moveBtn = card.querySelector('.move-btn');
+            const moveDropdown = card.querySelector('.move-dropdown');
+            
+            moveBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Close all other dropdowns
+                document.querySelectorAll('.move-dropdown, .attachment-dropdown').forEach(d => {
+                    if (d !== moveDropdown) d.classList.add('hidden');
+                });
+                moveDropdown.classList.toggle('hidden');
+            });
+
+            card.querySelectorAll('.opt-move-note').forEach(opt => {
+                opt.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const targetFolderId = opt.getAttribute('data-folder-id');
+                    if (targetFolderId) {
+                        item.folderId = targetFolderId;
+                        item.updatedAt = Date.now();
+                        await forceSaveNoteToServer(item);
+                        renderGrid();
+                        showToast("Note moved!");
+                    }
+                });
             });
         }
 
@@ -1963,8 +1997,8 @@ if (DOM.btnToggleTrash) {
 }
 
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('.attachment-btn-container')) {
-        document.querySelectorAll('.attachment-dropdown').forEach(d => d.classList.add('hidden'));
+    if (!e.target.closest('.attachment-btn-container') && !e.target.closest('.move-dropdown-container')) {
+        document.querySelectorAll('.attachment-dropdown, .move-dropdown').forEach(d => d.classList.add('hidden'));
     }
 });
 
