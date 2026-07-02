@@ -1103,15 +1103,9 @@ function countWordsAndChars(text) {
 }
 
 function resizeTextarea(textarea) {
-    textarea.style.height = 'auto';
-    const limit = 220; // limit height to 220px to look neat like Google Keep
-    if (textarea.scrollHeight > limit) {
-        textarea.style.height = limit + 'px';
-        textarea.style.overflowY = 'auto';
-    } else {
-        textarea.style.height = textarea.scrollHeight + 'px';
-        textarea.style.overflowY = 'hidden';
-    }
+    if (!textarea) return;
+    textarea.style.height = '100%';
+    textarea.style.overflowY = 'auto';
 }
 
 function renderGrid() {
@@ -1384,7 +1378,8 @@ function renderGrid() {
                     Move...
                     <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </span>
-                <div class="move-dropdown hidden" style="position: absolute; top: 100%; left: 0; margin-top: 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 110; min-width: 130px; display: flex; flex-direction: column; overflow: hidden; padding: 4px 0;">
+                <div class="move-dropdown hidden" style="position: absolute; top: 100%; left: 0; margin-top: 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 110; min-width: 140px; display: flex; flex-direction: column; overflow: hidden; padding: 4px 0;">
+                    <div style="padding: 6px 12px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); border-bottom: 1px solid var(--border); margin-bottom: 4px; letter-spacing: 0.5px; text-transform: uppercase;">Move to...</div>
                     ${moveDropdownItems}
                 </div>
             </div>
