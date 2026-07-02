@@ -495,9 +495,10 @@ header {
 
 /* Grid & Cards */
 .grid {
-    column-width: 280px;
-    column-gap: 20px;
-    display: block;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-gap: 20px;
+    align-items: start;
 }
 
 .card {
@@ -770,7 +771,7 @@ select.badge option {
     .fab-mobile .fab-text { display: none; }
     .fab-mobile .fab-icon { display: block !important; }
     
-    .grid { column-count: 1; }
+    .grid { grid-template-columns: 1fr; }
 }
 
 .fab-icon { display: none; }
@@ -1064,5 +1065,24 @@ textarea:focus-visible,
 }
 .light .dropdown-item.active {
     color: var(--primary) !important;
+}
+
+/* Accordion & Document Attachments Styles */
+.btn-accordion-toggle:hover {
+    background: var(--bg-hover) !important;
+    color: var(--text-main) !important;
+}
+.card-document-wrapper {
+    transition: background 0.2s, border-color 0.2s;
+}
+.card-document-wrapper:hover {
+    background: var(--bg-hover) !important;
+    border-color: var(--primary-light) !important;
+}
+.btn-download-document, .btn-remove-document {
+    transition: transform 0.15s;
+}
+.btn-download-document:hover, .btn-remove-document:hover {
+    transform: scale(1.15);
 }
 

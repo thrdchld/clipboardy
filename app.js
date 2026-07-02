@@ -36,7 +36,8 @@ let unsubscribeNotes = null;
 let unsubscribeFolders = null;
 
 let isAppLocked = true;
-let viewMode = 'active'; // 'active' atau 'archived'
+let viewMode = 'active'; // 'active' atau 'trash'
+let isPinnedCollapsed = localStorage.getItem('isPinnedCollapsed') === 'true';
 let searchQuery = '';
 let ignoreBlur = false;
 
@@ -129,7 +130,6 @@ const DOM = {
     profileModalAuthType: document.getElementById('profileModalAuthType'),
     btnSignOut: document.getElementById('btnSignOut'),
     btnCloseProfile: document.getElementById('btnCloseProfile'),
-    btnToggleView: document.getElementById('btnToggleView'),
     btnToggleTrash: document.getElementById('btnToggleTrash'),
     btnEmptyTrash: document.getElementById('btnEmptyTrash'),
     btnToggleTrashText: document.getElementById('btnToggleTrashText'),
@@ -147,8 +147,7 @@ const DOM = {
     lightboxModal: document.getElementById('lightboxModal'),
     lightboxImage: document.getElementById('lightboxImage'),
     closeLightbox: document.getElementById('closeLightbox'),
-    btnDownloadLightbox: document.getElementById('btnDownloadLightbox'),
-    btnToggleViewText: document.getElementById('btnToggleViewText')
+    btnDownloadLightbox: document.getElementById('btnDownloadLightbox')
 };
 
 // Initialize settings state in DOM
@@ -777,15 +776,12 @@ function startNotesSync() {
 }
 
 function updateViewArchiveUI() {
-    DOM.btnToggleView.classList.remove('active');
     if (DOM.btnToggleTrash) DOM.btnToggleTrash.classList.remove('active');
     
     // Update dynamic header title
     const headerTitleEl = document.getElementById('headerTitleText');
     if (headerTitleEl) {
-        if (viewMode === 'archived') {
-            headerTitleEl.textContent = "Archive";
-        } else if (viewMode === 'trash') {
+        if (viewMode === 'trash') {
             headerTitleEl.textContent = "Trash";
         } else {
             const currentFolder = folders.find(f => f.id === currentFolderId);
@@ -793,20 +789,12 @@ function updateViewArchiveUI() {
         }
     }
     
-    if (viewMode === 'archived') {
-        DOM.btnToggleViewText.textContent = "Back to Last Folder";
-        DOM.btnToggleView.classList.add('active');
-        if (DOM.btnToggleTrash) {
-            DOM.btnToggleTrashText.textContent = "Trash";
-        }
-    } else if (viewMode === 'trash') {
-        DOM.btnToggleViewText.textContent = "View Archive";
+    if (viewMode === 'trash') {
         if (DOM.btnToggleTrash) {
             DOM.btnToggleTrashText.textContent = "Back to Last Folder";
             DOM.btnToggleTrash.classList.add('active');
         }
     } else {
-        DOM.btnToggleViewText.textContent = "View Archive";
         if (DOM.btnToggleTrash) {
             DOM.btnToggleTrashText.textContent = "Trash";
         }
@@ -821,15 +809,6 @@ function updateViewArchiveUI() {
             if (DOM.btnEmptyTrashMobile) {
                 DOM.btnEmptyTrashMobile.classList.remove('hidden');
                 DOM.btnEmptyTrashMobile.style.display = '';
-            }
-        } else if (viewMode === 'archived') {
-            DOM.btnEmptyTrash.classList.add('hidden');
-            DOM.btnEmptyTrash.style.display = 'none';
-            if (DOM.btnAddNoteHeader) DOM.btnAddNoteHeader.style.display = 'none';
-            if (DOM.btnAddNoteMobile) DOM.btnAddNoteMobile.style.display = 'none';
-            if (DOM.btnEmptyTrashMobile) {
-                DOM.btnEmptyTrashMobile.classList.add('hidden');
-                DOM.btnEmptyTrashMobile.style.display = 'none';
             }
         } else {
             DOM.btnEmptyTrash.classList.add('hidden');
@@ -1255,17 +1234,13 @@ function renderGrid() {
         return;
     }
     
-    if (viewMode === 'archived') {
-        DOM.emptyState.querySelector('h3').textContent = "Archive is empty";
-        DOM.emptyState.querySelector('p').textContent = "Archived notes are hidden from your main folders but safely stored here. Click the archive icon on any note to move it here.";
-    } else {
-        DOM.emptyState.querySelector('h3').textContent = "No notes yet";
-        DOM.emptyState.querySelector('p').textContent = 'Click "+ New Note" to start writing in this folder.';
-    }
+    DOM.emptyState.querySelector('h3').textContent = "No notes yet";
+    DOM.emptyState.querySelector('p').textContent = 'Click "+ New Note" to start writing in this folder.';
     
+    // Filter active notes
     let filtered = notesArray.filter(n => {
         const matchesFolder = n.folderId === currentFolderId;
-        const matchesView = viewMode === 'archived' ? (n.archived && !n.deleted) : (!n.archived && !n.deleted);
+        const matchesView = !n.deleted;
         const matchesSearch = n.text.toLowerCase().includes(searchQuery);
         return matchesFolder && matchesView && matchesSearch;
     });
@@ -1277,8 +1252,53 @@ function renderGrid() {
 
     if (filtered.length === 0) {
         DOM.emptyState.classList.remove('hidden');
+        DOM.clipGrid.innerHTML = "";
+        return;
     } else {
         DOM.emptyState.classList.add('hidden');
+    }
+
+    const pinnedNotes = filtered.filter(n => n.pinned);
+    const otherNotes = filtered.filter(n => !n.pinned);
+
+    let pinnedGrid, othersGrid;
+
+    if (pinnedNotes.length > 0) {
+        DOM.clipGrid.innerHTML = `
+            <div class="section-container" style="width: 100%; margin-bottom: 24px;">
+                <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px;">
+                    <span style="font-size: 0.8rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted);">PINNED</span>
+                    <button class="btn-accordion-toggle" style="background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 600; padding: 4px 8px; border-radius: var(--radius-sm); transition: background 0.2s;">
+                        <span>${isPinnedCollapsed ? 'Show' : 'Hide'}</span>
+                        <svg class="toggle-icon" style="transition: transform 0.2s; ${isPinnedCollapsed ? 'transform: rotate(-90deg);' : ''}" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                </div>
+                <div id="pinnedGrid" class="grid ${isPinnedCollapsed ? 'hidden' : ''}"></div>
+            </div>
+            <div class="section-container" style="width: 100%;">
+                <div class="section-header" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px;">
+                    <span style="font-size: 0.8rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted);">OTHERS</span>
+                </div>
+                <div id="othersGrid" class="grid"></div>
+            </div>
+        `;
+        pinnedGrid = DOM.clipGrid.querySelector('#pinnedGrid');
+        othersGrid = DOM.clipGrid.querySelector('#othersGrid');
+
+        const toggleBtn = DOM.clipGrid.querySelector('.btn-accordion-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                isPinnedCollapsed = !isPinnedCollapsed;
+                localStorage.setItem('isPinnedCollapsed', isPinnedCollapsed);
+                renderGrid();
+            });
+        }
+    } else {
+        DOM.clipGrid.innerHTML = `
+            <div id="othersGrid" class="grid" style="width: 100%;"></div>
+        `;
+        othersGrid = DOM.clipGrid.querySelector('#othersGrid');
     }
 
     filtered.forEach(item => {
@@ -1299,13 +1319,43 @@ function renderGrid() {
             </div>
         ` : '';
 
-        const downloadBtnHtml = '';
+        const documentHtml = item.document ? `
+            <div class="card-document-wrapper" style="margin-top: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-base); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.85em; font-weight: 500;">
+                <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary); flex-shrink: 0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    <span class="document-name" style="overflow: hidden; text-overflow: ellipsis;" title="${item.documentName}">${item.documentName || 'Document'}</span>
+                </div>
+                <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                    <button class="btn-download-document" title="Download Document" aria-label="Download Document" style="background: none; border: none; cursor: pointer; color: var(--text-muted); display: inline-flex; align-items: center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    </button>
+                    <button class="btn-remove-document" title="Delete Document" aria-label="Delete Document" style="background: none; border: none; cursor: pointer; color: var(--danger); display: inline-flex; align-items: center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            </div>
+        ` : '';
 
-        const uploadBtnHtml = item.image ? '' : `
-            <button class="action-btn upload-btn" title="Upload Image" aria-label="Upload Image" style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-            </button>
-            <input type="file" class="card-file-input" accept="image/*" style="display: none;" aria-label="Upload Image">
+        const hasAttachment = item.image || item.document;
+        const attachmentBtnHtml = hasAttachment ? '' : `
+            <div class="attachment-btn-container" style="position: relative; display: inline-block;">
+                <button class="action-btn attachment-btn" title="Add Attachment" aria-label="Add Attachment" style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px; gap: 6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                    Attachment
+                </button>
+                <div class="attachment-dropdown hidden" style="position: absolute; bottom: 100%; right: 0; margin-bottom: 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 100; min-width: 140px; display: flex; flex-direction: column; overflow: hidden; padding: 4px 0;">
+                    <button class="dropdown-item opt-add-image" style="background: none; border: none; padding: 8px 12px; font-size: 0.85em; font-weight: 500; text-align: left; cursor: pointer; color: var(--text-main); display: flex; align-items: center; gap: 8px; width: 100%;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                        Media/Image
+                    </button>
+                    <button class="dropdown-item opt-add-document" style="background: none; border: none; padding: 8px 12px; font-size: 0.85em; font-weight: 500; text-align: left; cursor: pointer; color: var(--text-main); display: flex; align-items: center; gap: 8px; width: 100%;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                        Document
+                    </button>
+                </div>
+            </div>
+            <input type="file" class="card-image-input" accept="image/*" style="display: none;" aria-label="Upload Image">
+            <input type="file" class="card-document-input" accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv" style="display: none;" aria-label="Upload Document">
         `;
 
         let moveOptions = `<option value="" disabled selected>Move...</option>`;
@@ -1328,14 +1378,11 @@ function renderGrid() {
                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A.5.5 0 0 0 6.36 14h11.28a.5.5 0 0 0 .25-.56l-1.78-.89a2 2 0 0 1-1.11-1.79V4H9v6.76zM8 4h8M10 2h4"/></svg>
                         ${item.pinned ? 'Pinned' : 'Pin'}
                     </span>
-                    <span class="badge arc-btn ${item.archived ? 'active-arc' : ''}" role="button" tabindex="0" aria-label="${item.archived ? 'Unarchive Note' : 'Archive Note'}" style="display:inline-flex; align-items:center; gap:4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-                        ${item.archived ? 'Unarchived' : 'Archive'}
-                    </span>
                     ${moveSelectHtml}
                 </div>
             </div>
             ${imageHtml}
+            ${documentHtml}
             <textarea class="card-body" data-note-id="${item.id}" placeholder="Type something..." aria-label="Note Content">${item.text}</textarea>
             <div class="card-footer">
                 <div class="card-stats">
@@ -1343,7 +1390,7 @@ function renderGrid() {
                     <span class="word-count">${countWordsAndChars(item.text)}</span>
                 </div>
                 <div class="card-actions">
-                    ${uploadBtnHtml}
+                    ${attachmentBtnHtml}
                     <button class="action-btn copy-btn" title="Copy Note" aria-label="Copy Note" style="display:inline-flex; align-items:center; gap:4px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                         Copy
@@ -1408,22 +1455,6 @@ function renderGrid() {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 togglePin();
-            }
-        });
-
-        const arcBtn = card.querySelector('.arc-btn');
-        const toggleArc = () => {
-            item.archived = !item.archived;
-            if (item.archived) item.pinned = false; 
-            item.updatedAt = Date.now();
-            forceSaveNoteToServer(item);
-            renderGrid();
-        };
-        arcBtn.addEventListener('click', toggleArc);
-        arcBtn.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                toggleArc();
             }
         });
 
@@ -1495,27 +1526,64 @@ function renderGrid() {
                 e.stopPropagation();
                 downloadImage(item.image, `image-${item.id}`);
             });
-        } else {
-            // Upload handlers
-            const uploadBtn = card.querySelector('.upload-btn');
-            const fileInput = card.querySelector('.card-file-input');
-
-            uploadBtn.addEventListener('click', () => {
-                ignoreBlur = true;
-                fileInput.click();
+        }
+        
+        if (item.document) {
+            // Download document handler
+            card.querySelector('.btn-download-document').addEventListener('click', (e) => {
+                e.stopPropagation();
+                downloadFile(item.document, item.documentName);
             });
 
-            fileInput.addEventListener('cancel', () => {
+            // Remove document
+            card.querySelector('.btn-remove-document').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (await showCustomConfirm("Delete Document", "Remove this document from the note permanently?", true)) {
+                    item.document = null;
+                    item.documentName = null;
+                    item.documentType = null;
+                    item.updatedAt = Date.now();
+                    forceSaveNoteToServer(item);
+                    renderGrid();
+                }
+            });
+        }
+
+        if (!hasAttachment) {
+            // Attachment dropdown toggle
+            const attachmentBtn = card.querySelector('.attachment-btn');
+            const attachmentDropdown = card.querySelector('.attachment-dropdown');
+            const fileImageInput = card.querySelector('.card-image-input');
+            const fileDocInput = card.querySelector('.card-document-input');
+            const optAddImage = card.querySelector('.opt-add-image');
+            const optAddDoc = card.querySelector('.opt-add-document');
+
+            attachmentBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.attachment-dropdown').forEach(d => {
+                    if (d !== attachmentDropdown) d.classList.add('hidden');
+                });
+                attachmentDropdown.classList.toggle('hidden');
+            });
+
+            // Upload Image choice
+            optAddImage.addEventListener('click', () => {
+                attachmentDropdown.classList.add('hidden');
+                ignoreBlur = true;
+                fileImageInput.click();
+            });
+
+            fileImageInput.addEventListener('cancel', () => {
                 setTimeout(() => { ignoreBlur = false; }, 300);
             });
 
-            fileInput.addEventListener('change', async (e) => {
+            fileImageInput.addEventListener('change', async (e) => {
                 setTimeout(() => { ignoreBlur = false; }, 300);
                 const file = e.target.files[0];
                 if (!file) return;
 
-                uploadBtn.innerHTML = `<svg class="spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>`;
-                uploadBtn.disabled = true;
+                attachmentBtn.innerHTML = `Loading...`;
+                attachmentBtn.disabled = true;
 
                 try {
                     const compressedBase64 = await compressImage(file, 256);
@@ -1527,13 +1595,67 @@ function renderGrid() {
                 } catch (err) {
                     console.error(err);
                     showToast(err.message || "Failed to compress image.");
-                    uploadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`;
-                    uploadBtn.disabled = false;
+                    renderGrid();
+                }
+            });
+
+            // Upload Document choice
+            optAddDoc.addEventListener('click', () => {
+                attachmentDropdown.classList.add('hidden');
+                ignoreBlur = true;
+                fileDocInput.click();
+            });
+
+            fileDocInput.addEventListener('cancel', () => {
+                setTimeout(() => { ignoreBlur = false; }, 300);
+            });
+
+            fileDocInput.addEventListener('change', async (e) => {
+                setTimeout(() => { ignoreBlur = false; }, 300);
+                const file = e.target.files[0];
+                if (!file) return;
+
+                attachmentBtn.innerHTML = `Loading...`;
+                attachmentBtn.disabled = true;
+
+                try {
+                    if (file.size > 2 * 1024 * 1024) {
+                        throw new Error("File size cannot exceed 2MB.");
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        try {
+                            item.document = event.target.result;
+                            item.documentName = file.name;
+                            item.documentType = file.type;
+                            item.updatedAt = Date.now();
+                            await forceSaveNoteToServer(item);
+                            renderGrid();
+                            showToast("Document uploaded successfully!");
+                        } catch (err) {
+                            showToast(err.message || "Failed to save document.");
+                            renderGrid();
+                        }
+                    };
+                    reader.onerror = () => {
+                        showToast("Failed to read document file.");
+                        renderGrid();
+                    };
+                    reader.readAsDataURL(file);
+                } catch (err) {
+                    console.error(err);
+                    showToast(err.message || "Failed to process document.");
+                    renderGrid();
                 }
             });
         }
 
-        DOM.clipGrid.appendChild(card);
+        if (item.pinned && pinnedNotes.length > 0) {
+            pinnedGrid.appendChild(card);
+        } else {
+            othersGrid.appendChild(card);
+        }
     });
 
     // Restore active note textarea focus & caret state
@@ -1796,13 +1918,10 @@ if (DOM.btnSignOut) {
 }
 
 const handleAddNote = async () => {
-    if (viewMode === 'archived' || viewMode === 'trash') {
-        const oldMode = viewMode;
+    if (viewMode === 'trash') {
         viewMode = 'active';
         updateViewArchiveUI();
-        if (oldMode === 'trash') {
-            startNotesSync();
-        }
+        startNotesSync();
     }
     
     const newNoteId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -1811,7 +1930,6 @@ const handleAddNote = async () => {
         text: "",
         folderId: currentFolderId,
         pinned: false,
-        archived: false,
         updatedAt: Date.now()
     };
     
@@ -1834,12 +1952,6 @@ if (DOM.btnAddNoteHeader) {
     DOM.btnAddNoteHeader.addEventListener('click', handleAddNote);
 }
 
-DOM.btnToggleView.addEventListener('click', () => {
-    viewMode = viewMode === 'archived' ? 'active' : 'archived';
-    updateViewArchiveUI();
-    startNotesSync();
-    closeMobileSidebar();
-});
 
 if (DOM.btnToggleTrash) {
     DOM.btnToggleTrash.addEventListener('click', () => {
@@ -1849,6 +1961,12 @@ if (DOM.btnToggleTrash) {
         closeMobileSidebar();
     });
 }
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.attachment-btn-container')) {
+        document.querySelectorAll('.attachment-dropdown').forEach(d => d.classList.add('hidden'));
+    }
+});
 
 // Search and Clear Search
 DOM.searchInput.addEventListener('input', (e) => {
@@ -2056,6 +2174,19 @@ function downloadImage(base64Data, baseFilename = 'image') {
     link.click();
     document.body.removeChild(link);
     
+    setTimeout(() => {
+        ignoreBlur = false;
+    }, 1000);
+}
+
+function downloadFile(base64Data, filename) {
+    ignoreBlur = true;
+    const link = document.createElement('a');
+    link.href = base64Data;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     setTimeout(() => {
         ignoreBlur = false;
     }, 1000);

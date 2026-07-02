@@ -5,7 +5,7 @@ export const onSnapshot = (ref, callback) => {
     callback({
         exists: () => true,
         data: () => ({ folders: [{ id: 'default', name: 'General' }] }),
-        forEach: (fn) => fn({ id: 'note123', data: () => ({ text: 'Test note content', folderId: 'default', pinned: false, archived: false, updatedAt: Date.now() }) })
+        forEach: (fn) => fn({ id: 'note123', data: () => ({ text: 'Test note content', folderId: 'default', pinned: false, updatedAt: Date.now() }) })
     });
     return () => {};
 };

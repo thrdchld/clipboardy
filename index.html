@@ -158,14 +158,7 @@
             </div>
             
             <div class="sidebar-footer">
-                <!-- View Archive Button -->
-                <button id="btnToggleView" class="btn" title="Toggle archive/active view" aria-label="Toggle archive/active view" style="width: 100%; justify-content: center; margin-bottom: 8px;">
-                    <span class="btn-svg" style="display:inline-flex; align-items:center; color:currentColor;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-                    </span>
-                    <span id="btnToggleViewText">View Archive</span>
-                </button>
-                
+
                 <!-- Trash Button -->
                 <button id="btnToggleTrash" class="btn" title="View Trash" aria-label="View Trash" style="width: 100%; justify-content: center; margin-bottom: 16px;">
                     <span class="btn-svg" style="display:inline-flex; align-items:center; color:currentColor;">
@@ -174,11 +167,6 @@
                     <span id="btnToggleTrashText">Trash</span>
                 </button>
                 
-                <!-- App Lock Settings Trigger Button -->
-                <button id="btnOpenLockSettings" class="btn" title="App Lock Settings" aria-label="App Lock Settings" style="width: 100%; justify-content: center; margin-bottom: 12px; display: inline-flex; align-items: center; gap: 8px; padding: 10px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    App Lock Settings
-                </button>
                 
                 <!-- Profile Card Button (Google only) -->
                 <div id="sidebarProfileCard" class="sidebar-profile-card" style="margin-top: 16px; padding: 10px; border-radius: var(--radius-md); background: rgba(0,0,0,0.03); border: 1px solid var(--border-color); display: none; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.2s;">
@@ -201,7 +189,7 @@
                     </div>
                 </div>
 
-                <!-- Theme Toggle and Lock Application Buttons -->
+                <!-- Theme Toggle and Lock/Settings Buttons -->
                 <div style="display: flex; gap: 8px; margin-top: 16px; width: 100%;">
                     <!-- Theme Toggle Button -->
                     <button id="btnThemeToggle" class="btn" title="Toggle Theme" aria-label="Toggle Theme" style="flex: 0 0 40px; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; color: var(--text-main); transition: all 0.2s;">
@@ -210,11 +198,19 @@
                         <!-- Moon Icon (for dark theme, shown when in light mode) -->
                         <svg id="themeIconMoon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                     </button>
-                    <!-- Lock Application Button -->
-                    <button id="btnLock" class="btn btn-danger" title="Lock Application" aria-label="Lock Application" style="flex: 1; justify-content: center; display: inline-flex; align-items: center; gap: 8px; padding: 10px; height: 40px; margin: 0;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                        Lock
-                    </button>
+                    <!-- Lock & Settings Split Container -->
+                    <div style="flex: 1; display: flex; gap: 4px; margin: 0; min-width: 0;">
+                        <!-- Lock Button (70%) -->
+                        <button id="btnLock" class="btn btn-danger" title="Lock Application" aria-label="Lock Application" style="flex: 7; justify-content: center; display: inline-flex; align-items: center; gap: 6px; padding: 10px 4px; height: 40px; margin: 0; min-width: 0; font-size: 0.85rem; font-weight: 600;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            Lock
+                        </button>
+                        <!-- App Lock Settings Button (30%) -->
+                        <button id="btnOpenLockSettings" class="btn" title="App Lock Settings" aria-label="App Lock Settings" style="flex: 3; justify-content: center; display: inline-flex; align-items: center; padding: 10px 0; height: 40px; margin: 0; min-width: 0; color: var(--text-main);">
+                            <!-- Gear/Gerigi Icon -->
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </aside>
