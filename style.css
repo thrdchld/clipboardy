@@ -789,7 +789,7 @@ select.badge option {
     margin-bottom: 10px;
     border-radius: var(--radius-sm);
     overflow: hidden;
-    height: 80px;
+    height: 95px;
     background: var(--bg-hover);
     border: 1px solid var(--border);
 }
