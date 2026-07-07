@@ -1282,5 +1282,40 @@ textarea:focus-visible,
     .card-badges {
         margin-bottom: 0px !important;
     }
+
+    /* Pull to Refresh Spinner */
+    .ptr-spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 0;
+        opacity: 0;
+        overflow: hidden;
+        margin-bottom: 0px;
+        flex-shrink: 0;
+    }
+    .ptr-spinner.visible {
+        height: 48px !important;
+        opacity: 1 !important;
+        margin-bottom: 12px !important;
+    }
+    .ptr-svg {
+        width: 28px;
+        height: 28px;
+        animation: ptr-rotate 0.8s linear infinite;
+    }
+    .ptr-bg {
+        fill: none;
+        stroke: var(--border);
+        stroke-width: 3;
+    }
+    .ptr-indicator {
+        fill: var(--primary);
+    }
+    
+    @keyframes ptr-rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
 }
 

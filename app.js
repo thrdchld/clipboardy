@@ -2875,6 +2875,151 @@ function initializeMobileSheets() {
             }
         };
     }
+
+    // Pull-to-refresh implementation
+    const mainScroll = document.querySelector('.main-scroll');
+    const ptr = document.getElementById('pullToRefreshSpinner');
+    if (mainScroll && ptr) {
+        let ptrStartY = 0;
+        let ptrDiffY = 0;
+        let isPtrActive = false;
+
+        mainScroll.addEventListener('touchstart', (e) => {
+            if (mainScroll.scrollTop === 0 && e.touches.length === 1) {
+                ptrStartY = e.touches[0].clientY;
+                isPtrActive = true;
+            }
+        }, { passive: true });
+
+        mainScroll.addEventListener('touchmove', (e) => {
+            if (!isPtrActive || e.touches.length !== 1) return;
+            const currentY = e.touches[0].clientY;
+            ptrDiffY = currentY - ptrStartY;
+
+            if (ptrDiffY > 0) {
+                if (e.cancelable) e.preventDefault();
+                
+                const pullHeight = Math.min(60, ptrDiffY * 0.4);
+                ptr.style.display = 'flex';
+                ptr.style.height = `${pullHeight}px`;
+                ptr.style.opacity = `${pullHeight / 60}`;
+            } else {
+                isPtrActive = false;
+            }
+        }, { passive: false });
+
+        mainScroll.addEventListener('touchend', async () => {
+            if (!isPtrActive) return;
+            isPtrActive = false;
+
+            if (ptrDiffY > 80) {
+                ptr.classList.add('visible');
+                ptr.style.height = '';
+                ptr.style.opacity = '';
+                
+                if (navigator.vibrate) navigator.vibrate(20);
+                showToast("Syncing database...");
+                
+                try {
+                    await startFoldersSync();
+                    await startNotesSync();
+                    showToast("Database up to date");
+                } catch (err) {
+                    console.error("Sync failed", err);
+                } finally {
+                    ptr.classList.remove('visible');
+                    ptr.style.display = 'none';
+                }
+            } else {
+                ptr.style.transition = 'height 0.2s, opacity 0.2s';
+                ptr.style.height = '0px';
+                ptr.style.opacity = '0';
+                setTimeout(() => {
+                    ptr.style.transition = '';
+                    ptr.style.display = 'none';
+                }, 200);
+            }
+            ptrDiffY = 0;
+        });
+    }
+
+    // Left edge swipe-to-open and swipe-to-close sidebar drawer
+    let sidebarStartX = 0;
+    let sidebarStartY = 0;
+    let sidebarIsPulling = false;
+    const sidebar = DOM.sidebar;
+    const sidebarBackdrop = DOM.sidebarBackdrop;
+
+    if (sidebar && sidebarBackdrop) {
+        document.addEventListener('touchstart', (e) => {
+            if (!isMobile()) return;
+            const touch = e.touches[0];
+            
+            if (!sidebar.classList.contains('open') && touch.clientX < 30) {
+                sidebarStartX = touch.clientX;
+                sidebarStartY = touch.clientY;
+                sidebarIsPulling = true;
+                sidebar.style.transition = 'none';
+                sidebarBackdrop.style.transition = 'none';
+            }
+            else if (sidebar.classList.contains('open')) {
+                sidebarStartX = touch.clientX;
+                sidebarIsPulling = true;
+                sidebar.style.transition = 'none';
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!sidebarIsPulling || e.touches.length !== 1) return;
+            const touch = e.touches[0];
+            const diffX = touch.clientX - sidebarStartX;
+            
+            if (!sidebar.classList.contains('open')) {
+                if (diffX > 0) {
+                    if (e.cancelable) e.preventDefault();
+                    const translateAmt = Math.min(0, -260 + diffX);
+                    sidebar.style.transform = `translateX(${translateAmt}px)`;
+                    sidebarBackdrop.classList.remove('hidden');
+                    sidebarBackdrop.style.opacity = `${Math.min(1, diffX / 260)}`;
+                }
+            } else {
+                if (diffX < 0) {
+                    if (e.cancelable) e.preventDefault();
+                    const translateAmt = Math.max(-260, diffX);
+                    sidebar.style.transform = `translateX(${translateAmt}px)`;
+                    sidebarBackdrop.style.opacity = `${Math.max(0, 1 + (diffX / 260))}`;
+                }
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+            if (!sidebarIsPulling) return;
+            sidebarIsPulling = false;
+            
+            sidebar.style.transition = '';
+            sidebarBackdrop.style.transition = '';
+            sidebarBackdrop.style.opacity = '';
+            
+            const touch = e.changedTouches[0];
+            const diffX = touch.clientX - sidebarStartX;
+            
+            if (!sidebar.classList.contains('open')) {
+                if (diffX > 80) {
+                    toggleSidebar();
+                } else {
+                    closeMobileSidebar();
+                    sidebar.style.transform = '';
+                }
+            } else {
+                if (diffX < -80) {
+                    closeMobileSidebar();
+                    sidebar.style.transform = '';
+                } else {
+                    sidebar.style.transform = 'translateX(0)';
+                }
+            }
+        });
+    }
 }
 
 // Run mobile sheets initializer
