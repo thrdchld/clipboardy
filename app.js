@@ -316,7 +316,7 @@ function updateProfileUI(user) {
 
 // Sign in with Google
 async function loginWithGoogle() {
-    if (!currentUser) return showToast("Waiting for Firebase initialization...");
+    if (!currentUser) return showToast("Sedang menyambungkan ke database...");
     
     DOM.btnGoogleLogin.disabled = true;
     const originalText = DOM.btnGoogleLogin.innerHTML;
