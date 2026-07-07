@@ -975,13 +975,21 @@ function renderFolders() {
             const clearTimer = () => clearTimeout(pressTimer);
             li.addEventListener('touchstart', (e) => {
                 pressTimer = setTimeout(() => {
-                    document.querySelectorAll('.folder-dropdown.show').forEach(d => {
-                        d.classList.remove('show');
-                        if (d.parentElement) d.parentElement.classList.remove('open');
-                    });
-                    dropdown.classList.add('show');
-                    actions.classList.add('open');
-                }, 500); // 500ms long press
+                    if (isMobile()) {
+                        if (navigator.vibrate) navigator.vibrate(15);
+                        closeMobileSidebar();
+                        setTimeout(() => {
+                            openMobileFolderActions(f);
+                        }, 250);
+                    } else {
+                        document.querySelectorAll('.folder-dropdown.show').forEach(d => {
+                            d.classList.remove('show');
+                            if (d.parentElement) d.parentElement.classList.remove('open');
+                        });
+                        dropdown.classList.add('show');
+                        actions.classList.add('open');
+                    }
+                }, 550); // 550ms long press
             });
             li.addEventListener('touchend', clearTimer);
             li.addEventListener('touchmove', clearTimer);
@@ -2492,6 +2500,7 @@ function closeMobileEditor() {
     
     backdrop.classList.remove('active');
     sheet.classList.remove('active');
+    sheet.style.bottom = '';
     
     if (currentEditingMobileNote) {
         triggerNoteAutoSave(currentEditingMobileNote);
@@ -3020,6 +3029,67 @@ function initializeMobileSheets() {
             }
         });
     }
+
+    // Folder Actions Context Menu handlers
+    const folderActionsBackdrop = document.getElementById('mobileFolderActionsBackdrop');
+    if (folderActionsBackdrop) {
+        folderActionsBackdrop.onclick = () => closeMobileFolderActions();
+    }
+    
+    const btnRenameFolder = document.getElementById('btnMobileFolderRename');
+    if (btnRenameFolder) {
+        btnRenameFolder.onclick = () => {
+            if (currentFolderMobileAction) {
+                const folder = currentFolderMobileAction;
+                closeMobileFolderActions();
+                setTimeout(() => editFolder(folder.id, folder.name), 200);
+            }
+        };
+    }
+
+    const btnDeleteFolder = document.getElementById('btnMobileFolderDelete');
+    if (btnDeleteFolder) {
+        btnDeleteFolder.onclick = () => {
+            if (currentFolderMobileAction) {
+                const folder = currentFolderMobileAction;
+                closeMobileFolderActions();
+                setTimeout(() => deleteFolder(folder.id), 200);
+            }
+        };
+    }
+
+    // Visual Viewport Keyboard pinning
+    if (window.visualViewport) {
+        const adjustSheetHeight = () => {
+            const editorSheet = document.getElementById('mobileNoteEditorSheet');
+            if (editorSheet && editorSheet.classList.contains('active')) {
+                const offsetBottom = window.innerHeight - window.visualViewport.height;
+                editorSheet.style.bottom = `${offsetBottom}px`;
+            }
+        };
+        window.visualViewport.addEventListener('resize', adjustSheetHeight);
+        window.visualViewport.addEventListener('scroll', adjustSheetHeight);
+    }
+}
+
+let currentFolderMobileAction = null;
+
+function openMobileFolderActions(folder) {
+    currentFolderMobileAction = folder;
+    const backdrop = document.getElementById('mobileFolderActionsBackdrop');
+    const sheet = document.getElementById('mobileFolderActionsSheet');
+    const title = document.getElementById('mobileFolderActionsTitle');
+    title.textContent = `Folder Options: ${folder.name}`;
+    backdrop.classList.add('active');
+    sheet.classList.add('active');
+}
+
+function closeMobileFolderActions() {
+    const backdrop = document.getElementById('mobileFolderActionsBackdrop');
+    const sheet = document.getElementById('mobileFolderActionsSheet');
+    backdrop.classList.remove('active');
+    sheet.classList.remove('active');
+    currentFolderMobileAction = null;
 }
 
 // Run mobile sheets initializer
