@@ -316,7 +316,7 @@ function updateProfileUI(user) {
 
 // Sign in with Google
 async function loginWithGoogle() {
-    if (!currentUser) return showToast("Sedang menyambungkan ke database...");
+    if (!currentUser) return showToast("Connecting to database...");
     
     DOM.btnGoogleLogin.disabled = true;
     const originalText = DOM.btnGoogleLogin.innerHTML;
