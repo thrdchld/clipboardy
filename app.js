@@ -1420,6 +1420,11 @@ function renderGrid() {
         const textInput = card.querySelector('.card-body');
         const wordCountDisplay = card.querySelector('.word-count');
         
+        if (isMobile()) {
+            textInput.setAttribute('readonly', 'true');
+            textInput.style.cursor = 'pointer';
+        }
+        
         // Auto-resize on initial render
         setTimeout(() => resizeTextarea(textInput), 0);
 
@@ -1678,6 +1683,10 @@ function renderGrid() {
                     renderGrid();
                 }
             });
+        }
+
+        if (isMobile()) {
+            bindMobileCardEvents(card, item);
         }
 
         if (item.pinned && pinnedNotes.length > 0) {
@@ -1964,13 +1973,17 @@ const handleAddNote = async () => {
     
     await forceSaveNoteToServer(newNote);
     
-    setTimeout(() => {
-        const firstInput = DOM.clipGrid.querySelector('.card-body');
-        if (firstInput) {
-            firstInput.focus();
-            resizeTextarea(firstInput);
-        }
-    }, 100);
+    if (isMobile()) {
+        openMobileEditor(newNote);
+    } else {
+        setTimeout(() => {
+            const firstInput = DOM.clipGrid.querySelector('.card-body');
+            if (firstInput) {
+                firstInput.focus();
+                resizeTextarea(firstInput);
+            }
+        }, 100);
+    }
 };
 
 DOM.btnAddNote.addEventListener('click', handleAddNote);
@@ -2420,6 +2433,452 @@ if (DOM.btnEmptyTrash) {
 if (DOM.btnEmptyTrashMobile) {
     DOM.btnEmptyTrashMobile.addEventListener('click', emptyTrash);
 }
+
+// ==========================================
+// 📱 MOBILE INTERACTION & GESTURE SYSTEM (Juli 2026)
+// ==========================================
+
+function isMobile() {
+    return window.innerWidth <= 768;
+}
+
+let currentEditingMobileNote = null;
+let currentContextMobileNote = null;
+let currentPickerMobileNote = null;
+
+// Opens the mobile bottom sheet note editor
+function openMobileEditor(note) {
+    currentEditingMobileNote = note;
+    
+    const backdrop = document.getElementById('mobileNoteEditorBackdrop');
+    const sheet = document.getElementById('mobileNoteEditorSheet');
+    const textarea = document.getElementById('mobileEditorTextarea');
+    const stats = document.getElementById('mobileEditorStats');
+    
+    textarea.value = note.text;
+    stats.textContent = countWordsAndChars(note.text);
+    
+    // Set attachments state
+    const imgWrapper = document.getElementById('mobileEditorImageWrapper');
+    const img = document.getElementById('mobileEditorImage');
+    if (note.image) {
+        img.src = note.image;
+        imgWrapper.style.display = 'block';
+    } else {
+        img.src = '';
+        imgWrapper.style.display = 'none';
+    }
+    
+    const docWrapper = document.getElementById('mobileEditorDocumentWrapper');
+    const docName = document.getElementById('mobileEditorDocumentName');
+    if (note.document) {
+        docName.textContent = note.documentName || 'Document';
+        docWrapper.style.display = 'flex';
+    } else {
+        docWrapper.style.display = 'none';
+    }
+    
+    backdrop.classList.add('active');
+    sheet.classList.add('active');
+    
+    setTimeout(() => {
+        textarea.focus();
+    }, 150);
+}
+
+function closeMobileEditor() {
+    const backdrop = document.getElementById('mobileNoteEditorBackdrop');
+    const sheet = document.getElementById('mobileNoteEditorSheet');
+    
+    backdrop.classList.remove('active');
+    sheet.classList.remove('active');
+    
+    if (currentEditingMobileNote) {
+        triggerNoteAutoSave(currentEditingMobileNote);
+    }
+    currentEditingMobileNote = null;
+}
+
+// Opens the context action menu (from hold / long-press)
+function openMobileContextMenu(note) {
+    currentContextMobileNote = note;
+    
+    const backdrop = document.getElementById('mobileContextMenuBackdrop');
+    const sheet = document.getElementById('mobileContextMenuSheet');
+    const preview = document.getElementById('mobileMenuNotePreview');
+    const pinText = document.getElementById('mobileMenuPinText');
+    
+    preview.textContent = note.text.trim() || "(Empty note)";
+    pinText.textContent = note.pinned ? "Unpin Note" : "Pin Note";
+    
+    backdrop.classList.add('active');
+    sheet.classList.add('active');
+}
+
+function closeMobileContextMenu() {
+    const backdrop = document.getElementById('mobileContextMenuBackdrop');
+    const sheet = document.getElementById('mobileContextMenuSheet');
+    backdrop.classList.remove('active');
+    sheet.classList.remove('active');
+    currentContextMobileNote = null;
+}
+
+// Opens the folder picker sheet
+function openMobileFolderPicker(note) {
+    currentPickerMobileNote = note;
+    
+    const backdrop = document.getElementById('mobileFolderPickerBackdrop');
+    const sheet = document.getElementById('mobileFolderPickerSheet');
+    const folderList = document.getElementById('mobileFolderList');
+    
+    folderList.innerHTML = '';
+    
+    folders.forEach(f => {
+        if (f.id === currentFolderId || f.deleted) return;
+        
+        const btn = document.createElement('button');
+        btn.className = 'mobile-menu-item';
+        btn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            ${f.name}
+        `;
+        
+        btn.onclick = async () => {
+            note.folderId = f.id;
+            note.updatedAt = Date.now();
+            await forceSaveNoteToServer(note);
+            showToast(`Moved to ${f.name}`);
+            closeMobileFolderPicker();
+            renderGrid();
+        };
+        
+        folderList.appendChild(btn);
+    });
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'mobile-menu-item';
+    cancelBtn.style.color = 'var(--text-muted)';
+    cancelBtn.innerHTML = `Cancel`;
+    cancelBtn.onclick = () => closeMobileFolderPicker();
+    folderList.appendChild(cancelBtn);
+    
+    backdrop.classList.add('active');
+    sheet.classList.add('active');
+}
+
+function closeMobileFolderPicker() {
+    const backdrop = document.getElementById('mobileFolderPickerBackdrop');
+    const sheet = document.getElementById('mobileFolderPickerSheet');
+    backdrop.classList.remove('active');
+    sheet.classList.remove('active');
+    currentPickerMobileNote = null;
+}
+
+// Helpers for swipe/context actions
+async function toggleNotePin(note) {
+    note.pinned = !note.pinned;
+    note.updatedAt = Date.now();
+    await forceSaveNoteToServer(note);
+    renderGrid();
+}
+
+async function deleteNoteToTrash(note) {
+    if (await showCustomConfirm("Move to Trash", "Move this note to Trash? It will be automatically deleted after 30 days.", false)) {
+        const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
+        try {
+            await setDoc(noteRef, {
+                deleted: true,
+                deletedAt: Date.now()
+            }, { merge: true });
+            showToast("Note moved to Trash");
+            renderGrid();
+        } catch(err) {
+            showToast("Failed to move note to Trash");
+        }
+    }
+}
+
+// Bind swipe gestures and tap/long-press events
+function bindMobileCardEvents(card, item) {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchMoveX = 0;
+    let touchMoveY = 0;
+    let longPressTimer = null;
+    let isLongPressTriggered = false;
+    let isSwiping = false;
+
+    card.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchMoveX = touchStartX;
+        touchMoveY = touchStartY;
+        isLongPressTriggered = false;
+        isSwiping = false;
+
+        longPressTimer = setTimeout(() => {
+            isLongPressTriggered = true;
+            if (navigator.vibrate) navigator.vibrate(15);
+            openMobileContextMenu(item);
+        }, 550);
+    }, { passive: true });
+
+    card.addEventListener('touchmove', (e) => {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        touchMoveX = touch.clientX;
+        touchMoveY = touch.clientY;
+
+        const diffX = touchMoveX - touchStartX;
+        const diffY = touchMoveY - touchStartY;
+
+        if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }
+
+        if (Math.abs(diffX) > Math.abs(diffY) * 1.5 && Math.abs(diffX) > 15) {
+            isSwiping = true;
+            card.style.transform = `translateX(${diffX}px) scale(0.98)`;
+            
+            if (diffX > 0) {
+                card.className = `card swipe-action-pin ${item.pinned ? 'pinned' : ''}`;
+            } else {
+                card.className = `card swipe-action-delete ${item.pinned ? 'pinned' : ''}`;
+            }
+        }
+    }, { passive: true });
+
+    card.addEventListener('touchend', (e) => {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+
+        if (isLongPressTriggered) return;
+
+        const diffX = touchMoveX - touchStartX;
+        const diffY = touchMoveY - touchStartY;
+
+        if (isSwiping) {
+            card.style.transform = '';
+            card.className = `card ${item.pinned ? 'pinned' : ''}`;
+            
+            const threshold = window.innerWidth * 0.35;
+            if (diffX > threshold) {
+                if (navigator.vibrate) navigator.vibrate([10, 20]);
+                toggleNotePin(item);
+            } else if (diffX < -threshold) {
+                if (navigator.vibrate) navigator.vibrate([20, 50]);
+                deleteNoteToTrash(item);
+            }
+        } else {
+            if (Math.abs(diffX) < 8 && Math.abs(diffY) < 8) {
+                openMobileEditor(item);
+            }
+        }
+    });
+
+    card.addEventListener('click', (e) => {
+        if (isMobile()) {
+            e.preventDefault();
+            e.stopPropagation();
+            openMobileEditor(item);
+        }
+    });
+}
+
+// Wire up the mobile sheet control elements
+function initializeMobileSheets() {
+    const btnDone = document.getElementById('btnDoneMobileEditor');
+    const editorBackdrop = document.getElementById('mobileNoteEditorBackdrop');
+    const contextBackdrop = document.getElementById('mobileContextMenuBackdrop');
+    const folderBackdrop = document.getElementById('mobileFolderPickerBackdrop');
+    
+    if (btnDone) btnDone.onclick = () => { closeMobileEditor(); renderGrid(); };
+    if (editorBackdrop) editorBackdrop.onclick = () => { closeMobileEditor(); renderGrid(); };
+    if (contextBackdrop) contextBackdrop.onclick = () => closeMobileContextMenu();
+    if (folderBackdrop) folderBackdrop.onclick = () => closeMobileFolderPicker();
+    
+    // Mobile editor text input handler
+    const mobileTextarea = document.getElementById('mobileEditorTextarea');
+    if (mobileTextarea) {
+        mobileTextarea.addEventListener('input', (e) => {
+            if (currentEditingMobileNote) {
+                currentEditingMobileNote.text = e.target.value;
+                currentEditingMobileNote.updatedAt = Date.now();
+                document.getElementById('mobileEditorStats').textContent = countWordsAndChars(e.target.value);
+                triggerNoteAutoSave(currentEditingMobileNote);
+            }
+        });
+    }
+
+    // Context menu items
+    const btnCopy = document.getElementById('btnMobileMenuCopy');
+    const btnPin = document.getElementById('btnMobileMenuPin');
+    const btnMove = document.getElementById('btnMobileMenuMove');
+    const btnDelete = document.getElementById('btnMobileMenuDelete');
+
+    if (btnCopy) btnCopy.onclick = () => {
+        if (currentContextMobileNote) {
+            navigator.clipboard.writeText(currentContextMobileNote.text).then(() => {
+                showToast("Copied to clipboard");
+            });
+            closeMobileContextMenu();
+        }
+    };
+
+    if (btnPin) btnPin.onclick = () => {
+        if (currentContextMobileNote) {
+            toggleNotePin(currentContextMobileNote);
+            closeMobileContextMenu();
+        }
+    };
+
+    if (btnDelete) btnDelete.onclick = () => {
+        if (currentContextMobileNote) {
+            deleteNoteToTrash(currentContextMobileNote);
+            closeMobileContextMenu();
+        }
+    };
+
+    if (btnMove) btnMove.onclick = () => {
+        if (currentContextMobileNote) {
+            const note = currentContextMobileNote;
+            closeMobileContextMenu();
+            setTimeout(() => openMobileFolderPicker(note), 200);
+        }
+    };
+
+    // Attachments flow inside mobile sheet
+    const btnMobileAttach = document.getElementById('btnMobileAttach');
+    const mobileAttachDropdown = document.getElementById('mobileAttachDropdown');
+    const mobileImageInput = document.getElementById('mobileEditorImageInput');
+    const mobileDocInput = document.getElementById('mobileEditorDocumentInput');
+    const optAddImage = document.getElementById('optMobileAddImage');
+    const optAddDoc = document.getElementById('optMobileAddDocument');
+
+    if (btnMobileAttach && mobileAttachDropdown) {
+        btnMobileAttach.onclick = (e) => {
+            e.stopPropagation();
+            mobileAttachDropdown.style.display = mobileAttachDropdown.style.display === 'flex' ? 'none' : 'flex';
+        };
+        document.addEventListener('click', () => {
+            mobileAttachDropdown.style.display = 'none';
+        });
+    }
+
+    if (optAddImage) optAddImage.onclick = () => { ignoreBlur = true; mobileImageInput.click(); };
+    if (optAddDoc) optAddDoc.onclick = () => { ignoreBlur = true; mobileDocInput.click(); };
+
+    if (mobileImageInput) {
+        mobileImageInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file || !currentEditingMobileNote) return;
+            showToast("Uploading image...");
+            try {
+                const compressedBase64 = await compressImage(file, 256);
+                currentEditingMobileNote.image = compressedBase64;
+                currentEditingMobileNote.updatedAt = Date.now();
+                await forceSaveNoteToServer(currentEditingMobileNote);
+                
+                document.getElementById('mobileEditorImage').src = compressedBase64;
+                document.getElementById('mobileEditorImageWrapper').style.display = 'block';
+                showToast("Image uploaded successfully!");
+            } catch (err) {
+                console.error(err);
+                showToast(err.message || "Failed to compress image.");
+            }
+        });
+    }
+
+    if (mobileDocInput) {
+        mobileDocInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file || !currentEditingMobileNote) return;
+            try {
+                if (file.size > 2 * 1024 * 1024) throw new Error("File size cannot exceed 2MB.");
+                showToast("Uploading document...");
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        currentEditingMobileNote.document = event.target.result;
+                        currentEditingMobileNote.documentName = file.name;
+                        currentEditingMobileNote.documentType = file.type;
+                        currentEditingMobileNote.updatedAt = Date.now();
+                        await forceSaveNoteToServer(currentEditingMobileNote);
+                        
+                        document.getElementById('mobileEditorDocumentName').textContent = file.name;
+                        document.getElementById('mobileEditorDocumentWrapper').style.display = 'flex';
+                        showToast("Document uploaded successfully!");
+                    } catch (err) {
+                        showToast(err.message || "Failed to save document.");
+                    }
+                };
+                reader.readAsDataURL(file);
+            } catch (err) {
+                console.error(err);
+                showToast(err.message || "Failed to process document.");
+            }
+        });
+    }
+
+    const btnRemoveImage = document.getElementById('btnMobileRemoveImage');
+    if (btnRemoveImage) {
+        btnRemoveImage.onclick = async (e) => {
+            e.stopPropagation();
+            if (!currentEditingMobileNote) return;
+            if (await showCustomConfirm("Delete Image", "Remove this image from the note permanently?", true)) {
+                currentEditingMobileNote.image = null;
+                currentEditingMobileNote.updatedAt = Date.now();
+                await forceSaveNoteToServer(currentEditingMobileNote);
+                document.getElementById('mobileEditorImageWrapper').style.display = 'none';
+                showToast("Image deleted");
+            }
+        };
+    }
+
+    const btnRemoveDoc = document.getElementById('btnMobileRemoveDocument');
+    if (btnRemoveDoc) {
+        btnRemoveDoc.onclick = async (e) => {
+            e.stopPropagation();
+            if (!currentEditingMobileNote) return;
+            if (await showCustomConfirm("Delete Document", "Remove this document from the note permanently?", true)) {
+                currentEditingMobileNote.document = null;
+                currentEditingMobileNote.documentName = null;
+                currentEditingMobileNote.documentType = null;
+                currentEditingMobileNote.updatedAt = Date.now();
+                await forceSaveNoteToServer(currentEditingMobileNote);
+                document.getElementById('mobileEditorDocumentWrapper').style.display = 'none';
+                showToast("Document deleted");
+            }
+        };
+    }
+
+    const btnShare = document.getElementById('btnMobileShare');
+    if (btnShare) {
+        btnShare.onclick = () => {
+            if (!currentEditingMobileNote) return;
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Clipboardy Note',
+                    text: currentEditingMobileNote.text
+                }).catch(err => console.log('Share failed', err));
+            } else {
+                navigator.clipboard.writeText(currentEditingMobileNote.text).then(() => {
+                    showToast("Copied to clipboard (Share not supported)");
+                });
+            }
+        };
+    }
+}
+
+// Run mobile sheets initializer
+initializeMobileSheets();
 
 // Exports for unit testing
 export { hashPassword, countWordsAndChars, login, lockApp, isAppLocked, currentUser, currentRoomHash, ignoreBlur, safeConfirm };
