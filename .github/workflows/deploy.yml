@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - clipboardy-dev
+      - dev
 
 permissions:
   contents: write
@@ -26,7 +26,7 @@ jobs:
             dev
 
       - name: Deploy to Dev (Testing)
-        if: github.ref == 'refs/heads/clipboardy-dev'
+        if: github.ref == 'refs/heads/dev'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: .

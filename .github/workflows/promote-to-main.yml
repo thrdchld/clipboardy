@@ -20,11 +20,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Merge clipboardy-dev into main
+      - name: Merge dev into main
         run: |
           # Checkout main branch
           git checkout main
-          # Merge origin/clipboardy-dev branch
-          git merge origin/clipboardy-dev -m "chore: merge clipboardy-dev into main (manual promote)"
+          # Merge origin/dev branch
+          git merge origin/dev -m "chore: merge dev into main (manual promote)"
           # Push back to origin main
           git push origin main
