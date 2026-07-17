@@ -1,0 +1,30 @@
+name: Promote Dev to Main (Manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for all branches
+
+      - name: Configure Git User
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge clipboardy-dev into main
+        run: |
+          # Checkout main branch
+          git checkout main
+          # Merge origin/clipboardy-dev branch
+          git merge origin/clipboardy-dev -m "chore: merge clipboardy-dev into main (manual promote)"
+          # Push back to origin main
+          git push origin main
