@@ -1,56 +1,53 @@
 :root {
-    --bg-base: #121212;         /* Charcoal Black base */
-    --bg-surface: #1e1e1e;      /* Slightly lighter charcoal */
-    --bg-sidebar: #1e1e1e;
-    --bg-hover: #2d2d2d;
+    --bg-base: #09090b;          /* AMOLED deep black base */
+    --bg-surface: rgba(24, 24, 27, 0.7); /* Translucent surface */
+    --bg-sidebar: #09090b;
+    --bg-hover: rgba(39, 39, 42, 0.8);
     
-    --text-main: #faf8f5;       /* Warm Ivory White text */
-    --text-muted: #8c8c8c;
-    --text: #faf8f5;
+    --text-main: #fafafa;
+    --text-muted: #a1a1aa;
+    --text: #fafafa;
     
-    --primary: #9bb1c9;         /* Muted pastel blue */
-    --primary-hover: #b3c5d7;
-    --primary-light: #252c36;
+    --primary: #6366f1;          /* Indigo */
+    --primary-hover: #4f46e5;
+    --primary-light: rgba(99, 102, 241, 0.15);
     
-    --danger: #d99393;          /* Muted pastel red */
-    --danger-hover: #e5b1b1;
-    --warning: #e9c487;         /* Muted pastel yellow/gold */
-    --success: #98c1a1;         /* Muted pastel green */
+    --danger: #ef4444;           /* Coral red */
+    --danger-hover: #dc2626;
+    --warning: #f59e0b;
+    --success: #10b981;
     
-    --border: #2d2d2d;
-    --border-color: #2d2d2d;
+    --border: rgba(63, 63, 70, 0.4);
+    --border-color: rgba(63, 63, 70, 0.4);
+    
     --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --shadow-sm: 0 1px 3px 0 rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 20px -2px rgba(0,0,0,0.4);
+    --shadow-lg: 0 10px 30px -3px rgba(0,0,0,0.6);
+    --glass-blur: blur(16px);
 }
 
 .light {
-    --bg-base: #f5f2e9;         /* Ivory White/warm cream base */
-    --bg-surface: #fdfbf7;      /* Warm Ivory surface */
-    --bg-sidebar: #fdfbf7;
-    --bg-hover: #ebe7dc;
+    --bg-base: #f4f4f5;
+    --bg-surface: rgba(255, 255, 255, 0.75);
+    --bg-sidebar: #f4f4f5;
+    --bg-hover: rgba(228, 228, 231, 0.8);
     
-    --text-main: #1c1c1c;       /* Charcoal Black text */
-    --text-muted: #5c5c5c;
-    --text: #1c1c1c;
+    --text-main: #09090b;
+    --text-muted: #71717a;
+    --text: #09090b;
     
-    --primary: #455a73;         /* Darker muted pastel blue for WCAG contrast */
-    --primary-hover: #334356;
-    --primary-light: #e6edf5;
+    --primary: #4f46e5;
+    --primary-hover: #3730a3;
+    --primary-light: rgba(79, 70, 229, 0.1);
     
-    --danger: #b34a4a;          /* Darker muted pastel red */
-    --danger-hover: #943535;
-    --warning: #aa7424;         /* Darker muted pastel gold */
-    --success: #3c6e47;         /* Darker muted pastel green */
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
     
-    --border: #dcd7cb;
-    --border-color: #dcd7cb;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(140, 130, 120, 0.15), 0 2px 4px -1px rgba(140, 130, 120, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(140, 130, 120, 0.2), 0 4px 6px -2px rgba(140, 130, 120, 0.1);
+    --border: rgba(228, 228, 231, 0.8);
+    --border-color: rgba(228, 228, 231, 0.8);
 }
 
 * {
@@ -58,6 +55,18 @@
     margin: 0;
     padding: 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+h1, h2, h3, h4, .brand, .mobile-sheet-title, .nav-tab span {
+    font-family: 'Outfit', sans-serif !important;
+}
+
+/* Glassmorphism Styles */
+.card, .auth-box, .modal, .mobile-sheet {
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border) !important;
+    background: var(--bg-surface) !important;
 }
 
 body {
@@ -1319,36 +1328,214 @@ textarea:focus-visible,
     }
 }
 
-/* Quick Paste Bar styling */
-.quick-paste-container {
-    display: flex;
-    justify-content: center;
-    padding: 0 0 16px 0;
-    width: 100%;
+/* Bottom Navigation Bar styling */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: var(--bg-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-top: 1px solid var(--border);
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+    padding-bottom: env(safe-area-inset-bottom);
 }
-.btn-quick-paste {
-    width: 100%;
+
+.nav-tab {
+    background: none;
+    border: none;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 14px;
-    background: var(--primary-light);
-    color: var(--primary);
-    border: 1px dashed var(--primary);
-    border-radius: var(--radius-md);
-    font-size: 0.95rem;
-    font-weight: 700;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    gap: 4px;
     cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: var(--shadow-sm);
+    width: 25%;
+    height: 100%;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.btn-quick-paste:hover {
+
+.nav-tab svg {
+    color: var(--text-muted);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s;
+}
+
+.nav-tab:active {
+    transform: scale(0.92);
+}
+
+.nav-tab.active {
+    color: var(--primary);
+}
+
+.nav-tab.active svg {
+    color: var(--primary);
+    transform: translateY(-2px) scale(1.1);
+}
+
+/* Chat-Style Quick Input */
+.quick-input-container {
+    display: none;
+    position: fixed;
+    bottom: 64px;
+    left: 0;
+    right: 0;
+    padding: 12px 16px;
+    background: transparent;
+    z-index: 990;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.quick-input-wrapper {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    background: var(--bg-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 6px 8px;
+    box-shadow: var(--shadow-md);
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.quick-input-wrapper:focus-within {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    transform: translateY(-1px);
+    border-color: var(--primary);
+}
+
+.quick-input-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background 0.2s, color 0.2s;
+    flex-shrink: 0;
+}
+
+.quick-input-btn:hover, .quick-input-btn:active {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+
+.quick-input-field {
+    flex-grow: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-main);
+    padding: 8px 10px;
+    font-size: 0.95rem;
+    min-width: 0;
+}
+
+.quick-input-send {
     background: var(--primary);
     color: white;
-    border-style: solid;
+    border: none;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background 0.2s, transform 0.2s;
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+    flex-shrink: 0;
 }
-.btn-quick-paste:active {
-    transform: scale(0.98);
+
+.quick-input-send:active {
+    transform: scale(0.92);
 }
+
+/* Quick Input dropdown items */
+.quick-input-attach-dropdown {
+    pointer-events: auto;
+    position: absolute;
+    bottom: 68px;
+    right: 24px;
+    background: var(--bg-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 1010;
+    min-width: 140px;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    overflow: hidden;
+}
+
+.quick-input-attach-dropdown .dropdown-item {
+    background: none;
+    border: none;
+    padding: 10px 14px;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.quick-input-attach-dropdown .dropdown-item:active {
+    background: var(--bg-hover);
+}
+
+/* Mobile responsive navigation overrides */
+@media (max-width: 768px) {
+    .bottom-nav {
+        display: flex;
+    }
+    
+    .quick-input-container {
+        display: block;
+    }
+    
+    .main-scroll {
+        padding-bottom: 140px !important; /* Extra padding for bottom input and nav */
+    }
+    
+    .fab-mobile {
+        display: none !important; /* Hide old FAB */
+    }
+    
+    #btnMobileMenu {
+        display: none !important; /* Hamburger is obsolete */
+    }
+    
+    header {
+        background: var(--bg-surface) !important;
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border-bottom: 1px solid var(--border) !important;
+    }
+}
+
 
 

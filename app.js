@@ -139,6 +139,34 @@ const DOM = {
     
     toast: document.getElementById('toast'),
     btnQuickPaste: document.getElementById('btnQuickPaste'),
+    tabNotes: document.getElementById('tabNotes'),
+    tabFolders: document.getElementById('tabFolders'),
+    tabTrash: document.getElementById('tabTrash'),
+    tabSettings: document.getElementById('tabSettings'),
+    quickInputContainer: document.getElementById('quickInputContainer'),
+    btnQuickInputPaste: document.getElementById('btnQuickInputPaste'),
+    txtQuickInput: document.getElementById('txtQuickInput'),
+    btnQuickInputAttach: document.getElementById('btnQuickInputAttach'),
+    btnQuickInputSend: document.getElementById('btnQuickInputSend'),
+    quickInputAttachDropdown: document.getElementById('quickInputAttachDropdown'),
+    btnQuickAttachImage: document.getElementById('btnQuickAttachImage'),
+    btnQuickAttachDoc: document.getElementById('btnQuickAttachDoc'),
+    quickInputImageFile: document.getElementById('quickInputImageFile'),
+    quickInputDocFile: document.getElementById('quickInputDocFile'),
+    mobileFolderSelectorBackdrop: document.getElementById('mobileFolderSelectorBackdrop'),
+    mobileFolderSelectorSheet: document.getElementById('mobileFolderSelectorSheet'),
+    mobileFolderSelectorList: document.getElementById('mobileFolderSelectorList'),
+    btnAddNewFolderMobile: document.getElementById('btnAddNewFolderMobile'),
+    mobileSettingsBackdrop: document.getElementById('mobileSettingsBackdrop'),
+    mobileSettingsSheet: document.getElementById('mobileSettingsSheet'),
+    mobileSettingsAvatar: document.getElementById('mobileSettingsAvatar'),
+    mobileSettingsName: document.getElementById('mobileSettingsName'),
+    mobileSettingsEmail: document.getElementById('mobileSettingsEmail'),
+    btnMobileSettingsLock: document.getElementById('btnMobileSettingsLock'),
+    btnMobileSettingsChangePwd: document.getElementById('btnMobileSettingsChangePwd'),
+    btnMobileSettingsReset: document.getElementById('btnMobileSettingsReset'),
+    btnMobileSettingsTheme: document.getElementById('btnMobileSettingsTheme'),
+    btnMobileSettingsSignOut: document.getElementById('btnMobileSettingsSignOut'),
     
     folderModal: document.getElementById('folderModal'),
     folderNameInput: document.getElementById('folderNameInput'),
@@ -784,6 +812,7 @@ function startNotesSync() {
 
 function updateViewArchiveUI() {
     if (DOM.btnToggleTrash) DOM.btnToggleTrash.classList.remove('active');
+    setActiveTab(viewMode === 'trash' ? 'tabTrash' : 'tabNotes');
     
     // Update dynamic header title
     const headerTitleEl = document.getElementById('headerTitleText');
@@ -835,6 +864,7 @@ function updateViewArchiveUI() {
 function switchFolder(folderId) {
     currentFolderId = folderId;
     viewMode = 'active';
+    setActiveTab('tabNotes');
     updateViewArchiveUI();
     startNotesSync();
     closeMobileSidebar(); // Auto-close on mobile when folder selected
@@ -2747,6 +2777,99 @@ function bindMobileCardEvents(card, item) {
     });
 }
 
+function setActiveTab(tabId) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    const activeTab = document.getElementById(tabId);
+    if (activeTab) activeTab.classList.add('active');
+}
+
+function openMobileFolderSelector() {
+    const backdrop = DOM.mobileFolderSelectorBackdrop;
+    const sheet = DOM.mobileFolderSelectorSheet;
+    const list = DOM.mobileFolderSelectorList;
+    if (!backdrop || !sheet || !list) return;
+    
+    list.innerHTML = '';
+    
+    const generalBtn = document.createElement('button');
+    generalBtn.className = 'mobile-menu-item' + (currentFolderId === 'default' ? ' active' : '');
+    generalBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg> General`;
+    generalBtn.onclick = () => {
+        switchFolder('default');
+        closeMobileFolderSelector();
+    };
+    list.appendChild(generalBtn);
+    
+    folders.filter(f => !f.deleted && f.id !== 'default').forEach(f => {
+        const folderBtn = document.createElement('button');
+        folderBtn.className = 'mobile-menu-item' + (currentFolderId === f.id ? ' active' : '');
+        folderBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            ${f.name}
+        `;
+        folderBtn.onclick = () => {
+            switchFolder(f.id);
+            closeMobileFolderSelector();
+        };
+        list.appendChild(folderBtn);
+    });
+    
+    backdrop.classList.add('active');
+    sheet.classList.add('active');
+}
+
+function closeMobileFolderSelector() {
+    if (DOM.mobileFolderSelectorBackdrop) DOM.mobileFolderSelectorBackdrop.classList.remove('active');
+    if (DOM.mobileFolderSelectorSheet) DOM.mobileFolderSelectorSheet.classList.remove('active');
+}
+
+function openMobileSettings() {
+    const backdrop = DOM.mobileSettingsBackdrop;
+    const sheet = DOM.mobileSettingsSheet;
+    if (!backdrop || !sheet) return;
+    
+    if (currentUser && !currentUser.isAnonymous) {
+        if (DOM.mobileSettingsAvatar) DOM.mobileSettingsAvatar.src = currentUser.photoURL || 'https://via.placeholder.com/48';
+        if (DOM.mobileSettingsName) DOM.mobileSettingsName.textContent = currentUser.displayName || 'Google User';
+        if (DOM.mobileSettingsEmail) DOM.mobileSettingsEmail.textContent = currentUser.email || '';
+        if (DOM.btnMobileSettingsChangePwd) DOM.btnMobileSettingsChangePwd.style.display = 'inline-flex';
+        if (DOM.btnMobileSettingsReset) DOM.btnMobileSettingsReset.style.display = 'inline-flex';
+    } else {
+        if (DOM.mobileSettingsAvatar) DOM.mobileSettingsAvatar.src = 'https://via.placeholder.com/48';
+        if (DOM.mobileSettingsName) DOM.mobileSettingsName.textContent = 'Guest User';
+        if (DOM.mobileSettingsEmail) DOM.mobileSettingsEmail.textContent = 'Local Session';
+        if (DOM.btnMobileSettingsChangePwd) DOM.btnMobileSettingsChangePwd.style.display = 'none';
+        if (DOM.btnMobileSettingsReset) DOM.btnMobileSettingsReset.style.display = 'none';
+    }
+    
+    backdrop.classList.add('active');
+    sheet.classList.add('active');
+}
+
+function closeMobileSettings() {
+    if (DOM.mobileSettingsBackdrop) DOM.mobileSettingsBackdrop.classList.remove('active');
+    if (DOM.mobileSettingsSheet) DOM.mobileSettingsSheet.classList.remove('active');
+}
+
+async function addNoteWithAttachment(text, imageBase64, docData, docName, docType) {
+    const newNoteId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    const newNote = {
+        id: newNoteId,
+        text: text || '',
+        folderId: currentFolderId,
+        pinned: false,
+        updatedAt: Date.now()
+    };
+    if (imageBase64) newNote.image = imageBase64;
+    if (docData) {
+        newNote.document = docData;
+        newNote.documentName = docName;
+        newNote.documentType = docType;
+    }
+    await forceSaveNoteToServer(newNote);
+    showToast("Note created!");
+}
+
 // Wire up the mobile sheet control elements
 function initializeMobileSheets() {
     const btnDone = document.getElementById('btnDoneMobileEditor');
@@ -2758,6 +2881,7 @@ function initializeMobileSheets() {
     if (editorBackdrop) editorBackdrop.onclick = () => { closeMobileEditor(); renderGrid(); };
     if (contextBackdrop) contextBackdrop.onclick = () => closeMobileContextMenu();
     if (folderBackdrop) folderBackdrop.onclick = () => closeMobileFolderPicker();
+
     
     // Mobile editor text input handler
     const mobileTextarea = document.getElementById('mobileEditorTextarea');
@@ -3141,40 +3265,169 @@ function closeMobileFolderActions() {
 // Run mobile sheets initializer
 initializeMobileSheets();
 
-if (DOM.btnQuickPaste) {
-    DOM.btnQuickPaste.addEventListener('click', async () => {
+// Wire up 2026 Navigation and Quick Input
+if (DOM.tabNotes) {
+    DOM.tabNotes.onclick = () => {
+        viewMode = 'active';
+        setActiveTab('tabNotes');
+        updateViewArchiveUI();
+        startNotesSync();
+    };
+}
+if (DOM.tabFolders) {
+    DOM.tabFolders.onclick = () => {
+        openMobileFolderSelector();
+    };
+}
+if (DOM.tabTrash) {
+    DOM.tabTrash.onclick = () => {
+        viewMode = 'trash';
+        setActiveTab('tabTrash');
+        updateViewArchiveUI();
+        startNotesSync();
+    };
+}
+if (DOM.tabSettings) {
+    DOM.tabSettings.onclick = () => {
+        openMobileSettings();
+    };
+}
+
+// Backdrop close events
+if (DOM.mobileFolderSelectorBackdrop) DOM.mobileFolderSelectorBackdrop.onclick = closeMobileFolderSelector;
+if (DOM.mobileSettingsBackdrop) DOM.mobileSettingsBackdrop.onclick = closeMobileSettings;
+
+// Mobile settings sheet action items
+if (DOM.btnMobileSettingsLock) DOM.btnMobileSettingsLock.onclick = () => { closeMobileSettings(); lockApp(); };
+if (DOM.btnMobileSettingsChangePwd) {
+    DOM.btnMobileSettingsChangePwd.onclick = () => {
+        closeMobileSettings();
+        DOM.changeOldPassword.value = '';
+        DOM.changeNewPassword.value = '';
+        DOM.changeConfirmPassword.value = '';
+        DOM.changeLockPasswordModal.classList.remove('hidden');
+    };
+}
+if (DOM.btnMobileSettingsReset) DOM.btnMobileSettingsReset.onclick = () => { closeMobileSettings(); resetRoomData(); };
+if (DOM.btnMobileSettingsTheme) {
+    DOM.btnMobileSettingsTheme.onclick = () => {
+        const isLight = document.documentElement.classList.toggle('light');
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        if (isLight) {
+            DOM.themeIconSun.classList.add('hidden');
+            DOM.themeIconMoon.classList.remove('hidden');
+        } else {
+            DOM.themeIconSun.classList.remove('hidden');
+            DOM.themeIconMoon.classList.add('hidden');
+        }
+    };
+}
+if (DOM.btnMobileSettingsSignOut) DOM.btnMobileSettingsSignOut.onclick = () => { closeMobileSettings(); handleSignOut(); };
+if (DOM.btnAddNewFolderMobile) {
+    DOM.btnAddNewFolderMobile.onclick = () => {
+        closeMobileFolderSelector();
+        editingFolderId = null;
+        DOM.folderModal.querySelector('h3').textContent = "Create New Folder";
+        DOM.folderModal.classList.remove('hidden');
+        DOM.folderNameInput.focus();
+    };
+}
+
+// Chat-Style Quick Input Listeners
+if (DOM.btnQuickInputPaste) {
+    DOM.btnQuickInputPaste.onclick = async () => {
         try {
             if (!navigator.clipboard || !navigator.clipboard.readText) {
-                throw new Error("Clipboard API not supported or permission denied.");
+                throw new Error("Clipboard API not supported.");
             }
             showToast("Reading clipboard...");
             const text = await navigator.clipboard.readText();
             const trimmed = text.trim();
-            if (!trimmed) {
-                showToast("Clipboard is empty!");
-                return;
-            }
-            
-            const newNoteId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-            const newNote = {
-                id: newNoteId,
-                text: trimmed,
-                folderId: currentFolderId,
-                pinned: false,
-                updatedAt: Date.now()
-            };
-            
-            await forceSaveNoteToServer(newNote);
+            if (!trimmed) return showToast("Clipboard is empty!");
+            await addNoteWithAttachment(trimmed, null, null, null, null);
             showToast("Clipboard pasted & synced!");
-        } catch (err) {
-            console.error(err);
-            showToast("Quick Paste failed: " + err.message);
-            // Fallback: Open normal editor
-            handleAddNote();
+        } catch(err) {
+            showToast("Paste failed: " + err.message);
         }
+    };
+}
+
+if (DOM.btnQuickInputAttach) {
+    DOM.btnQuickInputAttach.onclick = (e) => {
+        e.stopPropagation();
+        if (DOM.quickInputAttachDropdown) DOM.quickInputAttachDropdown.classList.toggle('hidden');
+    };
+    document.addEventListener('click', () => {
+        if (DOM.quickInputAttachDropdown) DOM.quickInputAttachDropdown.classList.add('hidden');
     });
+}
+
+if (DOM.btnQuickAttachImage) {
+    DOM.btnQuickAttachImage.onclick = () => {
+        ignoreBlur = true;
+        if (DOM.quickInputImageFile) DOM.quickInputImageFile.click();
+    };
+}
+if (DOM.btnQuickAttachDoc) {
+    DOM.btnQuickAttachDoc.onclick = () => {
+        ignoreBlur = true;
+        if (DOM.quickInputDocFile) DOM.quickInputDocFile.click();
+    };
+}
+
+if (DOM.quickInputImageFile) {
+    DOM.quickInputImageFile.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        showToast("Uploading image...");
+        try {
+            const compressedBase64 = await compressImage(file, 256);
+            await addNoteWithAttachment('', compressedBase64, null, null, null);
+        } catch(err) {
+            showToast("Image failed: " + err.message);
+        }
+    };
+}
+
+if (DOM.quickInputDocFile) {
+    DOM.quickInputDocFile.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) return showToast("File size cannot exceed 2MB.");
+        showToast("Uploading document...");
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                await addNoteWithAttachment('', null, event.target.result, file.name, file.type);
+            } catch(err) {
+                showToast("Failed to upload document.");
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+}
+
+async function sendQuickInputText() {
+    if (!DOM.txtQuickInput) return;
+    const text = DOM.txtQuickInput.value.trim();
+    if (!text) return;
+    
+    DOM.txtQuickInput.value = '';
+    await addNoteWithAttachment(text, null, null, null, null);
+}
+
+if (DOM.btnQuickInputSend) {
+    DOM.btnQuickInputSend.onclick = sendQuickInputText;
+}
+if (DOM.txtQuickInput) {
+    DOM.txtQuickInput.onkeypress = (e) => {
+        if (e.key === 'Enter') {
+            sendQuickInputText();
+        }
+    };
 }
 
 // Exports for unit testing
 export { hashPassword, countWordsAndChars, login, lockApp, isAppLocked, currentUser, currentRoomHash, ignoreBlur };
+
 
