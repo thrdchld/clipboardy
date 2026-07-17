@@ -59,6 +59,7 @@ const saveTimeouts = new Map(); // Debounce map per note ID
 const DOM = {
     authScreen: document.getElementById('authScreen'),
     appScreen: document.getElementById('appScreen'),
+    roomNameInput: document.getElementById('roomNameInput'),
     passwordInput: document.getElementById('passwordInput'),
     loginBtn: document.getElementById('loginBtn'),
     
@@ -623,15 +624,19 @@ function lockApp() {
 }
 
 async function login() {
+    const roomName = DOM.roomNameInput ? DOM.roomNameInput.value.trim().toLowerCase().replace(/\s+/g, '') : '';
     const pwd = DOM.passwordInput.value.trim();
-    if (!pwd) return;
+    
+    if (!roomName) return showToast("Please enter a room name");
+    if (!pwd) return showToast("Please enter a PIN");
+    if (pwd.length !== 4) return showToast("PIN must be 4 digits");
     if (!currentUser) return showToast("Waiting for server connection...");
 
     DOM.loginBtn.textContent = "Joining...";
     DOM.loginBtn.disabled = true;
 
     try {
-        currentRoomHash = await hashPassword(pwd);
+        currentRoomHash = await hashPassword(roomName + "_" + pwd);
         
         await ensureRoomMetadata();
         
@@ -642,10 +647,11 @@ async function login() {
         DOM.authScreen.classList.add('hidden');
         DOM.appScreen.classList.remove('hidden');
         DOM.passwordInput.value = ''; 
+        if (DOM.roomNameInput) DOM.roomNameInput.value = '';
         
         updateProfileUI(currentUser);
         resetAutoLockTimer();
-        showToast("Joined guest room");
+        showToast("Joined guest room: " + roomName);
     } catch (err) {
         console.error(err);
         showToast("Error: " + err.message);
@@ -1912,6 +1918,13 @@ async function resetRoomData() {
 
 
 DOM.loginBtn.addEventListener('click', login);
+if (DOM.roomNameInput) {
+    DOM.roomNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            DOM.passwordInput.focus();
+        }
+    });
+}
 DOM.passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
 DOM.passwordInput.addEventListener('input', () => {
     if (DOM.passwordInput.value.length === 4) {
