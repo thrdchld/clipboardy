@@ -478,15 +478,6 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("pagehide", checkStrictLock);
 
-// Helper safe confirm dialog to avoid blur auto-lock
-function safeConfirm(message) {
-    ignoreBlur = true;
-    const result = confirm(message);
-    setTimeout(() => {
-        ignoreBlur = false;
-    }, 300);
-    return result;
-}
 
 function showCustomConfirm(title, message, isDangerous = false) {
     ignoreBlur = true;
@@ -3096,4 +3087,4 @@ function closeMobileFolderActions() {
 initializeMobileSheets();
 
 // Exports for unit testing
-export { hashPassword, countWordsAndChars, login, lockApp, isAppLocked, currentUser, currentRoomHash, ignoreBlur, safeConfirm };
+export { hashPassword, countWordsAndChars, login, lockApp, isAppLocked, currentUser, currentRoomHash, ignoreBlur };
