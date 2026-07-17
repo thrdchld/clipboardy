@@ -138,6 +138,7 @@ const DOM = {
     syncIndicator: document.getElementById('syncIndicator'),
     
     toast: document.getElementById('toast'),
+    btnQuickPaste: document.getElementById('btnQuickPaste'),
     
     folderModal: document.getElementById('folderModal'),
     folderNameInput: document.getElementById('folderNameInput'),
@@ -465,18 +466,33 @@ function resetAutoLockTimer() {
     window.addEventListener(evt, resetAutoLockTimer);
 });
 
-// Instant strict lock
+// Strict lock with Grace Period (10 seconds)
+let strictLockTimer = null;
+const GRACE_PERIOD_MS = 10000;
+
 function checkStrictLock() {
     if (ignoreBlur) return;
     if (!isAppLocked && strictLockEnabled) {
-        lockApp();
+        clearTimeout(strictLockTimer);
+        strictLockTimer = setTimeout(() => {
+            lockApp();
+        }, GRACE_PERIOD_MS);
     }
 }
 
+function cancelStrictLockTimer() {
+    clearTimeout(strictLockTimer);
+}
+
 document.addEventListener("visibilitychange", () => {
-    if (document.hidden) checkStrictLock();
+    if (document.hidden) {
+        checkStrictLock();
+    } else {
+        cancelStrictLockTimer();
+    }
 });
 window.addEventListener("pagehide", checkStrictLock);
+window.addEventListener("pageshow", cancelStrictLockTimer);
 
 
 function showCustomConfirm(title, message, isDangerous = false) {
@@ -1867,6 +1883,11 @@ async function resetRoomData() {
 
 DOM.loginBtn.addEventListener('click', login);
 DOM.passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+DOM.passwordInput.addEventListener('input', () => {
+    if (DOM.passwordInput.value.length === 4) {
+        login();
+    }
+});
 if (DOM.btnGoogleLogin) {
     DOM.btnGoogleLogin.addEventListener('click', loginWithGoogle);
 }
@@ -1875,12 +1896,24 @@ if (DOM.btnUnlockGoogle) {
 }
 if (DOM.lockPasswordInput) {
     DOM.lockPasswordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') unlockGoogleRoom(); });
+    DOM.lockPasswordInput.addEventListener('input', () => {
+        if (DOM.lockPasswordInput.value.length === 4) {
+            unlockGoogleRoom();
+        }
+    });
 }
 if (DOM.btnSwitchAccount) {
     DOM.btnSwitchAccount.addEventListener('click', handleSignOut);
 }
 if (DOM.btnSaveLockPassword) {
     DOM.btnSaveLockPassword.addEventListener('click', saveLockPassword);
+}
+if (DOM.confirmLockPassword) {
+    DOM.confirmLockPassword.addEventListener('input', () => {
+        if (DOM.confirmLockPassword.value.length === 4 && DOM.newLockPassword.value.length === 4) {
+            saveLockPassword();
+        }
+    });
 }
 if (DOM.btnLock) {
     DOM.btnLock.addEventListener('click', lockApp);
@@ -1909,6 +1942,13 @@ if (DOM.changeLockPasswordModal) {
 }
 if (DOM.btnSubmitChangePassword) {
     DOM.btnSubmitChangePassword.addEventListener('click', submitChangePassword);
+}
+if (DOM.changeConfirmPassword) {
+    DOM.changeConfirmPassword.addEventListener('input', () => {
+        if (DOM.changeConfirmPassword.value.length === 4 && DOM.changeNewPassword.value.length === 4 && DOM.changeOldPassword.value.length === 4) {
+            submitChangePassword();
+        }
+    });
 }
 if (DOM.btnResetData) {
     DOM.btnResetData.addEventListener('click', resetRoomData);
@@ -2607,6 +2647,7 @@ function bindMobileCardEvents(card, item) {
     let longPressTimer = null;
     let isLongPressTriggered = false;
     let isSwiping = false;
+    let lastTap = 0;
 
     card.addEventListener('touchstart', (e) => {
         if (e.touches.length !== 1) return;
@@ -2678,7 +2719,22 @@ function bindMobileCardEvents(card, item) {
             }
         } else {
             if (Math.abs(diffX) < 8 && Math.abs(diffY) < 8) {
-                openMobileEditor(item);
+                const currentTime = Date.now();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 250 && tapLength > 0) {
+                    navigator.clipboard.writeText(item.text).then(() => {
+                        showToast("Copied (Double-Tap)");
+                        if (navigator.vibrate) navigator.vibrate(30);
+                    });
+                    lastTap = 0;
+                    return;
+                }
+                lastTap = currentTime;
+                setTimeout(() => {
+                    if (lastTap === currentTime) {
+                        openMobileEditor(item);
+                    }
+                }, 200);
             }
         }
     });
@@ -2687,7 +2743,6 @@ function bindMobileCardEvents(card, item) {
         if (isMobile()) {
             e.preventDefault();
             e.stopPropagation();
-            openMobileEditor(item);
         }
     });
 }
@@ -3086,5 +3141,40 @@ function closeMobileFolderActions() {
 // Run mobile sheets initializer
 initializeMobileSheets();
 
+if (DOM.btnQuickPaste) {
+    DOM.btnQuickPaste.addEventListener('click', async () => {
+        try {
+            if (!navigator.clipboard || !navigator.clipboard.readText) {
+                throw new Error("Clipboard API not supported or permission denied.");
+            }
+            showToast("Reading clipboard...");
+            const text = await navigator.clipboard.readText();
+            const trimmed = text.trim();
+            if (!trimmed) {
+                showToast("Clipboard is empty!");
+                return;
+            }
+            
+            const newNoteId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+            const newNote = {
+                id: newNoteId,
+                text: trimmed,
+                folderId: currentFolderId,
+                pinned: false,
+                updatedAt: Date.now()
+            };
+            
+            await forceSaveNoteToServer(newNote);
+            showToast("Clipboard pasted & synced!");
+        } catch (err) {
+            console.error(err);
+            showToast("Quick Paste failed: " + err.message);
+            // Fallback: Open normal editor
+            handleAddNote();
+        }
+    });
+}
+
 // Exports for unit testing
 export { hashPassword, countWordsAndChars, login, lockApp, isAppLocked, currentUser, currentRoomHash, ignoreBlur };
+

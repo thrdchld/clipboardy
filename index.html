@@ -79,7 +79,7 @@
             
             <!-- Guest Login Area -->
             <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
-                <input type="password" id="passwordInput" class="input-field" placeholder="Room Password" style="box-sizing: border-box;" autocomplete="off">
+                <input type="password" id="passwordInput" class="input-field" placeholder="4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; letter-spacing: 2px;" autocomplete="off">
                 <button id="loginBtn" class="btn btn-primary" style="width: 100%;">Join Room</button>
             </div>
         </div>
@@ -107,7 +107,7 @@
             </div>
             
             <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
-                <input type="password" id="lockPasswordInput" class="input-field" placeholder="Enter Lock Password" style="box-sizing: border-box; text-align: center; font-size: 1.2em; letter-spacing: 2px; margin-bottom: 8px;">
+                <input type="password" id="lockPasswordInput" class="input-field" placeholder="Enter 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.2em; letter-spacing: 2px; margin-bottom: 8px;">
                 <button id="btnUnlockGoogle" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">Unlock Screen</button>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; box-sizing: border-box; width: 100%;">
                     <button id="btnForgotPassword" class="btn" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.85em; font-weight: 500; padding: 6px 10px;">Forgot Password?</button>
@@ -254,6 +254,13 @@
                         <path class="ptr-indicator" d="M12 2a10 10 0 0 1 10 10h-2a8 8 0 0 0-8-8V2z"></path>
                     </svg>
                 </div>
+                <!-- Quick Paste Bar -->
+                <div id="quickPasteContainer" class="quick-paste-container">
+                    <button id="btnQuickPaste" class="btn btn-quick-paste">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                        Insta-Paste (Add from Clipboard)
+                    </button>
+                </div>
                 <div id="clipGrid">
                     <!-- Cards render here via JS -->
                 </div>
@@ -336,8 +343,8 @@
                 This is your first Google login! Please set a lock password. You will use this password to unlock your screen when Clipboardy locks.
             </p>
             <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; width: 100%; box-sizing: border-box;">
-                <input type="password" id="newLockPassword" class="input-field" placeholder="New Password" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 1px;">
-                <input type="password" id="confirmLockPassword" class="input-field" placeholder="Confirm Password" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 1px;">
+                <input type="password" id="newLockPassword" class="input-field" placeholder="New 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
+                <input type="password" id="confirmLockPassword" class="input-field" placeholder="Confirm 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
             </div>
             <button id="btnSaveLockPassword" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight: 600;">Save & Unlock</button>
         </div>
@@ -351,9 +358,9 @@
                 Change Lock Password
             </h3>
             <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; width: 100%; box-sizing: border-box;">
-                <input type="password" id="changeOldPassword" class="input-field" placeholder="Current Lock Password" style="box-sizing: border-box; text-align: center; font-size: 1.1em;">
-                <input type="password" id="changeNewPassword" class="input-field" placeholder="New Lock Password" style="box-sizing: border-box; text-align: center; font-size: 1.1em;">
-                <input type="password" id="changeConfirmPassword" class="input-field" placeholder="Confirm New Password" style="box-sizing: border-box; text-align: center; font-size: 1.1em;">
+                <input type="password" id="changeOldPassword" class="input-field" placeholder="Current 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
+                <input type="password" id="changeNewPassword" class="input-field" placeholder="New 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
+                <input type="password" id="changeConfirmPassword" class="input-field" placeholder="Confirm New 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
             </div>
             <div style="display: flex; justify-content: flex-end; margin-top: -5px; margin-bottom: 15px; width: 100%;">
                 <button id="btnChangeModalForgotPassword" class="btn" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.85em; font-weight: 500; padding: 6px 0;">Forgot Password?</button>

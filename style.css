@@ -1319,3 +1319,36 @@ textarea:focus-visible,
     }
 }
 
+/* Quick Paste Bar styling */
+.quick-paste-container {
+    display: flex;
+    justify-content: center;
+    padding: 0 0 16px 0;
+    width: 100%;
+}
+.btn-quick-paste {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    background: var(--primary-light);
+    color: var(--primary);
+    border: 1px dashed var(--primary);
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+.btn-quick-paste:hover {
+    background: var(--primary);
+    color: white;
+    border-style: solid;
+}
+.btn-quick-paste:active {
+    transform: scale(0.98);
+}
+
+
