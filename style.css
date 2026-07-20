@@ -1018,9 +1018,43 @@ select.badge option {
     }
     .grid .card .card-body {
         pointer-events: none !important;
+        max-height: 8em !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        height: auto !important;
+    }
+    .grid .card.has-attachment .card-body {
+        max-height: 4.8em !important;
     }
     .grid .card .card-header {
         margin-bottom: 4px !important;
+    }
+    .grid .card .card-footer {
+        display: none !important;
+    }
+    .grid .card.has-attachment:not(.attachment-only) .card-image-wrapper {
+        display: block !important;
+        height: 3.2em !important;
+        margin-bottom: 8px !important;
+    }
+    .grid .card.has-attachment:not(.attachment-only) .card-document-wrapper {
+        display: flex !important;
+        height: 3.2em !important;
+        margin-top: 0 !important;
+        margin-bottom: 8px !important;
+        padding: 6px 12px !important;
+        box-sizing: border-box !important;
+        border-radius: var(--radius-sm) !important;
+        font-size: 0.8em !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 6px !important;
+    }
+    .grid .card .btn-remove-image,
+    .grid .card .btn-download-image,
+    .grid .card .btn-download-document,
+    .grid .card .btn-remove-document {
+        display: none !important;
     }
 }
 
