@@ -931,7 +931,13 @@ select.badge option {
     .fab-mobile .fab-text { display: none; }
     .fab-mobile .fab-icon { display: block !important; }
     
-    .grid { grid-template-columns: 1fr; }
+    .grid.list-view {
+        grid-template-columns: 1fr;
+    }
+    .grid.grid-view {
+        grid-template-columns: repeat(2, 1fr) !important;
+        grid-gap: 10px !important;
+    }
 }
 
 .fab-icon { display: none; }
