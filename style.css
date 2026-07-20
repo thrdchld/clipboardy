@@ -1018,13 +1018,15 @@ select.badge option {
     }
     .grid .card .card-body {
         pointer-events: none !important;
+        height: 8em !important;
         max-height: 8em !important;
-        min-height: 0 !important;
+        min-height: 8em !important;
         overflow: hidden !important;
-        height: auto !important;
     }
     .grid .card.has-attachment .card-body {
-        max-height: 4.8em !important;
+        height: 4.5em !important;
+        max-height: 4.5em !important;
+        min-height: 4.5em !important;
     }
     .grid .card .card-header {
         margin-bottom: 4px !important;
@@ -1034,14 +1036,14 @@ select.badge option {
     }
     .grid .card.has-attachment:not(.attachment-only) .card-image-wrapper {
         display: block !important;
-        height: 3.2em !important;
-        margin-bottom: 8px !important;
+        height: 3em !important;
+        margin-bottom: 0.5em !important;
     }
     .grid .card.has-attachment:not(.attachment-only) .card-document-wrapper {
         display: flex !important;
-        height: 3.2em !important;
+        height: 3em !important;
         margin-top: 0 !important;
-        margin-bottom: 8px !important;
+        margin-bottom: 0.5em !important;
         padding: 6px 12px !important;
         box-sizing: border-box !important;
         border-radius: var(--radius-sm) !important;
@@ -1049,6 +1051,18 @@ select.badge option {
         align-items: center !important;
         justify-content: flex-start !important;
         gap: 6px !important;
+    }
+    .grid .card.attachment-only .card-image-wrapper {
+        height: 8em !important;
+        min-height: 8em !important;
+        margin: 0 !important;
+    }
+    .grid .card.attachment-only .card-document-wrapper {
+        height: 8em !important;
+        min-height: 8em !important;
+        margin: 0 !important;
+        padding: 24px 16px !important;
+        box-sizing: border-box !important;
     }
     .grid .card .btn-remove-image,
     .grid .card .btn-download-image,
