@@ -545,14 +545,14 @@ header {
 .grid.grid-view {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    grid-gap: 16px;
+    grid-gap: 20px;
     align-items: start;
     width: 100%;
 }
 .grid.list-view {
     display: grid;
     grid-template-columns: 1fr;
-    grid-gap: 16px;
+    grid-gap: 20px;
     max-width: 600px;
     margin: 0 auto;
     width: 100%;
@@ -561,7 +561,7 @@ header {
 .card {
     background: var(--bg-surface);
     border-radius: var(--radius-md);
-    padding: 16px;
+    padding: 20px 22px;
     box-shadow: var(--shadow-sm);
     display: flex;
     flex-direction: column;
@@ -572,6 +572,10 @@ header {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     box-sizing: border-box;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
 }
 
 .card:hover { 
@@ -649,6 +653,52 @@ header {
 }
 .card .card-document-wrapper {
     display: none !important;
+}
+
+/* Attachment-only notes fill the entire card preview edge-to-edge */
+.card.attachment-only {
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+.card.attachment-only .card-header {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 10;
+    margin-bottom: 0 !important;
+}
+
+.card.attachment-only .card-body {
+    display: none !important;
+}
+
+.card.attachment-only .card-footer {
+    display: none !important;
+}
+
+.card.attachment-only .card-image-wrapper {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 130px;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+}
+
+.card.attachment-only .card-document-wrapper {
+    display: flex !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 130px;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 24px 16px !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
 }
 
 /* Keep Color selector dropdown */
@@ -956,13 +1006,18 @@ select.badge option {
     
     .grid.list-view {
         grid-template-columns: 1fr;
+        grid-gap: 16px !important;
     }
     .grid.grid-view {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        grid-gap: 10px !important;
+        grid-gap: 16px !important;
     }
     .card {
         min-width: 0 !important;
+        padding: 18px 20px !important;
+    }
+    .grid .card .card-body {
+        pointer-events: none !important;
     }
     .grid .card .card-header {
         margin-bottom: 4px !important;
