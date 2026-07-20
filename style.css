@@ -1015,6 +1015,9 @@ select.badge option {
     .card {
         min-width: 0 !important;
         padding: 18px 20px !important;
+        height: calc(8em + 64px) !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
     }
     .grid .card .card-body {
         pointer-events: none !important;
@@ -1053,13 +1056,13 @@ select.badge option {
         gap: 6px !important;
     }
     .grid .card.attachment-only .card-image-wrapper {
-        height: 8em !important;
-        min-height: 8em !important;
+        height: 100% !important;
+        min-height: 100% !important;
         margin: 0 !important;
     }
     .grid .card.attachment-only .card-document-wrapper {
-        height: 8em !important;
-        min-height: 8em !important;
+        height: 100% !important;
+        min-height: 100% !important;
         margin: 0 !important;
         padding: 24px 16px !important;
         box-sizing: border-box !important;
