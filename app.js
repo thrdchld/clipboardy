@@ -66,6 +66,10 @@ const DOM = {
     sidebar: document.querySelector('.sidebar'),
     sidebarBackdrop: document.getElementById('sidebarBackdrop'),
     btnMobileMenu: document.getElementById('btnMobileMenu'),
+    btnToggleLayout: document.getElementById('btnToggleLayout'),
+    layoutIconList: document.getElementById('layoutIconList'),
+    layoutIconGrid: document.getElementById('layoutIconGrid'),
+    mobileEditorTitle: document.getElementById('mobileEditorTitle'),
     
 
     strictLockToggle: document.getElementById('strictLockToggle'),
@@ -208,6 +212,29 @@ if (DOM.btnThemeToggle) {
             DOM.themeIconSun.classList.remove('hidden');
             DOM.themeIconMoon.classList.add('hidden');
         }
+    });
+}
+
+// Initialize layout mode from localStorage on load
+let layoutMode = localStorage.getItem('layoutMode') || 'grid';
+function updateLayoutModeUI() {
+    if (!DOM.layoutIconList || !DOM.layoutIconGrid) return;
+    if (layoutMode === 'grid') {
+        DOM.layoutIconList.classList.remove('hidden');
+        DOM.layoutIconGrid.classList.add('hidden');
+    } else {
+        DOM.layoutIconList.classList.add('hidden');
+        DOM.layoutIconGrid.classList.remove('hidden');
+    }
+}
+updateLayoutModeUI();
+
+if (DOM.btnToggleLayout) {
+    DOM.btnToggleLayout.addEventListener('click', () => {
+        layoutMode = layoutMode === 'grid' ? 'list' : 'grid';
+        localStorage.setItem('layoutMode', layoutMode);
+        updateLayoutModeUI();
+        renderGrid();
     });
 }
 
@@ -1300,7 +1327,7 @@ function renderGrid() {
     let filtered = notesArray.filter(n => {
         const matchesFolder = n.folderId === currentFolderId;
         const matchesView = !n.deleted;
-        const matchesSearch = n.text.toLowerCase().includes(searchQuery);
+        const matchesSearch = n.text.toLowerCase().includes(searchQuery) || (n.title && n.title.toLowerCase().includes(searchQuery));
         return matchesFolder && matchesView && matchesSearch;
     });
 
@@ -1332,13 +1359,13 @@ function renderGrid() {
                         <svg class="toggle-icon" style="transition: transform 0.2s; ${isPinnedCollapsed ? 'transform: rotate(-90deg);' : ''}" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </button>
                 </div>
-                <div id="pinnedGrid" class="grid ${isPinnedCollapsed ? 'hidden' : ''}"></div>
+                <div id="pinnedGrid" class="grid ${isPinnedCollapsed ? 'hidden' : ''} ${layoutMode === 'list' ? 'list-view' : 'grid-view'}"></div>
             </div>
             <div class="section-container" style="width: 100%;">
                 <div class="section-header" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px;">
                     <span style="font-size: 0.8rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted);">OTHERS</span>
                 </div>
-                <div id="othersGrid" class="grid"></div>
+                <div id="othersGrid" class="grid ${layoutMode === 'list' ? 'list-view' : 'grid-view'}"></div>
             </div>
         `;
         pinnedGrid = DOM.clipGrid.querySelector('#pinnedGrid');
@@ -1355,14 +1382,14 @@ function renderGrid() {
         }
     } else {
         DOM.clipGrid.innerHTML = `
-            <div id="othersGrid" class="grid" style="width: 100%;"></div>
+            <div id="othersGrid" class="grid ${layoutMode === 'list' ? 'list-view' : 'grid-view'}" style="width: 100%;"></div>
         `;
         othersGrid = DOM.clipGrid.querySelector('#othersGrid');
     }
 
     filtered.forEach(item => {
         const card = document.createElement('div');
-        card.className = `card ${item.pinned ? 'pinned' : ''}`;
+        card.className = `card ${item.pinned ? 'pinned' : ''} color-${item.color || 'default'}`;
         
         const dateStr = item.updatedAt ? new Date(item.updatedAt).toLocaleString('en-US', {day:'numeric', month:'short', hour: '2-digit', minute:'2-digit'}) : 'New';
 
@@ -1436,6 +1463,35 @@ function renderGrid() {
             </div>
         ` : '';
 
+        const titleHtml = `
+            <div class="card-title-container">
+                <input type="text" class="card-title-field" data-note-id="${item.id}" placeholder="Title" value="${item.title || ''}">
+            </div>
+        `;
+
+        const colorPickerHtml = `
+            <div class="color-palette-container">
+                <button class="action-btn color-btn" title="Change Color" aria-label="Change Color" style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px; gap: 6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a7 7 0 0 0-7 7c0 2.38 2 6 7 13 5-7 7-10.62 7-13a7 7 0 0 0-7-7z"></path></svg>
+                    Color
+                </button>
+                <div class="color-palette-dropdown hidden">
+                    <button class="color-dot default" data-color="default" title="Default"></button>
+                    <button class="color-dot red" data-color="red" title="Red"></button>
+                    <button class="color-dot orange" data-color="orange" title="Orange"></button>
+                    <button class="color-dot yellow" data-color="yellow" title="Yellow"></button>
+                    <button class="color-dot green" data-color="green" title="Green"></button>
+                    <button class="color-dot teal" data-color="teal" title="Teal"></button>
+                    <button class="color-dot blue" data-color="blue" title="Blue"></button>
+                    <button class="color-dot darkblue" data-color="darkblue" title="Dark Blue"></button>
+                    <button class="color-dot purple" data-color="purple" title="Purple"></button>
+                    <button class="color-dot pink" data-color="pink" title="Pink"></button>
+                    <button class="color-dot brown" data-color="brown" title="Brown"></button>
+                    <button class="color-dot gray" data-color="gray" title="Gray"></button>
+                </div>
+            </div>
+        `;
+
         card.innerHTML = `
             <div class="card-header">
                 <div class="card-badges">
@@ -1446,15 +1502,17 @@ function renderGrid() {
                     ${moveSelectHtml}
                 </div>
             </div>
+            ${titleHtml}
             ${imageHtml}
             ${documentHtml}
-            <textarea class="card-body" data-note-id="${item.id}" placeholder="Type something..." aria-label="Note Content">${item.text}</textarea>
+            <textarea class="card-body" data-note-id="${item.id}" placeholder="Note" aria-label="Note Content">${item.text}</textarea>
             <div class="card-footer">
                 <div class="card-stats">
                     <span class="card-date">${dateStr}</span>
                     <span class="word-count">${countWordsAndChars(item.text)}</span>
                 </div>
                 <div class="card-actions">
+                    ${colorPickerHtml}
                     ${attachmentBtnHtml}
                     <button class="action-btn copy-btn" title="Copy Note" aria-label="Copy Note" style="display:inline-flex; align-items:center; gap:4px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -1468,12 +1526,21 @@ function renderGrid() {
             </div>
         `;
         
+        const titleInput = card.querySelector('.card-title-field');
         const textInput = card.querySelector('.card-body');
         const wordCountDisplay = card.querySelector('.word-count');
         
         if (isMobile()) {
+            titleInput.setAttribute('readonly', 'true');
+            titleInput.style.cursor = 'pointer';
             textInput.setAttribute('readonly', 'true');
             textInput.style.cursor = 'pointer';
+        } else {
+            titleInput.addEventListener('input', (e) => {
+                item.title = e.target.value;
+                item.updatedAt = Date.now();
+                triggerNoteAutoSave(item);
+            });
         }
         
         // Auto-resize on initial render
@@ -1529,7 +1596,8 @@ function renderGrid() {
         });
 
         const copyBtn = card.querySelector('.copy-btn');
-        copyBtn.addEventListener('click', () => {
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             navigator.clipboard.writeText(textInput.value).then(() => {
                 // Micro-animation
                 const originalContent = copyBtn.innerHTML;
@@ -1545,7 +1613,8 @@ function renderGrid() {
             });
         });
 
-        card.querySelector('.del-btn').addEventListener('click', async () => {
+        card.querySelector('.del-btn').addEventListener('click', async (e) => {
+            e.stopPropagation();
             if (await showCustomConfirm("Move to Trash", "Move this note to Trash? It will be automatically deleted after 30 days.", false)) {
                 const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', item.id);
                 try {
@@ -1567,7 +1636,7 @@ function renderGrid() {
             moveBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 // Close all other dropdowns
-                document.querySelectorAll('.move-dropdown, .attachment-dropdown').forEach(d => {
+                document.querySelectorAll('.move-dropdown, .attachment-dropdown, .color-palette-dropdown').forEach(d => {
                     if (d !== moveDropdown) d.classList.add('hidden');
                 });
                 moveDropdown.classList.toggle('hidden');
@@ -1588,11 +1657,44 @@ function renderGrid() {
             });
         }
 
+        // Color Picker events
+        const colorBtn = card.querySelector('.color-btn');
+        const colorDropdown = card.querySelector('.color-palette-dropdown');
+        if (colorBtn && colorDropdown) {
+            colorBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Close all other dropdowns
+                document.querySelectorAll('.move-dropdown, .attachment-dropdown, .color-palette-dropdown').forEach(d => {
+                    if (d !== colorDropdown) d.classList.add('hidden');
+                });
+                colorDropdown.classList.toggle('hidden');
+            });
+            
+            colorDropdown.querySelectorAll('.color-dot').forEach(dot => {
+                dot.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const chosenColor = dot.getAttribute('data-color');
+                    item.color = chosenColor;
+                    item.updatedAt = Date.now();
+                    
+                    // Instantly update card class for visual feedback
+                    card.className = `card ${item.pinned ? 'pinned' : ''} color-${chosenColor}`;
+                    
+                    await forceSaveNoteToServer(item);
+                    colorDropdown.classList.add('hidden');
+                    showToast("Color updated!");
+                });
+            });
+        }
+
         if (item.image) {
             // Lightbox viewer
-            card.querySelector('.card-image').addEventListener('click', () => {
-                DOM.lightboxImage.src = item.image;
-                DOM.lightboxModal.classList.remove('hidden');
+            card.querySelector('.card-image').addEventListener('click', (e) => {
+                if (!isMobile()) {
+                    e.stopPropagation();
+                    DOM.lightboxImage.src = item.image;
+                    DOM.lightboxModal.classList.remove('hidden');
+                }
             });
 
             // Remove image
@@ -1645,7 +1747,7 @@ function renderGrid() {
 
             attachmentBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                document.querySelectorAll('.attachment-dropdown').forEach(d => {
+                document.querySelectorAll('.attachment-dropdown, .move-dropdown, .color-palette-dropdown').forEach(d => {
                     if (d !== attachmentDropdown) d.classList.add('hidden');
                 });
                 attachmentDropdown.classList.toggle('hidden');
@@ -1749,7 +1851,10 @@ function renderGrid() {
 
     // Restore active note textarea focus & caret state
     if (activeNoteId) {
-        const textInput = DOM.clipGrid.querySelector(`textarea[data-note-id="${activeNoteId}"]`);
+        const selector = activeFieldType === 'title' 
+            ? `.card-title-field[data-note-id="${activeNoteId}"]`
+            : `textarea[data-note-id="${activeNoteId}"]`;
+        const textInput = DOM.clipGrid.querySelector(selector);
         if (textInput) {
             textInput.focus();
             textInput.setSelectionRange(caretStart, caretEnd);
@@ -2537,6 +2642,9 @@ function openMobileEditor(note) {
     const textarea = document.getElementById('mobileEditorTextarea');
     const stats = document.getElementById('mobileEditorStats');
     
+    if (DOM.mobileEditorTitle) {
+        DOM.mobileEditorTitle.value = note.title || '';
+    }
     textarea.value = note.text;
     stats.textContent = countWordsAndChars(note.text);
     
@@ -2577,6 +2685,9 @@ function closeMobileEditor() {
     sheet.style.bottom = '';
     
     if (currentEditingMobileNote) {
+        if (DOM.mobileEditorTitle) {
+            currentEditingMobileNote.title = DOM.mobileEditorTitle.value;
+        }
         triggerNoteAutoSave(currentEditingMobileNote);
     }
     currentEditingMobileNote = null;
@@ -2904,6 +3015,18 @@ function initializeMobileSheets() {
                 currentEditingMobileNote.text = e.target.value;
                 currentEditingMobileNote.updatedAt = Date.now();
                 document.getElementById('mobileEditorStats').textContent = countWordsAndChars(e.target.value);
+                triggerNoteAutoSave(currentEditingMobileNote);
+            }
+        });
+    }
+
+    // Mobile editor title input handler
+    const mobileTitleInput = DOM.mobileEditorTitle;
+    if (mobileTitleInput) {
+        mobileTitleInput.addEventListener('input', (e) => {
+            if (currentEditingMobileNote) {
+                currentEditingMobileNote.title = e.target.value;
+                currentEditingMobileNote.updatedAt = Date.now();
                 triggerNoteAutoSave(currentEditingMobileNote);
             }
         });

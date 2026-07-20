@@ -57,12 +57,14 @@ describe('Clipboardy App Test Suite (TDD)', () => {
         await import('../app.js');
 
         const passwordInput = document.getElementById('passwordInput');
+        const roomNameInput = document.getElementById('roomNameInput');
         const loginBtn = document.getElementById('loginBtn');
         const authScreen = document.getElementById('authScreen');
         const appScreen = document.getElementById('appScreen');
         
-        // Simulate password entry and click login
-        passwordInput.value = 'rahasia123';
+        // Simulate room name and PIN entry
+        if (roomNameInput) roomNameInput.value = 'testroom';
+        passwordInput.value = '1234';
         
         // Trigger login
         loginBtn.click();
