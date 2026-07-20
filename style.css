@@ -632,17 +632,22 @@ header {
     opacity: 0.6;
 }
 
-/* Globally hide note titles and word count statistics */
+/* Globally hide note titles and card stats (timestamp & word counts in preview) */
 .card-title-container {
     display: none !important;
 }
 #mobileEditorTitle {
     display: none !important;
 }
-.word-count {
+.card-stats {
     display: none !important;
 }
-#mobileEditorStats {
+
+/* Hide full attachment previews on card grids */
+.card .card-image-wrapper {
+    display: none !important;
+}
+.card .card-document-wrapper {
     display: none !important;
 }
 
@@ -751,13 +756,17 @@ select.badge option {
     font-size: 1.05em;
     line-height: 1.6;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
 }
 .card-body::placeholder { color: var(--text-muted); opacity: 0.6; }
 
 /* Custom scrollbar for card body */
 .card-body::-webkit-scrollbar {
-    width: 6px;
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 .card-body::-webkit-scrollbar-track {
     background: transparent;
@@ -955,10 +964,8 @@ select.badge option {
     .card {
         min-width: 0 !important;
     }
-    .card-stats {
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        gap: 4px !important;
+    .grid .card .card-header {
+        margin-bottom: 4px !important;
     }
 }
 
