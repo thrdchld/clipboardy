@@ -632,6 +632,20 @@ header {
     opacity: 0.6;
 }
 
+/* Globally hide note titles and word count statistics */
+.card-title-container {
+    display: none !important;
+}
+#mobileEditorTitle {
+    display: none !important;
+}
+.word-count {
+    display: none !important;
+}
+#mobileEditorStats {
+    display: none !important;
+}
+
 /* Keep Color selector dropdown */
 .color-palette-container {
     position: relative;
