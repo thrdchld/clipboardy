@@ -935,8 +935,16 @@ select.badge option {
         grid-template-columns: 1fr;
     }
     .grid.grid-view {
-        grid-template-columns: repeat(2, 1fr) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         grid-gap: 10px !important;
+    }
+    .card {
+        min-width: 0 !important;
+    }
+    .card-stats {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 4px !important;
     }
 }
 
