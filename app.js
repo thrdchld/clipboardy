@@ -88,7 +88,7 @@ const DOM = {
     btnSelectFolders: document.getElementById('btnSelectFolders'),
     
     btnAddNote: document.getElementById('btnAddNote'),
-    btnAddNoteMobile: document.getElementById('btnAddNoteMobile'),
+    btnAddNoteMobile: document.getElementById('btnMobileFAB'),
     btnAddNoteHeader: document.getElementById('btnAddNoteHeader'),
     btnEmptyTrashMobile: document.getElementById('btnEmptyTrashMobile'),
     btnGoogleLogin: document.getElementById('btnGoogleLogin'),
