@@ -101,7 +101,7 @@ export function showToast(message) {
     DOM.toast.classList.add('show');
     setTimeout(() => {
         DOM.toast.classList.remove('show');
-    }, 2400);
+    }, 2800);
 }
 
 export function escapeHtml(str) {
@@ -114,16 +114,18 @@ export function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
+function getTimeMs(ts) {
+    if (!ts) return Date.now();
+    if (typeof ts === 'number') return ts;
+    if (ts.toMillis) return ts.toMillis();
+    if (ts.seconds) return ts.seconds * 1000;
+    return Date.now();
+}
+
 function formatTime(timestamp) {
-    if (!timestamp) return 'Just now';
-    let date;
-    if (timestamp.toDate) {
-        date = timestamp.toDate();
-    } else if (typeof timestamp === 'number') {
-        date = new Date(timestamp);
-    } else {
-        return 'Just now';
-    }
+    if (!timestamp) return 'Baru saja';
+    const ms = getTimeMs(timestamp);
+    const date = new Date(ms);
     
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
@@ -175,13 +177,15 @@ function startClipsRealtimeSync() {
     if (unsubscribeClips) unsubscribeClips();
     
     const clipsRef = collection(db, 'clipboards', currentRoomHash, 'clips');
-    const q = query(clipsRef, orderBy('timestamp', 'desc'), limit(50));
     
     if (DOM.syncIndicator) {
         DOM.syncIndicator.classList.remove('disconnected');
         DOM.syncIndicator.classList.add('saving');
         DOM.syncIndicator.title = "Menghubungkan ke live sync...";
     }
+    
+    // Primary query capped at 50 documents
+    const q = query(clipsRef, limit(50));
     
     unsubscribeClips = onSnapshot(q, (snapshot) => {
         clipsArray = [];
@@ -194,6 +198,9 @@ function startClipsRealtimeSync() {
             });
         });
         
+        // Client-side LIFO sorting (newest first)
+        clipsArray.sort((a, b) => getTimeMs(b.timestamp) - getTimeMs(a.timestamp));
+        
         if (DOM.syncIndicator) {
             DOM.syncIndicator.classList.remove('saving', 'disconnected');
             DOM.syncIndicator.title = "Live Sync Aktif";
@@ -204,59 +211,12 @@ function startClipsRealtimeSync() {
         }
     }, (error) => {
         console.error("Firestore realtime sync error:", error);
-        
-        // ponytail: [fallback query without orderBy if index missing] -> [create composite index in Firestore console]
-        if (error.code === 'failed-precondition' || error.message?.includes('index')) {
-            console.warn("Index missing, switching to fallback unindexed query...");
-            startFallbackSync(clipsRef);
-            return;
-        }
-        
         if (DOM.syncIndicator) {
             DOM.syncIndicator.classList.remove('saving');
             DOM.syncIndicator.classList.add('disconnected');
             DOM.syncIndicator.title = "Koneksi Realtime Terputus";
         }
-        showToast("Koneksi realtime terputus");
-    });
-}
-
-function startFallbackSync(clipsRef) {
-    const qFallback = query(clipsRef, limit(50));
-    unsubscribeClips = onSnapshot(qFallback, (snapshot) => {
-        clipsArray = [];
-        snapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            clipsArray.push({
-                id: docSnap.id,
-                text: data.text || data.content || '',
-                timestamp: data.timestamp
-            });
-        });
-        
-        // Client-side LIFO sorting for fallback mode
-        clipsArray.sort((a, b) => {
-            const tA = a.timestamp?.seconds || a.timestamp || 0;
-            const tB = b.timestamp?.seconds || b.timestamp || 0;
-            return tB - tA;
-        });
-        
-        if (DOM.syncIndicator) {
-            DOM.syncIndicator.classList.remove('saving', 'disconnected');
-            DOM.syncIndicator.title = "Live Sync Aktif (Fallback Mode)";
-        }
-        
-        if (!isSearchMode) {
-            renderClips(clipsArray);
-        }
-    }, (err) => {
-        console.error("Fallback sync error:", err);
-        if (DOM.syncIndicator) {
-            DOM.syncIndicator.classList.remove('saving');
-            DOM.syncIndicator.classList.add('disconnected');
-            DOM.syncIndicator.title = "Koneksi Realtime Terputus";
-        }
-        showToast("Koneksi realtime terputus");
+        showToast("Error realtime: " + (error.code || error.message));
     });
 }
 
@@ -265,6 +225,23 @@ async function createNewClip(text) {
     if (!text || !text.trim()) return;
     const cleanText = text.trim();
     
+    if (!currentRoomHash) {
+        showToast("Room belum dipilih!");
+        return;
+    }
+    
+    // Ensure Firebase Auth session is ready
+    if (!auth.currentUser) {
+        try {
+            const cred = await signInAnonymously(auth);
+            currentUser = cred.user;
+        } catch (err) {
+            console.error("Auth error during clip creation:", err);
+            showToast("Gagal autentikasi room: " + err.message);
+            return;
+        }
+    }
+    
     try {
         if (DOM.syncIndicator) DOM.syncIndicator.classList.add('saving');
         const clipsRef = collection(db, 'clipboards', currentRoomHash, 'clips');
@@ -272,14 +249,14 @@ async function createNewClip(text) {
         await addDoc(clipsRef, {
             text: cleanText,
             timestamp: serverTimestamp(),
-            userId: currentUser ? currentUser.uid : 'guest'
+            userId: auth.currentUser ? auth.currentUser.uid : 'guest'
         });
         
         if (DOM.txtQuickInput) DOM.txtQuickInput.value = '';
         showToast("Klip tersimpan!");
     } catch (err) {
         console.error("Gagal menyimpan klip:", err);
-        showToast("Gagal menyimpan klip");
+        showToast("Gagal menyimpan klip: " + (err.message || err));
     } finally {
         if (DOM.syncIndicator) DOM.syncIndicator.classList.remove('saving');
     }
@@ -292,7 +269,7 @@ async function deleteClip(clipId) {
         showToast("Klip dihapus");
     } catch (err) {
         console.error("Gagal menghapus klip:", err);
-        showToast("Gagal menghapus klip");
+        showToast("Gagal menghapus klip: " + (err.message || err));
     }
 }
 
@@ -330,6 +307,8 @@ async function performColdStorageSearch() {
             }
         });
         
+        matchedClips.sort((a, b) => getTimeMs(b.timestamp) - getTimeMs(a.timestamp));
+        
         if (DOM.searchBannerText) {
             DOM.searchBannerText.textContent = `Cold storage: ${matchedClips.length} klip ditemukan untuk "${term}"`;
         }
@@ -337,7 +316,7 @@ async function performColdStorageSearch() {
         renderClips(matchedClips, true);
     } catch (err) {
         console.error("Error searching cold storage:", err);
-        showToast("Gagal mencari di cold storage");
+        showToast("Gagal mencari di cold storage: " + (err.message || err));
     }
 }
 
@@ -474,13 +453,18 @@ if (DOM.loginBtn) {
         currentRoomHash = await hashPassword(combined);
         appLockPasswordHash = await hashPassword(pin);
         
-        if (!currentUser) {
+        // Always await Firebase Auth before opening room sync
+        if (!auth.currentUser) {
             try {
                 const cred = await signInAnonymously(auth);
                 currentUser = cred.user;
             } catch (err) {
                 console.error("Anonymous auth error:", err);
+                showToast("Gagal masuk ke Firebase Auth: " + err.message);
+                return;
             }
+        } else {
+            currentUser = auth.currentUser;
         }
         
         if (DOM.headerTitleText) DOM.headerTitleText.textContent = roomName;
@@ -507,7 +491,7 @@ if (DOM.btnGoogleLogin) {
             }
         } catch (err) {
             console.error("Google sign in error:", err);
-            showToast("Gagal masuk dengan Google");
+            showToast("Gagal masuk dengan Google: " + (err.message || err));
         }
     });
 }
