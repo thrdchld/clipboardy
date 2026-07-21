@@ -35,6 +35,11 @@ export let activePreviewClipId = null;
 export let editorAttachment = null;   // { type: 'image'|'file', data: string, name?: string, size?: number }
 export let previewAttachment = null;  // { type: 'image'|'file', data: string, name?: string, size?: number }
 
+// Undo / Redo History Stack (Max 50 actions)
+export let undoStack = [];
+export let redoStack = [];
+const MAX_HISTORY = 50;
+
 // DOM Elements
 const DOM = {
     authScreen: document.getElementById('authScreen'),
@@ -72,6 +77,13 @@ const DOM = {
     searchBanner: document.getElementById('searchBanner'),
     searchBannerText: document.getElementById('searchBannerText'),
     btnResetSearchBanner: document.getElementById('btnResetSearchBanner'),
+    
+    btnToggleUndoRedo: document.getElementById('btnToggleUndoRedo'),
+    undoRedoPopup: document.getElementById('undoRedoPopup'),
+    btnDoUndo: document.getElementById('btnDoUndo'),
+    btnDoRedo: document.getElementById('btnDoRedo'),
+    undoSubtext: document.getElementById('undoSubtext'),
+    redoSubtext: document.getElementById('redoSubtext'),
     
     clipGrid: document.getElementById('clipGrid'),
     emptyState: document.getElementById('emptyState'),
@@ -177,7 +189,6 @@ export async function compressImageToDataUrl(file, maxKb = 128) {
                 let width = img.width;
                 let height = img.height;
                 
-                // Downscale if very high resolution
                 const maxDim = 1000;
                 if (width > maxDim || height > maxDim) {
                     if (width > height) {
@@ -240,14 +251,12 @@ export async function readDocumentFile(file, maxKb = 128) {
     });
 }
 
-// Read clipboard for text, image, or document file
+// Read clipboard content
 export async function readClipboardContent() {
-    // 1. Try rich Clipboard API first (supports images)
     if (navigator.clipboard && navigator.clipboard.read) {
         try {
             const items = await navigator.clipboard.read();
             for (const item of items) {
-                // Check for image types in clipboard
                 const imageType = item.types.find(t => t.startsWith('image/'));
                 if (imageType) {
                     const blob = await item.getType(imageType);
@@ -256,7 +265,6 @@ export async function readClipboardContent() {
                     return { type: 'image', data: compressedDataUrl };
                 }
                 
-                // Check for text
                 if (item.types.includes('text/plain')) {
                     const blob = await item.getType('text/plain');
                     const text = await blob.text();
@@ -270,7 +278,6 @@ export async function readClipboardContent() {
         }
     }
     
-    // 2. Fallback to standard readText
     if (navigator.clipboard && navigator.clipboard.readText) {
         try {
             const text = await navigator.clipboard.readText();
@@ -283,6 +290,133 @@ export async function readClipboardContent() {
     }
     
     return null;
+}
+
+// ==========================================
+// ↺ UNDO & REDO HISTORY SYSTEM (Max 50 Actions)
+// ==========================================
+export function pushHistoryAction(action) {
+    // action: { type: 'ADD'|'DELETE'|'UPDATE', clipId: string, beforeState?: object, afterState?: object, title: string }
+    undoStack.push(action);
+    if (undoStack.length > MAX_HISTORY) {
+        undoStack.shift();
+    }
+    redoStack = [];
+    updateUndoRedoUI();
+}
+
+export function updateUndoRedoUI() {
+    if (DOM.btnDoUndo) {
+        DOM.btnDoUndo.disabled = undoStack.length === 0;
+    }
+    if (DOM.undoSubtext) {
+        if (undoStack.length > 0) {
+            const last = undoStack[undoStack.length - 1];
+            DOM.undoSubtext.textContent = `${last.title} (${undoStack.length}/${MAX_HISTORY})`;
+        } else {
+            DOM.undoSubtext.textContent = "No actions";
+        }
+    }
+    
+    if (DOM.btnDoRedo) {
+        DOM.btnDoRedo.disabled = redoStack.length === 0;
+    }
+    if (DOM.redoSubtext) {
+        if (redoStack.length > 0) {
+            const last = redoStack[redoStack.length - 1];
+            DOM.redoSubtext.textContent = `${last.title} (${redoStack.length})`;
+        } else {
+            DOM.redoSubtext.textContent = "No actions";
+        }
+    }
+}
+
+export async function performUndo() {
+    if (undoStack.length === 0) {
+        showToast("Nothing to undo");
+        return;
+    }
+    
+    const action = undoStack.pop();
+    redoStack.push(action);
+    updateUndoRedoUI();
+    
+    try {
+        if (action.type === 'ADD') {
+            // Undo ADD = Delete the clip
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await deleteDoc(docRef);
+            showToast("Undone: Created clip removed");
+        } else if (action.type === 'DELETE') {
+            // Undo DELETE = Restore clip
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await setDoc(docRef, {
+                text: action.beforeState.text || '',
+                timestamp: serverTimestamp(),
+                userId: action.beforeState.userId || 'guest',
+                imageData: action.beforeState.imageData || null,
+                fileData: action.beforeState.fileData || null
+            });
+            showToast("Undone: Clip restored");
+        } else if (action.type === 'UPDATE') {
+            // Undo UPDATE = Revert changes
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await updateDoc(docRef, {
+                text: action.beforeState.text || '',
+                timestamp: serverTimestamp(),
+                imageData: action.beforeState.imageData || null,
+                fileData: action.beforeState.fileData || null
+            });
+            showToast("Undone: Clip changes reverted");
+        }
+    } catch (err) {
+        console.error("Undo error:", err);
+        showToast("Undo failed: " + (err.message || err));
+    }
+}
+
+export async function performRedo() {
+    if (redoStack.length === 0) {
+        showToast("Nothing to redo");
+        return;
+    }
+    
+    const action = redoStack.pop();
+    undoStack.push(action);
+    updateUndoRedoUI();
+    
+    try {
+        if (action.type === 'ADD') {
+            // Redo ADD = Restore clip
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await setDoc(docRef, {
+                text: action.afterState.text || '',
+                timestamp: serverTimestamp(),
+                userId: action.afterState.userId || 'guest',
+                imageData: action.afterState.imageData || null,
+                fileData: action.afterState.fileData || null
+            });
+            showToast("Redone: Clip re-added");
+        } else if (action.type === 'DELETE') {
+            // Redo DELETE = Delete clip
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await deleteDoc(docRef);
+            showToast("Redone: Clip deleted again");
+        } else if (action.type === 'UPDATE') {
+            // Redo UPDATE = Re-apply edits
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await updateDoc(docRef, {
+                text: action.afterState.text || '',
+                timestamp: serverTimestamp(),
+                imageData: action.afterState.imageData || null,
+                fileData: action.afterState.fileData || null
+            });
+            showToast("Redone: Clip updated");
+        }
+    } catch (err) {
+        console.error("Redo error:", err);
+        showToast("Redo failed: " + (err.message || err));
+    }
 }
 
 // ==========================================
@@ -342,7 +476,8 @@ function startClipsRealtimeSync() {
                 text: data.text || data.content || '',
                 timestamp: data.timestamp,
                 imageData: data.imageData || null,
-                fileData: data.fileData || null
+                fileData: data.fileData || null,
+                userId: data.userId || 'guest'
             });
         });
         
@@ -367,7 +502,7 @@ function startClipsRealtimeSync() {
     });
 }
 
-async function createNewClip(text, attachment = null) {
+async function createNewClip(text, attachment = null, trackHistory = true) {
     const cleanText = (text || '').trim();
     
     if (!cleanText && !attachment) {
@@ -414,7 +549,16 @@ async function createNewClip(text, attachment = null) {
             }
         }
         
-        await addDoc(notesRef, payload);
+        const newDocRef = await addDoc(notesRef, payload);
+        
+        if (trackHistory) {
+            pushHistoryAction({
+                type: 'ADD',
+                clipId: newDocRef.id,
+                afterState: payload,
+                title: 'New Clip'
+            });
+        }
         
         if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
         editorAttachment = null;
@@ -429,7 +573,7 @@ async function createNewClip(text, attachment = null) {
     }
 }
 
-async function updateClip(clipId, newText, attachment = null) {
+async function updateClip(clipId, newText, attachment = null, trackHistory = true) {
     if (!clipId) return;
     try {
         const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', clipId);
@@ -456,6 +600,23 @@ async function updateClip(clipId, newText, attachment = null) {
             }
         }
         
+        if (trackHistory) {
+            const existingClip = clipsArray.find(c => c.id === clipId);
+            if (existingClip) {
+                pushHistoryAction({
+                    type: 'UPDATE',
+                    clipId: clipId,
+                    beforeState: {
+                        text: existingClip.text,
+                        imageData: existingClip.imageData,
+                        fileData: existingClip.fileData
+                    },
+                    afterState: payload,
+                    title: 'Edit Clip'
+                });
+            }
+        }
+        
         await updateDoc(docRef, payload);
         showToast("Clip updated!");
     } catch (err) {
@@ -464,8 +625,25 @@ async function updateClip(clipId, newText, attachment = null) {
     }
 }
 
-async function deleteClip(clipId) {
+async function deleteClip(clipId, trackHistory = true) {
     try {
+        if (trackHistory) {
+            const targetClip = clipsArray.find(c => c.id === clipId);
+            if (targetClip) {
+                pushHistoryAction({
+                    type: 'DELETE',
+                    clipId: clipId,
+                    beforeState: {
+                        text: targetClip.text,
+                        imageData: targetClip.imageData,
+                        fileData: targetClip.fileData,
+                        userId: targetClip.userId
+                    },
+                    title: 'Delete Clip'
+                });
+            }
+        }
+        
         const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', clipId);
         await deleteDoc(docRef);
         showToast("Clip deleted");
@@ -505,7 +683,8 @@ async function performSearch() {
                     text: text,
                     timestamp: data.timestamp,
                     imageData: data.imageData || null,
-                    fileData: data.fileData || null
+                    fileData: data.fileData || null,
+                    userId: data.userId || 'guest'
                 });
             }
         });
@@ -595,7 +774,6 @@ function renderClips(clipsList, isSearchResult = false) {
             </div>
         `;
         
-        // Open Full Page Preview & Edit Modal on card click
         card.addEventListener('click', (e) => {
             if (e.target.closest('.btn-copy') || e.target.closest('.btn-delete-clip')) {
                 return;
@@ -603,7 +781,6 @@ function renderClips(clipsList, isSearchResult = false) {
             openPreviewModal(clip);
         });
         
-        // 1-Tap Copy Button Event
         const copyBtn = card.querySelector('.btn-copy');
         copyBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -621,7 +798,6 @@ function renderClips(clipsList, isSearchResult = false) {
             }
         });
         
-        // Delete Button Event
         const delBtn = card.querySelector('.btn-delete-clip');
         delBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -749,7 +925,7 @@ function closePreviewModal() {
 // 🚀 EVENT LISTENERS & INITIALIZATION
 // ==========================================
 
-// Global Paste Event Listener (supports pasting images/files/text via Ctrl+V or OS paste)
+// Global Paste Event Listener
 document.addEventListener('paste', async (e) => {
     if (isAppLocked) return;
     
@@ -947,7 +1123,38 @@ if (DOM.btnSwitchAccount) {
 if (DOM.btnLock) {
     DOM.btnLock.addEventListener('click', () => {
         closeSearchOverlay();
+        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
         lockApp();
+    });
+}
+
+// ==========================================
+// 🔍 UNDO / REDO POPUP MENU LISTENERS
+// ==========================================
+if (DOM.btnToggleUndoRedo) {
+    DOM.btnToggleUndoRedo.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeSearchOverlay();
+        if (DOM.undoRedoPopup) {
+            DOM.undoRedoPopup.classList.toggle('hidden');
+            updateUndoRedoUI();
+        }
+    });
+}
+
+if (DOM.btnDoUndo) {
+    DOM.btnDoUndo.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await performUndo();
+        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+    });
+}
+
+if (DOM.btnDoRedo) {
+    DOM.btnDoRedo.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await performRedo();
+        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
     });
 }
 
@@ -957,6 +1164,7 @@ if (DOM.btnLock) {
 if (DOM.btnOpenSearch) {
     DOM.btnOpenSearch.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
         if (DOM.headerNormalView) DOM.headerNormalView.classList.add('hidden');
         if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.remove('hidden');
         if (DOM.searchInput) DOM.searchInput.focus();
@@ -992,13 +1200,21 @@ if (DOM.btnResetSearchBanner) {
     });
 }
 
-// Global click listener to auto-close topbar search when clicking outside
+// Global click listener to auto-close search bar and undo/redo popup on outside click
 document.addEventListener('click', (e) => {
     if (DOM.headerSearchOverlay && !DOM.headerSearchOverlay.classList.contains('hidden')) {
         const isClickInsideSearch = DOM.headerSearchOverlay.contains(e.target);
         const isClickOpenSearchBtn = DOM.btnOpenSearch?.contains(e.target);
         if (!isClickInsideSearch && !isClickOpenSearchBtn) {
             closeSearchOverlay();
+        }
+    }
+    
+    if (DOM.undoRedoPopup && !DOM.undoRedoPopup.classList.contains('hidden')) {
+        const isClickInsidePopup = DOM.undoRedoPopup.contains(e.target);
+        const isClickToggleBtn = DOM.btnToggleUndoRedo?.contains(e.target);
+        if (!isClickInsidePopup && !isClickToggleBtn) {
+            DOM.undoRedoPopup.classList.add('hidden');
         }
     }
 });
@@ -1011,6 +1227,7 @@ document.addEventListener('click', (e) => {
 if (DOM.btnFabEditor) {
     DOM.btnFabEditor.addEventListener('click', () => {
         closeSearchOverlay();
+        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
         editorAttachment = null;
         renderEditorAttachment();
         if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
@@ -1080,7 +1297,7 @@ if (DOM.btnCloseFullPageEditor) {
     });
 }
 
-// Full Page Editor: Paste Button (Supports text & images)
+// Full Page Editor: Paste Button
 if (DOM.btnFullEditorPaste) {
     DOM.btnFullEditorPaste.addEventListener('click', async () => {
         try {
@@ -1119,10 +1336,11 @@ if (DOM.btnFullEditorSend) {
     });
 }
 
-// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save (Supports text & images)
+// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         closeSearchOverlay();
+        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
         try {
             const content = await readClipboardContent();
             if (content) {

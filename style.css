@@ -213,6 +213,59 @@ header {
     flex-shrink: 0;
 }
 
+/* Undo / Redo Popup Dropdown Menu */
+.undo-redo-popup {
+    position: absolute;
+    top: 42px;
+    right: -10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    width: 200px;
+    padding: 6px;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.undo-popup-header {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    padding: 4px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2px;
+}
+
+.undo-popup-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-main);
+    font-size: 0.88rem;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 0.15s;
+}
+
+.undo-popup-item:hover:not(:disabled) {
+    background: var(--bg-hover);
+}
+
+.undo-popup-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 /* Expandable Top Bar Search Bar */
 .header-search-overlay {
     display: flex;
@@ -718,7 +771,7 @@ header {
 /* Mobile Responsive Adjustments (< 520px) */
 @media (max-width: 520px) {
     .editor-header-actions .btn-text {
-        display: none; /* Hide text on small mobile screens to keep buttons clean & compact icon-only */
+        display: none;
     }
     
     .editor-header-actions .btn {
