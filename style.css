@@ -183,22 +183,29 @@ header {
     color: var(--text-main);
 }
 
+/* Realtime Sync Status Indicator */
 .status-dot {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     background-color: var(--primary);
     border-radius: 50%;
     display: inline-block;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .status-dot.saving {
     animation: pulse 1s infinite;
 }
 
+.status-dot.disconnected {
+    background-color: var(--danger) !important;
+    box-shadow: 0 0 8px var(--danger);
+}
+
 @keyframes pulse {
-    0% { opacity: 0.3; }
-    50% { opacity: 1; }
-    100% { opacity: 0.3; }
+    0% { opacity: 0.3; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.1); }
+    100% { opacity: 0.3; transform: scale(0.9); }
 }
 
 /* Search Container */

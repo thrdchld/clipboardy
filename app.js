@@ -175,10 +175,13 @@ function startClipsRealtimeSync() {
     if (unsubscribeClips) unsubscribeClips();
     
     const clipsRef = collection(db, 'clipboards', currentRoomHash, 'clips');
-    // Query LIFO (newest first) strictly capped to 50 items
     const q = query(clipsRef, orderBy('timestamp', 'desc'), limit(50));
     
-    if (DOM.syncIndicator) DOM.syncIndicator.classList.add('saving');
+    if (DOM.syncIndicator) {
+        DOM.syncIndicator.classList.remove('disconnected');
+        DOM.syncIndicator.classList.add('saving');
+        DOM.syncIndicator.title = "Menghubungkan ke live sync...";
+    }
     
     unsubscribeClips = onSnapshot(q, (snapshot) => {
         clipsArray = [];
@@ -186,21 +189,74 @@ function startClipsRealtimeSync() {
             const data = docSnap.data();
             clipsArray.push({
                 id: docSnap.id,
-                text: data.text || '',
+                text: data.text || data.content || '',
                 timestamp: data.timestamp
             });
         });
         
-        if (DOM.syncIndicator) DOM.syncIndicator.classList.remove('saving');
+        if (DOM.syncIndicator) {
+            DOM.syncIndicator.classList.remove('saving', 'disconnected');
+            DOM.syncIndicator.title = "Live Sync Aktif";
+        }
         
-        // If not in active search mode, render the realtime 50 stream
         if (!isSearchMode) {
             renderClips(clipsArray);
         }
     }, (error) => {
         console.error("Firestore realtime sync error:", error);
+        
+        // ponytail: [fallback query without orderBy if index missing] -> [create composite index in Firestore console]
+        if (error.code === 'failed-precondition' || error.message?.includes('index')) {
+            console.warn("Index missing, switching to fallback unindexed query...");
+            startFallbackSync(clipsRef);
+            return;
+        }
+        
+        if (DOM.syncIndicator) {
+            DOM.syncIndicator.classList.remove('saving');
+            DOM.syncIndicator.classList.add('disconnected');
+            DOM.syncIndicator.title = "Koneksi Realtime Terputus";
+        }
         showToast("Koneksi realtime terputus");
-        if (DOM.syncIndicator) DOM.syncIndicator.classList.remove('saving');
+    });
+}
+
+function startFallbackSync(clipsRef) {
+    const qFallback = query(clipsRef, limit(50));
+    unsubscribeClips = onSnapshot(qFallback, (snapshot) => {
+        clipsArray = [];
+        snapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            clipsArray.push({
+                id: docSnap.id,
+                text: data.text || data.content || '',
+                timestamp: data.timestamp
+            });
+        });
+        
+        // Client-side LIFO sorting for fallback mode
+        clipsArray.sort((a, b) => {
+            const tA = a.timestamp?.seconds || a.timestamp || 0;
+            const tB = b.timestamp?.seconds || b.timestamp || 0;
+            return tB - tA;
+        });
+        
+        if (DOM.syncIndicator) {
+            DOM.syncIndicator.classList.remove('saving', 'disconnected');
+            DOM.syncIndicator.title = "Live Sync Aktif (Fallback Mode)";
+        }
+        
+        if (!isSearchMode) {
+            renderClips(clipsArray);
+        }
+    }, (err) => {
+        console.error("Fallback sync error:", err);
+        if (DOM.syncIndicator) {
+            DOM.syncIndicator.classList.remove('saving');
+            DOM.syncIndicator.classList.add('disconnected');
+            DOM.syncIndicator.title = "Koneksi Realtime Terputus";
+        }
+        showToast("Koneksi realtime terputus");
     });
 }
 
@@ -258,14 +314,13 @@ async function performColdStorageSearch() {
     
     try {
         const clipsRef = collection(db, 'clipboards', currentRoomHash, 'clips');
-        // Fetch up to 200 documents from LIFO cold storage for substring match
-        const q = query(clipsRef, orderBy('timestamp', 'desc'), limit(200));
+        const q = query(clipsRef, limit(200));
         const snapshot = await getDocs(q);
         
         const matchedClips = [];
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
-            const text = data.text || '';
+            const text = data.text || data.content || '';
             if (text.toLowerCase().includes(term)) {
                 matchedClips.push({
                     id: docSnap.id,
@@ -378,6 +433,27 @@ function renderClips(clipsList, isSearchResult = false) {
 // ==========================================
 // 🚀 EVENT LISTENERS & INITIALIZATION
 // ==========================================
+
+// Network connection change listeners
+window.addEventListener('online', () => {
+    if (DOM.syncIndicator) {
+        DOM.syncIndicator.classList.remove('disconnected');
+        DOM.syncIndicator.title = "Live Sync Aktif";
+    }
+    showToast("Internet terhubung kembali");
+    if (!isAppLocked && currentRoomHash) {
+        startClipsRealtimeSync();
+    }
+});
+
+window.addEventListener('offline', () => {
+    if (DOM.syncIndicator) {
+        DOM.syncIndicator.classList.remove('saving');
+        DOM.syncIndicator.classList.add('disconnected');
+        DOM.syncIndicator.title = "Koneksi Terputus (Offline)";
+    }
+    showToast("Koneksi terputus (Offline)");
+});
 
 // Guest / Room Login Handler
 if (DOM.loginBtn) {
