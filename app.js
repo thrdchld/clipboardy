@@ -23,13 +23,19 @@ const db = getFirestore(app);
 // ==========================================
 export let currentUser = null;
 export let currentRoomHash = null;
-export let appLockPasswordHash = null;
+export let isGuestRoom = false;
 
 export let clipsArray = [];
 export let unsubscribeClips = null;
 export let isAppLocked = true;
 export let isSearchMode = false;
 export let activePreviewClipId = null;
+
+// Realtime Device Authorization State
+export let currentDeviceId = getOrCreateDeviceId();
+export let unsubscribeRoomRequests = null;
+export let unsubscribeMyRequest = null;
+export let activePendingRequestId = null;
 
 // Attachments state
 export let editorAttachment = null;   // { type: 'image'|'file', data: string, name?: string, size?: number }
@@ -45,24 +51,18 @@ const DOM = {
     authScreen: document.getElementById('authScreen'),
     appScreen: document.getElementById('appScreen'),
     initialAuthContainer: document.getElementById('initialAuthContainer'),
-    googleLockedContainer: document.getElementById('googleLockedContainer'),
+    
+    quickGoogleUserContainer: document.getElementById('quickGoogleUserContainer'),
+    quickUserAvatar: document.getElementById('quickUserAvatar'),
+    quickUserName: document.getElementById('quickUserName'),
+    quickUserEmail: document.getElementById('quickUserEmail'),
+    quickUserShortName: document.getElementById('quickUserShortName'),
+    btnQuickContinueGoogle: document.getElementById('btnQuickContinueGoogle'),
     
     roomNameInput: document.getElementById('roomNameInput'),
-    passwordInput: document.getElementById('passwordInput'),
     loginBtn: document.getElementById('loginBtn'),
     btnGoogleLogin: document.getElementById('btnGoogleLogin'),
-    
-    lockedUserAvatar: document.getElementById('lockedUserAvatar'),
-    lockedUserName: document.getElementById('lockedUserName'),
-    lockedUserEmail: document.getElementById('lockedUserEmail'),
-    lockPasswordInput: document.getElementById('lockPasswordInput'),
-    btnUnlockGoogle: document.getElementById('btnUnlockGoogle'),
-    btnSwitchAccount: document.getElementById('btnSwitchAccount'),
-    
-    setupLockPasswordModal: document.getElementById('setupLockPasswordModal'),
-    newLockPassword: document.getElementById('newLockPassword'),
-    confirmLockPassword: document.getElementById('confirmLockPassword'),
-    btnSaveLockPassword: document.getElementById('btnSaveLockPassword'),
+    btnGoogleLoginText: document.getElementById('btnGoogleLoginText'),
     
     headerNormalView: document.getElementById('headerNormalView'),
     headerSearchOverlay: document.getElementById('headerSearchOverlay'),
@@ -114,8 +114,46 @@ const DOM = {
     btnPreviewSave: document.getElementById('btnPreviewSave'),
     txtPreviewText: document.getElementById('txtPreviewText'),
     
+    waitingApprovalModal: document.getElementById('waitingApprovalModal'),
+    waitingRoomName: document.getElementById('waitingRoomName'),
+    btnCancelWaitingRequest: document.getElementById('btnCancelWaitingRequest'),
+    
+    accessRequestModal: document.getElementById('accessRequestModal'),
+    requestingDeviceName: document.getElementById('requestingDeviceName'),
+    btnApproveAccessRequest: document.getElementById('btnApproveAccessRequest'),
+    btnDenyAccessRequest: document.getElementById('btnDenyAccessRequest'),
+    
     toast: document.getElementById('toast')
 };
+
+// Unique device ID generator & helper
+function getOrCreateDeviceId() {
+    let id = localStorage.getItem('clipboardy_device_id');
+    if (!id) {
+        id = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        localStorage.setItem('clipboardy_device_id', id);
+    }
+    return id;
+}
+
+function getDeviceName() {
+    const ua = navigator.userAgent;
+    if (/android/i.test(ua)) return "Android Device";
+    if (/iPhone|iPad/i.test(ua)) return "iOS Device";
+    if (/Macintosh/i.test(ua)) return "Mac Browser";
+    if (/Windows/i.test(ua)) return "Windows PC";
+    return "Web Browser";
+}
+
+// Get 00:00 WIB (GMT+7) timestamp for today
+function getStartOfTodayWibMs() {
+    const now = new Date();
+    const wibOffsetMs = 7 * 60 * 60 * 1000;
+    const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const wibDate = new Date(utcMs + wibOffsetMs);
+    wibDate.setHours(0, 0, 0, 0);
+    return wibDate.getTime() - wibOffsetMs;
+}
 
 // ==========================================
 // 🔐 UTILITIES & ATTACHMENT COMPRESSION
@@ -296,7 +334,6 @@ export async function readClipboardContent() {
 // ↺ UNDO & REDO HISTORY SYSTEM (Max 50 Actions)
 // ==========================================
 export function pushHistoryAction(action) {
-    // action: { type: 'ADD'|'DELETE'|'UPDATE', clipId: string, beforeState?: object, afterState?: object, title: string }
     undoStack.push(action);
     if (undoStack.length > MAX_HISTORY) {
         undoStack.shift();
@@ -343,12 +380,10 @@ export async function performUndo() {
     
     try {
         if (action.type === 'ADD') {
-            // Undo ADD = Delete the clip
             const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
             await deleteDoc(docRef);
             showToast("Undone: Created clip removed");
         } else if (action.type === 'DELETE') {
-            // Undo DELETE = Restore clip
             const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
             await setDoc(docRef, {
                 text: action.beforeState.text || '',
@@ -359,7 +394,6 @@ export async function performUndo() {
             });
             showToast("Undone: Clip restored");
         } else if (action.type === 'UPDATE') {
-            // Undo UPDATE = Revert changes
             const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
             await updateDoc(docRef, {
                 text: action.beforeState.text || '',
@@ -387,7 +421,6 @@ export async function performRedo() {
     
     try {
         if (action.type === 'ADD') {
-            // Redo ADD = Restore clip
             const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
             await setDoc(docRef, {
                 text: action.afterState.text || '',
@@ -398,12 +431,10 @@ export async function performRedo() {
             });
             showToast("Redone: Clip re-added");
         } else if (action.type === 'DELETE') {
-            // Redo DELETE = Delete clip
             const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
             await deleteDoc(docRef);
             showToast("Redone: Clip deleted again");
         } else if (action.type === 'UPDATE') {
-            // Redo UPDATE = Re-apply edits
             const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
             await updateDoc(docRef, {
                 text: action.afterState.text || '',
@@ -419,7 +450,7 @@ export async function performRedo() {
     }
 }
 
-// Global Keyboard Shortcut Listener for Ctrl+Z (Undo) and Ctrl+Y / Ctrl+Shift+Z (Redo)
+// Global Keyboard Shortcut Listener
 document.addEventListener('keydown', (e) => {
     if (isAppLocked) return;
     
@@ -428,18 +459,14 @@ document.addEventListener('keydown', (e) => {
     
     const activeElem = document.activeElement;
     const isTypingInTextarea = activeElem && (activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'INPUT');
-    
     const key = e.key.toLowerCase();
     
-    // Ctrl + Shift + Z  OR  Ctrl + Y -> REDO
     if ((key === 'z' && e.shiftKey) || key === 'y') {
         if (!isTypingInTextarea) {
             e.preventDefault();
             performRedo();
         }
-    } 
-    // Ctrl + Z -> UNDO
-    else if (key === 'z' && !e.shiftKey) {
+    } else if (key === 'z' && !e.shiftKey) {
         if (!isTypingInTextarea) {
             e.preventDefault();
             performUndo();
@@ -452,21 +479,24 @@ document.addEventListener('keydown', (e) => {
 // ==========================================
 export function lockApp() {
     isAppLocked = true;
+    
     if (unsubscribeClips) {
         unsubscribeClips();
         unsubscribeClips = null;
+    }
+    if (unsubscribeRoomRequests) {
+        unsubscribeRoomRequests();
+        unsubscribeRoomRequests = null;
+    }
+    if (unsubscribeMyRequest) {
+        unsubscribeMyRequest();
+        unsubscribeMyRequest = null;
     }
     
     if (DOM.appScreen) DOM.appScreen.classList.add('hidden');
     if (DOM.authScreen) DOM.authScreen.classList.remove('hidden');
     
-    if (currentUser && !currentUser.isAnonymous) {
-        if (DOM.initialAuthContainer) DOM.initialAuthContainer.classList.add('hidden');
-        if (DOM.googleLockedContainer) DOM.googleLockedContainer.classList.remove('hidden');
-    } else {
-        if (DOM.initialAuthContainer) DOM.initialAuthContainer.classList.remove('hidden');
-        if (DOM.googleLockedContainer) DOM.googleLockedContainer.classList.add('hidden');
-    }
+    renderSavedGoogleUser();
 }
 
 export function unlockApp() {
@@ -475,6 +505,136 @@ export function unlockApp() {
     if (DOM.appScreen) DOM.appScreen.classList.remove('hidden');
     
     startClipsRealtimeSync();
+    if (isGuestRoom) {
+        listenForIncomingAccessRequests();
+    }
+}
+
+// Check and render saved Google user on login screen
+function renderSavedGoogleUser() {
+    const savedStr = localStorage.getItem('last_google_user');
+    if (savedStr) {
+        try {
+            const savedUser = JSON.parse(savedStr);
+            if (DOM.quickGoogleUserContainer) DOM.quickGoogleUserContainer.classList.remove('hidden');
+            if (DOM.quickUserAvatar) DOM.quickUserAvatar.src = savedUser.photoURL || 'https://via.placeholder.com/40';
+            if (DOM.quickUserName) DOM.quickUserName.textContent = savedUser.displayName || 'Google User';
+            if (DOM.quickUserEmail) DOM.quickUserEmail.textContent = savedUser.email || '';
+            if (DOM.quickUserShortName) DOM.quickUserShortName.textContent = (savedUser.displayName || 'User').split(' ')[0];
+            if (DOM.btnGoogleLoginText) DOM.btnGoogleLoginText.textContent = "Sign in with Another Google Account";
+        } catch (e) {
+            console.error("Error parsing saved Google user:", e);
+        }
+    } else {
+        if (DOM.quickGoogleUserContainer) DOM.quickGoogleUserContainer.classList.add('hidden');
+        if (DOM.btnGoogleLoginText) DOM.btnGoogleLoginText.textContent = "Sign in with Google";
+    }
+}
+
+// ==========================================
+// 🤝 GUEST ROOM REALTIME MULTI-DEVICE AUTHORIZATION
+// ==========================================
+
+async function handleGuestRoomLogin(rawCode) {
+    const roomCode = (rawCode || '').trim();
+    if (!roomCode) {
+        showToast("Please enter a Room Code!");
+        return;
+    }
+    
+    isGuestRoom = true;
+    currentRoomHash = await hashPassword('guest_room_' + roomCode.toLowerCase());
+    
+    if (DOM.headerTitleText) DOM.headerTitleText.textContent = `Room: ${roomCode}`;
+    
+    if (!auth.currentUser) {
+        try {
+            const cred = await signInAnonymously(auth);
+            currentUser = cred.user;
+        } catch (err) {
+            console.error("Anonymous auth error:", err);
+            showToast("Failed to authenticate: " + err.message);
+            return;
+        }
+    }
+    
+    const roomRef = doc(db, 'guestRooms', currentRoomHash);
+    
+    try {
+        const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
+        const snapshot = await getDocs(query(notesRef, limit(10)));
+        
+        if (snapshot.empty) {
+            // First device in room - register as active device directly
+            await setDoc(roomRef, {
+                roomCode: roomCode,
+                activeDeviceId: currentDeviceId,
+                activeDeviceName: getDeviceName(),
+                lastActiveTime: serverTimestamp()
+            });
+            unlockApp();
+            return;
+        }
+        
+        // Room already exists & has data -> Check active device status
+        const roomSnap = await getDocs(query(collection(db, 'guestRooms'), limit(1)));
+        
+        // Submit access request to primary active device
+        const requestRef = doc(db, 'guestRooms', currentRoomHash, 'requests', currentDeviceId);
+        await setDoc(requestRef, {
+            deviceId: currentDeviceId,
+            deviceName: getDeviceName(),
+            status: 'pending',
+            timestamp: serverTimestamp()
+        });
+        
+        if (DOM.waitingRoomName) DOM.waitingRoomName.textContent = roomCode;
+        if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.remove('hidden');
+        
+        // Listen to approval response
+        if (unsubscribeMyRequest) unsubscribeMyRequest();
+        unsubscribeMyRequest = onSnapshot(requestRef, (docSnap) => {
+            if (!docSnap.exists()) return;
+            const data = docSnap.data();
+            
+            if (data.status === 'approved') {
+                if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.add('hidden');
+                if (unsubscribeMyRequest) unsubscribeMyRequest();
+                showToast("Access granted!");
+                unlockApp();
+            } else if (data.status === 'denied') {
+                if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.add('hidden');
+                if (unsubscribeMyRequest) unsubscribeMyRequest();
+                showToast("Access denied by active device.");
+            }
+        });
+        
+    } catch (err) {
+        console.error("Guest room authorization error:", err);
+        // Fallback unlock if security rules allow
+        unlockApp();
+    }
+}
+
+// Active Device A: Listen for incoming access requests from Device B
+function listenForIncomingAccessRequests() {
+    if (!currentRoomHash || !isGuestRoom) return;
+    
+    const requestsRef = collection(db, 'guestRooms', currentRoomHash, 'requests');
+    if (unsubscribeRoomRequests) unsubscribeRoomRequests();
+    
+    unsubscribeRoomRequests = onSnapshot(requestsRef, (snapshot) => {
+        snapshot.docChanges().forEach(change => {
+            if (change.type === 'added' || change.type === 'modified') {
+                const data = change.doc.data();
+                if (data.status === 'pending' && data.deviceId !== currentDeviceId) {
+                    activePendingRequestId = change.doc.id;
+                    if (DOM.requestingDeviceName) DOM.requestingDeviceName.textContent = data.deviceName || 'Device';
+                    if (DOM.accessRequestModal) DOM.accessRequestModal.classList.remove('hidden');
+                }
+            }
+        });
+    });
 }
 
 // ==========================================
@@ -497,8 +657,17 @@ function startClipsRealtimeSync() {
     
     unsubscribeClips = onSnapshot(q, (snapshot) => {
         clipsArray = [];
+        const startOfTodayWib = getStartOfTodayWibMs();
+        
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
+            const clipTs = getTimeMs(data.timestamp);
+            
+            // If Guest Room, filter out clips older than today's 00:00 WIB
+            if (isGuestRoom && clipTs < startOfTodayWib) {
+                return;
+            }
+            
             clipsArray.push({
                 id: docSnap.id,
                 text: data.text || data.content || '',
@@ -953,6 +1122,67 @@ function closePreviewModal() {
 // 🚀 EVENT LISTENERS & INITIALIZATION
 // ==========================================
 
+// Global Paste Event Listener
+document.addEventListener('paste', async (e) => {
+    if (isAppLocked) return;
+    
+    const items = e.clipboardData?.items || [];
+    let imageItem = null;
+    let fileItem = null;
+    
+    for (const item of items) {
+        if (item.type.startsWith('image/')) {
+            imageItem = item;
+            break;
+        } else if (item.kind === 'file') {
+            fileItem = item;
+        }
+    }
+    
+    if (imageItem) {
+        e.preventDefault();
+        const file = imageItem.getAsFile();
+        if (file) {
+            try {
+                showToast("Compressing pasted image...");
+                const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                
+                if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+                    editorAttachment = { type: 'image', data: compressedDataUrl };
+                    renderEditorAttachment();
+                    showToast("Image attached to clip");
+                } else {
+                    await createNewClip('', { type: 'image', data: compressedDataUrl });
+                    showToast("Image clip saved from clipboard!");
+                }
+            } catch (err) {
+                console.error("Paste image error:", err);
+                showToast("Failed to process pasted image");
+            }
+        }
+    } else if (fileItem) {
+        e.preventDefault();
+        const file = fileItem.getAsFile();
+        if (file) {
+            try {
+                const fileObj = await readDocumentFile(file, 128);
+                
+                if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+                    editorAttachment = { type: 'file', ...fileObj };
+                    renderEditorAttachment();
+                    showToast("File attached to clip");
+                } else {
+                    await createNewClip('', { type: 'file', ...fileObj });
+                    showToast("File clip saved from clipboard!");
+                }
+            } catch (err) {
+                console.error("Paste file error:", err);
+                showToast(err.message || "File size exceeds 128KB limit!");
+            }
+        }
+    }
+});
+
 // Network connection listeners
 window.addEventListener('online', () => {
     if (DOM.syncIndicator) {
@@ -974,40 +1204,11 @@ window.addEventListener('offline', () => {
     showToast("Connection lost (Offline)");
 });
 
-// Guest / Room Login Handler
+// Guest Room Login Handler (Accepts any code / text or numbers)
 if (DOM.loginBtn) {
     DOM.loginBtn.addEventListener('click', async () => {
-        const roomName = (DOM.roomNameInput?.value || '').trim().toLowerCase();
-        const pin = (DOM.passwordInput?.value || '').trim();
-        
-        if (!roomName) {
-            showToast("Please enter Room Name!");
-            return;
-        }
-        if (pin.length !== 4) {
-            showToast("Please enter 4-Digit PIN!");
-            return;
-        }
-        
-        const combined = `${roomName}_${pin}`;
-        currentRoomHash = await hashPassword(combined);
-        appLockPasswordHash = await hashPassword(pin);
-        
-        if (!auth.currentUser) {
-            try {
-                const cred = await signInAnonymously(auth);
-                currentUser = cred.user;
-            } catch (err) {
-                console.error("Anonymous auth error:", err);
-                showToast("Failed to authenticate room: " + err.message);
-                return;
-            }
-        } else {
-            currentUser = auth.currentUser;
-        }
-        
-        if (DOM.headerTitleText) DOM.headerTitleText.textContent = roomName;
-        unlockApp();
+        const roomCode = (DOM.roomNameInput?.value || '').trim();
+        await handleGuestRoomLogin(roomCode);
     });
 }
 
@@ -1018,16 +1219,21 @@ if (DOM.btnGoogleLogin) {
             const provider = new GoogleAuthProvider();
             const result = await signInWithPopup(auth, provider);
             currentUser = result.user;
+            isGuestRoom = false;
             
-            currentRoomHash = await hashPassword(currentUser.uid);
+            currentRoomHash = await hashPassword('google_user_' + currentUser.uid);
             
-            const savedPinHash = localStorage.getItem(`lock_pin_${currentUser.uid}`);
-            if (savedPinHash) {
-                appLockPasswordHash = savedPinHash;
-                unlockApp();
-            } else {
-                if (DOM.setupLockPasswordModal) DOM.setupLockPasswordModal.classList.remove('hidden');
-            }
+            // Save last Google user state to localStorage
+            const userObj = {
+                displayName: currentUser.displayName,
+                email: currentUser.email,
+                photoURL: currentUser.photoURL,
+                uid: currentUser.uid
+            };
+            localStorage.setItem('last_google_user', JSON.stringify(userObj));
+            
+            if (DOM.headerTitleText) DOM.headerTitleText.textContent = currentUser.displayName || 'Google Clipboard';
+            unlockApp();
         } catch (err) {
             console.error("Google sign in error:", err);
             showToast("Google sign in error: " + (err.message || err));
@@ -1035,58 +1241,62 @@ if (DOM.btnGoogleLogin) {
     });
 }
 
-// First time Google PIN setup handler
-if (DOM.btnSaveLockPassword) {
-    DOM.btnSaveLockPassword.addEventListener('click', async () => {
-        const pin = (DOM.newLockPassword?.value || '').trim();
-        const confirmPin = (DOM.confirmLockPassword?.value || '').trim();
-        
-        if (pin.length !== 4) {
-            showToast("PIN must be 4 digits!");
-            return;
-        }
-        if (pin !== confirmPin) {
-            showToast("PIN confirmation does not match!");
-            return;
-        }
-        
-        appLockPasswordHash = await hashPassword(pin);
-        if (currentUser) {
-            localStorage.setItem(`lock_pin_${currentUser.uid}`, appLockPasswordHash);
-        }
-        
-        if (DOM.setupLockPasswordModal) DOM.setupLockPasswordModal.classList.add('hidden');
-        unlockApp();
-    });
-}
-
-// Unlock Google screen handler
-if (DOM.btnUnlockGoogle) {
-    DOM.btnUnlockGoogle.addEventListener('click', async () => {
-        const pin = (DOM.lockPasswordInput?.value || '').trim();
-        const inputHash = await hashPassword(pin);
-        
-        if (inputHash === appLockPasswordHash) {
-            if (DOM.lockPasswordInput) DOM.lockPasswordInput.value = '';
+// Quick Resume Previous Google Account Button
+if (DOM.btnQuickContinueGoogle) {
+    DOM.btnQuickContinueGoogle.addEventListener('click', async () => {
+        const savedStr = localStorage.getItem('last_google_user');
+        if (!savedStr) return;
+        try {
+            const savedUser = JSON.parse(savedStr);
+            isGuestRoom = false;
+            currentRoomHash = await hashPassword('google_user_' + savedUser.uid);
+            
+            if (!auth.currentUser) {
+                try {
+                    const cred = await signInAnonymously(auth);
+                    currentUser = cred.user;
+                } catch (e) {}
+            }
+            
+            if (DOM.headerTitleText) DOM.headerTitleText.textContent = savedUser.displayName || 'Google Clipboard';
             unlockApp();
-        } else {
-            showToast("Incorrect PIN!");
+        } catch (e) {
+            console.error("Quick continue error:", e);
         }
     });
 }
 
-// Sign out / switch account
-if (DOM.btnSwitchAccount) {
-    DOM.btnSwitchAccount.addEventListener('click', async () => {
-        await signOut(auth);
-        currentUser = null;
-        currentRoomHash = null;
-        appLockPasswordHash = null;
-        lockApp();
+// Access Request Response Handlers on Active Device A
+if (DOM.btnApproveAccessRequest) {
+    DOM.btnApproveAccessRequest.addEventListener('click', async () => {
+        if (activePendingRequestId && currentRoomHash) {
+            const reqRef = doc(db, 'guestRooms', currentRoomHash, 'requests', activePendingRequestId);
+            await updateDoc(reqRef, { status: 'approved' });
+            if (DOM.accessRequestModal) DOM.accessRequestModal.classList.add('hidden');
+            showToast("Device access approved!");
+        }
     });
 }
 
-// Lock button
+if (DOM.btnDenyAccessRequest) {
+    DOM.btnDenyAccessRequest.addEventListener('click', async () => {
+        if (activePendingRequestId && currentRoomHash) {
+            const reqRef = doc(db, 'guestRooms', currentRoomHash, 'requests', activePendingRequestId);
+            await updateDoc(reqRef, { status: 'denied' });
+            if (DOM.accessRequestModal) DOM.accessRequestModal.classList.add('hidden');
+            showToast("Device access denied.");
+        }
+    });
+}
+
+if (DOM.btnCancelWaitingRequest) {
+    DOM.btnCancelWaitingRequest.addEventListener('click', () => {
+        if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.add('hidden');
+        if (unsubscribeMyRequest) unsubscribeMyRequest();
+    });
+}
+
+// Lock button (Returns to login screen)
 if (DOM.btnLock) {
     DOM.btnLock.addEventListener('click', () => {
         closeSearchOverlay();
@@ -1418,12 +1628,10 @@ if (DOM.btnPreviewDelete) {
     });
 }
 
-// Listen to Firebase Auth state change
+// Initial Auth State Check
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
-        if (user.photoURL && DOM.lockedUserAvatar) DOM.lockedUserAvatar.src = user.photoURL;
-        if (user.displayName && DOM.lockedUserName) DOM.lockedUserName.textContent = user.displayName;
-        if (user.email && DOM.lockedUserEmail) DOM.lockedUserEmail.textContent = user.email;
     }
+    renderSavedGoogleUser();
 });
