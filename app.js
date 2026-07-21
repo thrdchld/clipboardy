@@ -69,9 +69,14 @@ const DOM = {
     clipGrid: document.getElementById('clipGrid'),
     emptyState: document.getElementById('emptyState'),
     
-    txtQuickInput: document.getElementById('txtQuickInput'),
-    btnQuickInputPaste: document.getElementById('btnQuickInputPaste'),
-    btnQuickInputSend: document.getElementById('btnQuickInputSend'),
+    btnFabEditor: document.getElementById('btnFabEditor'),
+    btnFabQuickPaste: document.getElementById('btnFabQuickPaste'),
+    
+    fullPageEditorModal: document.getElementById('fullPageEditorModal'),
+    btnCloseFullPageEditor: document.getElementById('btnCloseFullPageEditor'),
+    btnFullEditorPaste: document.getElementById('btnFullEditorPaste'),
+    btnFullEditorSend: document.getElementById('btnFullEditorSend'),
+    txtFullPageEditor: document.getElementById('txtFullPageEditor'),
     
     toast: document.getElementById('toast')
 };
@@ -101,7 +106,7 @@ export function showToast(message) {
     DOM.toast.classList.add('show');
     setTimeout(() => {
         DOM.toast.classList.remove('show');
-    }, 3000);
+    }, 2800);
 }
 
 export function escapeHtml(str) {
@@ -176,7 +181,6 @@ function startClipsRealtimeSync() {
     if (!currentRoomHash) return;
     if (unsubscribeClips) unsubscribeClips();
     
-    // Matched Firestore security rules subcollection: 'notes'
     const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
     
     if (DOM.syncIndicator) {
@@ -185,7 +189,6 @@ function startClipsRealtimeSync() {
         DOM.syncIndicator.title = "Menghubungkan ke live sync...";
     }
     
-    // Primary query capped at 50 documents
     const q = query(notesRef, limit(50));
     
     unsubscribeClips = onSnapshot(q, (snapshot) => {
@@ -245,7 +248,6 @@ async function createNewClip(text) {
     
     try {
         if (DOM.syncIndicator) DOM.syncIndicator.classList.add('saving');
-        // Subcollection 'notes' matches Firestore security rules
         const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
         
         await addDoc(notesRef, {
@@ -254,7 +256,7 @@ async function createNewClip(text) {
             userId: auth.currentUser ? auth.currentUser.uid : 'guest'
         });
         
-        if (DOM.txtQuickInput) DOM.txtQuickInput.value = '';
+        if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
         showToast("Klip tersimpan!");
     } catch (err) {
         console.error("Gagal menyimpan klip:", err);
@@ -346,7 +348,7 @@ function renderClips(clipsList, isSearchResult = false) {
             if (subText) {
                 subText.textContent = isSearchResult 
                     ? "Tidak ada klip yang cocok ditemukan di cold storage."
-                    : "Ketik atau tempel teks di form bawah untuk membuat klip baru.";
+                    : "Gunakan tombol (+) di kanan bawah untuk membuat klip baru, atau tombol Paste untuk tempel otomatis.";
             }
         }
         return;
@@ -585,39 +587,70 @@ if (DOM.btnResetSearchBanner) {
     });
 }
 
-// Target Refactoring Frontend 1: Sticky Bottom Input Area Submit & Paste Actions
-if (DOM.btnQuickInputSend) {
-    DOM.btnQuickInputSend.addEventListener('click', () => {
-        const text = (DOM.txtQuickInput?.value || '').trim();
-        if (text) {
-            createNewClip(text);
+// ==========================================
+// 🔘 2 FABs MECHANISM LISTENERS
+// ==========================================
+
+// FAB Atas (+ Plus): Open Full Page Text Editor Modal
+if (DOM.btnFabEditor) {
+    DOM.btnFabEditor.addEventListener('click', () => {
+        if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
+        if (DOM.txtFullPageEditor) {
+            DOM.txtFullPageEditor.focus();
         }
     });
 }
 
-if (DOM.txtQuickInput) {
-    DOM.txtQuickInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            const text = DOM.txtQuickInput.value.trim();
-            if (text) {
-                createNewClip(text);
-            }
-        }
+// Full Page Editor: Close Button
+if (DOM.btnCloseFullPageEditor) {
+    DOM.btnCloseFullPageEditor.addEventListener('click', () => {
+        if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.add('hidden');
     });
 }
 
-if (DOM.btnQuickInputPaste) {
-    DOM.btnQuickInputPaste.addEventListener('click', async () => {
+// Full Page Editor: Paste Button
+if (DOM.btnFullEditorPaste) {
+    DOM.btnFullEditorPaste.addEventListener('click', async () => {
         try {
             const text = await navigator.clipboard.readText();
-            if (text && DOM.txtQuickInput) {
-                DOM.txtQuickInput.value = text;
+            if (text && DOM.txtFullPageEditor) {
+                DOM.txtFullPageEditor.value = text;
                 showToast("Teks ditempel dari clipboard!");
             }
         } catch (err) {
             console.error("Failed to read clipboard:", err);
             showToast("Izinkan akses clipboard di browser");
+        }
+    });
+}
+
+// Full Page Editor: Send/Save Button
+if (DOM.btnFullEditorSend) {
+    DOM.btnFullEditorSend.addEventListener('click', async () => {
+        const text = (DOM.txtFullPageEditor?.value || '').trim();
+        if (text) {
+            await createNewClip(text);
+            if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.add('hidden');
+        } else {
+            showToast("Tulis teks klip terlebih dahulu");
+        }
+    });
+}
+
+// FAB Bawah (Paste Icon): 1-Tap Automatic Paste & Immediate Save
+if (DOM.btnFabQuickPaste) {
+    DOM.btnFabQuickPaste.addEventListener('click', async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            if (text && text.trim()) {
+                await createNewClip(text.trim());
+                showToast("Teks dari clipboard berhasil disimpan!");
+            } else {
+                showToast("Clipboard kosong!");
+            }
+        } catch (err) {
+            console.error("Failed to read clipboard:", err);
+            showToast("Izinkan akses clipboard di browser untuk fitur ini");
         }
     });
 }

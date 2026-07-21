@@ -8,7 +8,7 @@
     <!-- Favicon and PWA Meta -->
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#121214">
+    <meta name="theme-color" content="#1a1815">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -115,7 +115,7 @@
                 <span id="syncIndicator" class="status-dot" title="Live Sync Active"></span>
             </div>
 
-            <!-- Cold Storage Search Container (Explisite Search Button Only) -->
+            <!-- Cold Storage Search Container (Explicit Search Button Only) -->
             <div class="search-container">
                 <input type="text" id="searchInput" placeholder="Cari di cold storage..." aria-label="Cari klip">
                 <button id="btnSearch" class="btn-search" title="Cari di Cold Storage">Cari</button>
@@ -137,11 +137,6 @@
 
         <!-- Main Scroll Area -->
         <div class="main-scroll">
-            <!-- Pull to Refresh Spinner -->
-            <div id="pullToRefreshSpinner" style="display: none; text-align: center; padding: 6px;">
-                <span class="status-dot saving"></span>
-            </div>
-
             <!-- Search Mode Notification Banner -->
             <div id="searchBanner" class="search-banner hidden">
                 <span id="searchBannerText">Hasil pencarian cold storage...</span>
@@ -160,22 +155,45 @@
                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                 </svg>
                 <h3>Belum ada klip</h3>
-                <p>Tulis atau tempel teks di form bawah untuk membuat klip baru.</p>
+                <p>Gunakan tombol (+) di kanan bawah untuk menulis klip baru, atau tombol Paste untuk tempel otomatis.</p>
             </div>
         </div>
 
-        <!-- STICKY BOTTOM INPUT AREA (Thumb-Friendly Mobile First) -->
-        <div id="quickInputContainer" class="sticky-input-container">
-            <div class="sticky-input-box">
-                <textarea id="txtQuickInput" class="sticky-textarea" placeholder="Ketik atau tempel teks klip di sini..." rows="1"></textarea>
-                <button id="btnQuickInputPaste" class="btn-paste-clip" title="Tempel dari Clipboard">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-                    Tempel
+        <!-- 2 STACKED FLOATING ACTION BUTTONS (FAB Atas & Bawah) -->
+        <div id="fabContainer" class="fab-container">
+            <!-- FAB Atas: Plus (+) for Fullpage Text Editor Modal -->
+            <button id="btnFabEditor" class="fab fab-top" title="Tulis Klip Baru (Full Editor)" aria-label="Tulis Klip Baru">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+            
+            <!-- FAB Bawah: Paste Icon for Automatic Paste & Instant Save -->
+            <button id="btnFabQuickPaste" class="fab fab-bottom" title="Tempel & Simpan Otomatis" aria-label="Tempel dan Simpan Otomatis">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- FULL PAGE TEXT EDITOR MODAL -->
+    <div id="fullPageEditorModal" class="fullpage-editor-overlay hidden">
+        <div class="fullpage-editor-container">
+            <div class="fullpage-editor-header">
+                <button id="btnCloseFullPageEditor" class="btn-icon" title="Tutup">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
-                <button id="btnQuickInputSend" class="btn-send-clip" title="Simpan Klip">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                    Kirim
-                </button>
+                <span class="fullpage-editor-title">Tulis / Edit Klip</span>
+                <div style="display: flex; gap: 8px;">
+                    <button id="btnFullEditorPaste" class="btn" title="Tempel dari Clipboard">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                        Tempel
+                    </button>
+                    <button id="btnFullEditorSend" class="btn btn-primary" title="Simpan Klip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        Kirim
+                    </button>
+                </div>
+            </div>
+            <div class="fullpage-editor-body">
+                <textarea id="txtFullPageEditor" class="fullpage-textarea" placeholder="Tulis atau edit teks klip di sini..."></textarea>
             </div>
         </div>
     </div>
