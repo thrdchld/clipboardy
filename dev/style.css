@@ -111,10 +111,10 @@ body {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 8px 14px;
+    padding: 8px 12px;
     border-radius: var(--radius-sm);
     font-weight: 600;
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     cursor: pointer;
     border: 1px solid var(--border);
     background: var(--bg-surface);
@@ -400,7 +400,7 @@ header {
 
 /* Attachment preview elements inside card list */
 .clip-card-attachment-thumb {
-    max-height: 120px;
+    max-height: 140px;
     width: 100%;
     object-fit: cover;
     border-radius: var(--radius-sm);
@@ -412,11 +412,11 @@ header {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 8px;
+    padding: 6px 10px;
     background: var(--bg-hover);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     color: var(--primary);
     font-weight: 600;
     max-width: 100%;
@@ -446,6 +446,7 @@ header {
     color: var(--text-muted);
     user-select: none;
     -webkit-user-select: none;
+    margin-top: 2px;
 }
 
 .clip-actions {
@@ -549,7 +550,6 @@ header {
     transform: scale(0.92);
 }
 
-/* FAB Top (+ Plus for Fullpage Editor) */
 .fab-top {
     background: var(--primary);
     color: #FFFFFF;
@@ -559,7 +559,6 @@ header {
     background: var(--primary-hover);
 }
 
-/* FAB Bottom (Paste Icon for Auto Paste & Save) */
 .fab-bottom {
     background: var(--accent-sand);
     color: #FFFFFF;
@@ -569,7 +568,7 @@ header {
     background: var(--primary-hover);
 }
 
-/* Full Page Text Editor & Full Page Preview Modals */
+/* Full Page Text Editor & Preview Modals */
 .fullpage-editor-overlay {
     position: fixed;
     top: 0;
@@ -643,37 +642,58 @@ header {
     border-color: var(--primary);
 }
 
-/* Modal Bottom Toolbar */
+.fullpage-textarea:disabled {
+    background: var(--bg-hover);
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Mobile-First Fully Responsive Bottom Bar */
 .fullpage-editor-bottombar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 10px 14px;
+    gap: 6px;
+    padding: 8px 10px;
     background: var(--bg-surface);
     border-top: 1px solid var(--border);
     flex-shrink: 0;
-    height: 60px;
+    min-height: 56px;
     position: relative;
+    width: 100%;
 }
 
 .bottombar-actions-left {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-wrap: nowrap;
 }
 
 .bottombar-actions-right {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
 }
 
-/* Attachment Popup Dropdown in Bottom Toolbar */
+@media (max-width: 440px) {
+    .fullpage-editor-bottombar {
+        padding: 6px 8px;
+        gap: 4px;
+    }
+    .fullpage-editor-bottombar .btn {
+        padding: 6px 8px;
+        font-size: 0.78rem;
+        gap: 4px;
+    }
+}
+
+/* Attachment Popup Dropdown */
 .attachment-popup {
     position: absolute;
-    bottom: 64px;
-    left: 12px;
+    bottom: 58px;
+    left: 8px;
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -707,7 +727,7 @@ header {
     background: var(--bg-hover);
 }
 
-/* Professional Attachment Containers inside Modals */
+/* Professional Attachment Containers */
 .attachment-preview-box {
     position: relative;
     border: 1px solid var(--border);
@@ -722,7 +742,7 @@ header {
 }
 
 .attachment-image-display {
-    max-height: 180px;
+    max-height: 200px;
     width: 100%;
     object-fit: contain;
     border-radius: var(--radius-sm);
