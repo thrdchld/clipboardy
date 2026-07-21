@@ -13,6 +13,8 @@ describe('Clipboardy App Test Suite (TDD)', () => {
         // Reset Vitest module registry to reload app.js fresh
         vi.resetModules();
         
+        // Mock global confirm dialog
+        vi.stubGlobal('confirm', vi.fn(() => true));
     });
 
     it('1. should calculate word and character count correctly', async () => {
@@ -57,14 +59,12 @@ describe('Clipboardy App Test Suite (TDD)', () => {
         await import('../app.js');
 
         const passwordInput = document.getElementById('passwordInput');
-        const roomNameInput = document.getElementById('roomNameInput');
         const loginBtn = document.getElementById('loginBtn');
         const authScreen = document.getElementById('authScreen');
         const appScreen = document.getElementById('appScreen');
         
-        // Simulate room name and PIN entry
-        if (roomNameInput) roomNameInput.value = 'testroom';
-        passwordInput.value = '1234';
+        // Simulate password entry and click login
+        passwordInput.value = 'rahasia123';
         
         // Trigger login
         loginBtn.click();
@@ -90,5 +90,22 @@ describe('Clipboardy App Test Suite (TDD)', () => {
 
         expect(authScreen.classList.contains('hidden')).toBe(false);
         expect(appScreen.classList.contains('hidden')).toBe(true);
+    });
+
+    it('6. should check safeConfirm avoids lock trigger by setting ignoreBlur', async () => {
+        const { safeConfirm } = await import('../app.js');
+        
+        const result = safeConfirm('Apakah Anda yakin?');
+        expect(result).toBe(true);
+        
+        // It should set ignoreBlur = true during confirm dialog sequence
+        const { ignoreBlur } = await import('../app.js');
+        expect(ignoreBlur).toBe(true);
+        
+        // Wait for timeout to reset ignoreBlur to false
+        await new Promise(resolve => setTimeout(resolve, 350));
+        
+        const { ignoreBlur: ignoreBlurAfter } = await import('../app.js');
+        expect(ignoreBlurAfter).toBe(false);
     });
 });
