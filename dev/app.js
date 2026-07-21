@@ -37,7 +37,10 @@ export let unsubscribeRoomRequests = null;
 export let unsubscribeMyRequest = null;
 export let activePendingRequestId = null;
 
-// Attachments state
+// Gboard-style Clip Creation Mode Tab State: 'text' | 'image' | 'file'
+export let currentEditorTab = 'text';
+
+// Attachment state
 export let editorAttachment = null;   // { type: 'image'|'file', data: string, name?: string, size?: number }
 export let previewAttachment = null;  // { type: 'image'|'file', data: string, name?: string, size?: number }
 
@@ -95,10 +98,10 @@ const DOM = {
     fullPageEditorModal: document.getElementById('fullPageEditorModal'),
     btnCloseFullPageEditor: document.getElementById('btnCloseFullPageEditor'),
     
-    btnAttachToggle: document.getElementById('btnAttachToggle'),
-    editorAttachmentPopup: document.getElementById('editorAttachmentPopup'),
-    btnChooseImage: document.getElementById('btnChooseImage'),
-    btnChooseFile: document.getElementById('btnChooseFile'),
+    tabTypeText: document.getElementById('tabTypeText'),
+    tabTypeImage: document.getElementById('tabTypeImage'),
+    tabTypeFile: document.getElementById('tabTypeFile'),
+    panelTypeText: document.getElementById('panelTypeText'),
     inputEditorImage: document.getElementById('inputEditorImage'),
     inputEditorFile: document.getElementById('inputEditorFile'),
     editorAttachmentPreview: document.getElementById('editorAttachmentPreview'),
@@ -108,10 +111,6 @@ const DOM = {
     
     fullPagePreviewModal: document.getElementById('fullPagePreviewModal'),
     btnClosePreviewModal: document.getElementById('btnClosePreviewModal'),
-    btnPreviewAttachToggle: document.getElementById('btnPreviewAttachToggle'),
-    previewAttachmentPopup: document.getElementById('previewAttachmentPopup'),
-    btnPreviewChooseImage: document.getElementById('btnPreviewChooseImage'),
-    btnPreviewChooseFile: document.getElementById('btnPreviewChooseFile'),
     inputPreviewImage: document.getElementById('inputPreviewImage'),
     inputPreviewFile: document.getElementById('inputPreviewFile'),
     previewAttachmentDisplay: document.getElementById('previewAttachmentDisplay'),
@@ -704,8 +703,8 @@ function startClipsRealtimeSync() {
     });
 }
 
-// ABSOLUTELY STRICT SINGLE CONTENT CREATION:
-// Priority: 1. Image Clip  2. File Clip  3. Text Clip (Never combination!)
+// GBOARD-STYLE DISCRETE CLIP CREATION:
+// Each clip is strictly ONE item type: Text OR Image OR File.
 async function createNewClip(text, attachment = null, trackHistory = true) {
     if (!currentRoomHash) {
         showToast("Room is required!");
@@ -732,7 +731,7 @@ async function createNewClip(text, attachment = null, trackHistory = true) {
     } else if (text && text.trim()) {
         payload.text = text.trim();
     } else {
-        showToast("Write text or attach a file first!");
+        showToast("Write text or select a file first!");
         return;
     }
     
@@ -764,7 +763,6 @@ async function createNewClip(text, attachment = null, trackHistory = true) {
         
         if (DOM.txtFullPageEditor) {
             DOM.txtFullPageEditor.value = '';
-            DOM.txtFullPageEditor.disabled = false;
         }
         editorAttachment = null;
         renderEditorAttachment();
@@ -936,7 +934,7 @@ function renderClips(clipsList, isSearchResult = false) {
             if (subText) {
                 subText.textContent = isSearchResult 
                     ? "No matching clips found."
-                    : "Use the (+) button at bottom right to write a new clip, or the Paste button to auto-save.";
+                    : "Use the (+) button at bottom right to add a text/image/file clip, or tap the Paste button to save directly from system clipboard.";
             }
         }
         return;
@@ -957,7 +955,7 @@ function renderClips(clipsList, isSearchResult = false) {
             const kbSize = Math.round((clip.fileData.size || 0) / 1024);
             contentHtml = `
                 <div class="clip-card-attachment-file">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
                     <span>${escapeHtml(clip.fileData.name)} (${kbSize} KB)</span>
                 </div>
             `;
@@ -1018,28 +1016,46 @@ function renderClips(clipsList, isSearchResult = false) {
     });
 }
 
-// Attachment UI Rendering inside Editor
+// Gboard Tab Switcher Handler (Text vs Image vs File)
+function setEditorTab(tabType) {
+    currentEditorTab = tabType;
+    
+    if (DOM.tabTypeText) DOM.tabTypeText.classList.toggle('active', tabType === 'text');
+    if (DOM.tabTypeImage) DOM.tabTypeImage.classList.toggle('active', tabType === 'image');
+    if (DOM.tabTypeFile) DOM.tabTypeFile.classList.toggle('active', tabType === 'file');
+    
+    if (tabType === 'text') {
+        if (DOM.panelTypeText) DOM.panelTypeText.classList.remove('hidden');
+        if (DOM.editorAttachmentPreview) DOM.editorAttachmentPreview.classList.add('hidden');
+        editorAttachment = null;
+        if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.focus();
+    } else if (tabType === 'image') {
+        if (DOM.panelTypeText) DOM.panelTypeText.classList.add('hidden');
+        if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
+        if (!editorAttachment || editorAttachment.type !== 'image') {
+            DOM.inputEditorImage?.click();
+        }
+    } else if (tabType === 'file') {
+        if (DOM.panelTypeText) DOM.panelTypeText.classList.add('hidden');
+        if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
+        if (!editorAttachment || editorAttachment.type !== 'file') {
+            DOM.inputEditorFile?.click();
+        }
+    }
+}
+
+// Render Attachment Preview inside Editor Modal
 function renderEditorAttachment() {
     if (!DOM.editorAttachmentPreview) return;
     
     if (!editorAttachment) {
         DOM.editorAttachmentPreview.classList.add('hidden');
         DOM.editorAttachmentPreview.innerHTML = '';
-        if (DOM.txtFullPageEditor) {
-            DOM.txtFullPageEditor.disabled = false;
-            DOM.txtFullPageEditor.placeholder = "Write or edit clip text here...";
-        }
         return;
     }
     
     DOM.editorAttachmentPreview.classList.remove('hidden');
-    
-    // Clear text and disable text input when attachment is selected (STRICT SINGLE CONTENT RULE)
-    if (DOM.txtFullPageEditor) {
-        DOM.txtFullPageEditor.value = '';
-        DOM.txtFullPageEditor.disabled = true;
-        DOM.txtFullPageEditor.placeholder = "(Attachment mode active: Remove attachment to type text)";
-    }
+    if (DOM.panelTypeText) DOM.panelTypeText.classList.add('hidden');
     
     if (editorAttachment.type === 'image') {
         DOM.editorAttachmentPreview.innerHTML = `
@@ -1053,7 +1069,7 @@ function renderEditorAttachment() {
         const kbSize = Math.round((editorAttachment.size || 0) / 1024);
         DOM.editorAttachmentPreview.innerHTML = `
             <div class="attachment-file-info">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
                 <span class="attachment-file-name">${escapeHtml(editorAttachment.name)} (${kbSize} KB)</span>
             </div>
             <button id="btnRemoveEditorAttachment" class="btn-detach" title="Remove attachment">
@@ -1068,55 +1084,43 @@ function renderEditorAttachment() {
         removeBtn.addEventListener('click', () => {
             editorAttachment = null;
             renderEditorAttachment();
+            setEditorTab('text');
         });
     }
 }
 
-// Attachment UI Rendering inside Preview Modal
+// Render Attachment Preview inside Preview Modal
 function renderPreviewAttachment() {
     if (!DOM.previewAttachmentDisplay) return;
     
     if (!previewAttachment || previewAttachment === 'DELETE') {
         DOM.previewAttachmentDisplay.classList.add('hidden');
         DOM.previewAttachmentDisplay.innerHTML = '';
-        if (DOM.txtPreviewText) DOM.txtPreviewText.disabled = false;
+        if (DOM.txtPreviewText) DOM.txtPreviewText.classList.remove('hidden');
         return;
     }
     
     DOM.previewAttachmentDisplay.classList.remove('hidden');
-    if (DOM.txtPreviewText) {
-        DOM.txtPreviewText.value = '';
-        DOM.txtPreviewText.disabled = true;
-    }
+    if (DOM.txtPreviewText) DOM.txtPreviewText.classList.add('hidden');
     
     if (previewAttachment.type === 'image') {
         DOM.previewAttachmentDisplay.innerHTML = `
             <img src="${previewAttachment.data}" class="attachment-image-display" alt="Attached Image">
             <div style="display: flex; gap: 8px; align-items: center;">
-                <a href="${previewAttachment.data}" download="image-clip.jpg" class="btn" style="padding: 4px 10px; font-size: 0.8rem;" title="Download image">Download</a>
-                <button id="btnRemovePreviewAttachment" class="btn-detach" title="Remove attachment">Remove</button>
+                <a href="${previewAttachment.data}" download="image-clip.jpg" class="btn" style="padding: 6px 12px; font-size: 0.82rem;" title="Download image">Download Image</a>
             </div>
         `;
     } else if (previewAttachment.type === 'file') {
         const kbSize = Math.round((previewAttachment.size || 0) / 1024);
         DOM.previewAttachmentDisplay.innerHTML = `
             <div class="attachment-file-info">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
                 <span class="attachment-file-name">${escapeHtml(previewAttachment.name)} (${kbSize} KB)</span>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
-                <a href="${previewAttachment.data}" download="${escapeHtml(previewAttachment.name)}" class="btn" style="padding: 4px 10px; font-size: 0.8rem;" title="Download file">Download</a>
-                <button id="btnRemovePreviewAttachment" class="btn-detach" title="Remove attachment">Remove</button>
+                <a href="${previewAttachment.data}" download="${escapeHtml(previewAttachment.name)}" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" title="Download file">Download File</a>
             </div>
         `;
-    }
-    
-    const removeBtn = document.getElementById('btnRemovePreviewAttachment');
-    if (removeBtn) {
-        removeBtn.addEventListener('click', () => {
-            previewAttachment = 'DELETE';
-            renderPreviewAttachment();
-        });
     }
 }
 
@@ -1125,21 +1129,12 @@ function openPreviewModal(clip) {
     
     if (clip.imageData) {
         previewAttachment = { type: 'image', data: clip.imageData };
-        if (DOM.txtPreviewText) {
-            DOM.txtPreviewText.value = '';
-            DOM.txtPreviewText.disabled = true;
-        }
     } else if (clip.fileData) {
         previewAttachment = { type: 'file', ...clip.fileData };
-        if (DOM.txtPreviewText) {
-            DOM.txtPreviewText.value = '';
-            DOM.txtPreviewText.disabled = true;
-        }
     } else {
         previewAttachment = null;
         if (DOM.txtPreviewText) {
             DOM.txtPreviewText.value = clip.text || '';
-            DOM.txtPreviewText.disabled = false;
         }
     }
     
@@ -1161,6 +1156,51 @@ function closePreviewModal() {
 // ==========================================
 // 🚀 EVENT LISTENERS & INITIALIZATION
 // ==========================================
+
+// Gboard Style Clip Type Tab Listeners
+if (DOM.tabTypeText) DOM.tabTypeText.addEventListener('click', () => setEditorTab('text'));
+if (DOM.tabTypeImage) DOM.tabTypeImage.addEventListener('click', () => setEditorTab('image'));
+if (DOM.tabTypeFile) DOM.tabTypeFile.addEventListener('click', () => setEditorTab('file'));
+
+// Image & File Input change handlers
+if (DOM.inputEditorImage) {
+    DOM.inputEditorImage.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                showToast("Compressing image...");
+                const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                editorAttachment = { type: 'image', data: compressedDataUrl };
+                renderEditorAttachment();
+                showToast("Image clip selected (<128KB)");
+            } catch (err) {
+                console.error("Image error:", err);
+                showToast("Failed to process image");
+                setEditorTab('text');
+            }
+        }
+        e.target.value = '';
+    });
+}
+
+if (DOM.inputEditorFile) {
+    DOM.inputEditorFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const fileObj = await readDocumentFile(file, 128);
+                editorAttachment = { type: 'file', ...fileObj };
+                renderEditorAttachment();
+                showToast("File clip selected (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
+            } catch (err) {
+                console.error("File error:", err);
+                showToast(err.message || "File size exceeds 128KB limit!");
+                setEditorTab('text');
+            }
+        }
+        e.target.value = '';
+    });
+}
 
 // Global Paste Event Listener
 document.addEventListener('paste', async (e) => {
@@ -1190,10 +1230,11 @@ document.addEventListener('paste', async (e) => {
                 if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
                     editorAttachment = { type: 'image', data: compressedDataUrl };
                     renderEditorAttachment();
-                    showToast("Converted to Image Clip");
+                    if (DOM.tabTypeImage) setEditorTab('image');
+                    showToast("Pasted image clip");
                 } else {
                     await createNewClip('', { type: 'image', data: compressedDataUrl });
-                    showToast("Image clip saved!");
+                    showToast("Pasted image saved to clipboard!");
                 }
             } catch (err) {
                 console.error("Paste image error:", err);
@@ -1210,10 +1251,11 @@ document.addEventListener('paste', async (e) => {
                 if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
                     editorAttachment = { type: 'file', ...fileObj };
                     renderEditorAttachment();
-                    showToast("Converted to File Clip");
+                    if (DOM.tabTypeFile) setEditorTab('file');
+                    showToast("Pasted file clip");
                 } else {
                     await createNewClip('', { type: 'file', ...fileObj });
-                    showToast("File clip saved!");
+                    showToast("Pasted file saved to clipboard!");
                 }
             } catch (err) {
                 console.error("Paste file error:", err);
@@ -1417,7 +1459,7 @@ if (DOM.btnResetSearchBanner) {
     });
 }
 
-// Global click listener to auto-close search bar, undo/redo popup, and attachment popups
+// Global click listener to auto-close search bar, undo/redo popup
 document.addEventListener('click', (e) => {
     if (DOM.headerSearchOverlay && !DOM.headerSearchOverlay.classList.contains('hidden')) {
         const isClickInsideSearch = DOM.headerSearchOverlay.contains(e.target);
@@ -1434,25 +1476,13 @@ document.addEventListener('click', (e) => {
             DOM.undoRedoPopup.classList.add('hidden');
         }
     }
-    
-    if (DOM.editorAttachmentPopup && !DOM.editorAttachmentPopup.classList.contains('hidden')) {
-        if (!DOM.editorAttachmentPopup.contains(e.target) && !DOM.btnAttachToggle?.contains(e.target)) {
-            DOM.editorAttachmentPopup.classList.add('hidden');
-        }
-    }
-    
-    if (DOM.previewAttachmentPopup && !DOM.previewAttachmentPopup.classList.contains('hidden')) {
-        if (!DOM.previewAttachmentPopup.contains(e.target) && !DOM.btnPreviewAttachToggle?.contains(e.target)) {
-            DOM.previewAttachmentPopup.classList.add('hidden');
-        }
-    }
 });
 
 // ==========================================
 // 🔘 2 FABs MECHANISM LISTENERS
 // ==========================================
 
-// FAB Top (+ Plus): Open Full Page Text Editor Modal
+// FAB Top (+ Plus): Open Add Clip Modal (Default to Text Tab)
 if (DOM.btnFabEditor) {
     DOM.btnFabEditor.addEventListener('click', () => {
         closeSearchOverlay();
@@ -1460,72 +1490,11 @@ if (DOM.btnFabEditor) {
         editorAttachment = null;
         renderEditorAttachment();
         if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
+        setEditorTab('text');
         if (DOM.txtFullPageEditor) {
             DOM.txtFullPageEditor.value = '';
-            DOM.txtFullPageEditor.disabled = false;
             DOM.txtFullPageEditor.focus();
         }
-    });
-}
-
-// Single Attachment Button & Popup Handlers (Editor)
-if (DOM.btnAttachToggle) {
-    DOM.btnAttachToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (DOM.editorAttachmentPopup) DOM.editorAttachmentPopup.classList.toggle('hidden');
-    });
-}
-
-if (DOM.btnChooseImage) {
-    DOM.btnChooseImage.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (DOM.editorAttachmentPopup) DOM.editorAttachmentPopup.classList.add('hidden');
-        DOM.inputEditorImage?.click();
-    });
-}
-
-if (DOM.btnChooseFile) {
-    DOM.btnChooseFile.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (DOM.editorAttachmentPopup) DOM.editorAttachmentPopup.classList.add('hidden');
-        DOM.inputEditorFile?.click();
-    });
-}
-
-if (DOM.inputEditorImage) {
-    DOM.inputEditorImage.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            try {
-                showToast("Compressing image...");
-                const compressedDataUrl = await compressImageToDataUrl(file, 128);
-                editorAttachment = { type: 'image', data: compressedDataUrl };
-                renderEditorAttachment();
-                showToast("Image clip attached (<128KB)");
-            } catch (err) {
-                console.error("Image error:", err);
-                showToast("Failed to process image");
-            }
-        }
-        e.target.value = '';
-    });
-}
-
-if (DOM.inputEditorFile) {
-    DOM.inputEditorFile.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            try {
-                const fileObj = await readDocumentFile(file, 128);
-                editorAttachment = { type: 'file', ...fileObj };
-                renderEditorAttachment();
-                showToast("File clip attached (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
-            } catch (err) {
-                console.error("File error:", err);
-                showToast(err.message || "File size exceeds 128KB limit!");
-            }
-        }
-        e.target.value = '';
     });
 }
 
@@ -1538,7 +1507,7 @@ if (DOM.btnCloseFullPageEditor) {
     });
 }
 
-// Full Page Editor: Paste Button
+// Full Page Editor: Paste Button (Detects text vs image vs file on system clipboard)
 if (DOM.btnFullEditorPaste) {
     DOM.btnFullEditorPaste.addEventListener('click', async () => {
         try {
@@ -1547,22 +1516,24 @@ if (DOM.btnFullEditorPaste) {
                 if (content.type === 'image') {
                     editorAttachment = { type: 'image', data: content.data };
                     renderEditorAttachment();
-                    showToast("Pasted image attached!");
+                    setEditorTab('image');
+                    showToast("Pasted image clip!");
                 } else if (content.type === 'file') {
                     editorAttachment = { type: 'file', ...content };
                     renderEditorAttachment();
-                    showToast("Pasted file attached!");
+                    setEditorTab('file');
+                    showToast("Pasted file clip!");
                 } else if (content.type === 'text') {
                     editorAttachment = null;
                     renderEditorAttachment();
+                    setEditorTab('text');
                     if (DOM.txtFullPageEditor) {
-                        DOM.txtFullPageEditor.disabled = false;
                         DOM.txtFullPageEditor.value = content.text;
                     }
-                    showToast("Pasted text from clipboard!");
+                    showToast("Pasted text clip!");
                 }
             } else {
-                showToast("Allow clipboard access or copy content first");
+                showToast("Clipboard is empty or inaccessible!");
             }
         } catch (err) {
             console.error("Failed to read clipboard:", err);
@@ -1579,12 +1550,12 @@ if (DOM.btnFullEditorSend) {
             await createNewClip(text, editorAttachment);
             if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.add('hidden');
         } else {
-            showToast("Write text or attach a file first");
+            showToast("Write text or select a file first");
         }
     });
 }
 
-// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save
+// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save (Direct Gboard Style!)
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         closeSearchOverlay();
@@ -1594,13 +1565,13 @@ if (DOM.btnFabQuickPaste) {
             if (content) {
                 if (content.type === 'image') {
                     await createNewClip('', { type: 'image', data: content.data });
-                    showToast("Pasted image saved!");
+                    showToast("Pasted image saved to clipboard!");
                 } else if (content.type === 'file') {
                     await createNewClip('', { type: 'file', ...content });
-                    showToast("Pasted file saved!");
+                    showToast("Pasted file saved to clipboard!");
                 } else if (content.type === 'text') {
                     await createNewClip(content.text);
-                    showToast("Pasted text saved!");
+                    showToast("Pasted text saved to clipboard!");
                 }
             } else {
                 showToast("Clipboard is empty or inaccessible!");
@@ -1615,67 +1586,6 @@ if (DOM.btnFabQuickPaste) {
 // ==========================================
 // 📖 FULL PAGE PREVIEW MODAL LISTENERS
 // ==========================================
-
-// Single Attachment Button & Popup Handlers (Preview)
-if (DOM.btnPreviewAttachToggle) {
-    DOM.btnPreviewAttachToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (DOM.previewAttachmentPopup) DOM.previewAttachmentPopup.classList.toggle('hidden');
-    });
-}
-
-if (DOM.btnPreviewChooseImage) {
-    DOM.btnPreviewChooseImage.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (DOM.previewAttachmentPopup) DOM.previewAttachmentPopup.classList.add('hidden');
-        DOM.inputPreviewImage?.click();
-    });
-}
-
-if (DOM.btnPreviewChooseFile) {
-    DOM.btnPreviewChooseFile.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (DOM.previewAttachmentPopup) DOM.previewAttachmentPopup.classList.add('hidden');
-        DOM.inputPreviewFile?.click();
-    });
-}
-
-if (DOM.inputPreviewImage) {
-    DOM.inputPreviewImage.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            try {
-                showToast("Compressing image...");
-                const compressedDataUrl = await compressImageToDataUrl(file, 128);
-                previewAttachment = { type: 'image', data: compressedDataUrl };
-                renderPreviewAttachment();
-                showToast("Converted to Image Clip (<128KB)");
-            } catch (err) {
-                console.error("Image error:", err);
-                showToast("Failed to process image");
-            }
-        }
-        e.target.value = '';
-    });
-}
-
-if (DOM.inputPreviewFile) {
-    DOM.inputPreviewFile.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            try {
-                const fileObj = await readDocumentFile(file, 128);
-                previewAttachment = { type: 'file', ...fileObj };
-                renderPreviewAttachment();
-                showToast("Converted to File Clip (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
-            } catch (err) {
-                console.error("File error:", err);
-                showToast(err.message || "File size exceeds 128KB limit!");
-            }
-        }
-        e.target.value = '';
-    });
-}
 
 if (DOM.btnClosePreviewModal) {
     DOM.btnClosePreviewModal.addEventListener('click', () => {
