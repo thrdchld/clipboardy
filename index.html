@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clipboardy</title>
+    <title>Clipboardy - Multi-Device Clipboard</title>
     
     <!-- Favicon and PWA Meta -->
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#3b82f6">
+    <meta name="theme-color" content="#121214">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -16,7 +16,8 @@
     <!-- Modern Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    
     <!-- Prevent Theme Flash -->
     <script>
         const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -46,21 +47,15 @@
         <!-- Initial Login Options (Google & Guest) -->
         <div id="initialAuthContainer" class="auth-box">
             <h1 style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; margin-bottom: 8px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="url(#brandGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <defs>
-                        <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="var(--primary)" />
-                            <stop offset="100%" stop-color="#8b5cf6" />
-                        </linearGradient>
-                    </defs>
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                 </svg>
                 Clipboardy
             </h1>
-            <p class="text-muted" style="margin-bottom: 24px;">Your secure cross-device clipboard sync.</p>
+            <p class="text-muted" style="margin-bottom: 20px; font-size: 0.9rem;">Multi-device transient clipboard sync.</p>
             
             <!-- Google Login Button -->
-            <button id="btnGoogleLogin" class="btn btn-google" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: white; color: #374151; border: 1px solid #d1d5db; box-shadow: var(--shadow-sm); padding: 12px; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; transition: all 0.2s;">
+            <button id="btnGoogleLogin" class="btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: white; color: #374151; border: 1px solid #d1d5db; padding: 12px; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; transition: all 0.2s;">
                 <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
                     <path d="M17.64 9.205c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
                     <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.938 5.482 18 9 18z" fill="#34A853"/>
@@ -71,49 +66,40 @@
             </button>
             
             <!-- Or Divider -->
-            <div style="display: flex; align-items: center; margin: 20px 0; color: var(--text-muted); font-size: 0.85rem;">
-                <hr style="flex-grow: 1; border: none; border-top: 1px solid var(--border-color); margin-right: 10px;">
-                <span>or use Guest Room</span>
-                <hr style="flex-grow: 1; border: none; border-top: 1px solid var(--border-color); margin-left: 10px;">
+            <div style="display: flex; align-items: center; margin: 18px 0; color: var(--text-muted); font-size: 0.85rem;">
+                <hr style="flex-grow: 1; border: none; border-top: 1px solid var(--border); margin-right: 10px;">
+                <span>atau Guest Room</span>
+                <hr style="flex-grow: 1; border: none; border-top: 1px solid var(--border); margin-left: 10px;">
             </div>
             
             <!-- Guest Login Area -->
             <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
-                <input type="text" id="roomNameInput" class="input-field" placeholder="Room Name (e.g. workspace)" style="box-sizing: border-box; text-align: center;" autocomplete="off">
-                <input type="password" id="passwordInput" class="input-field" placeholder="4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; letter-spacing: 2px;" autocomplete="off">
-                <button id="loginBtn" class="btn btn-primary" style="width: 100%;">Join Room</button>
+                <input type="text" id="roomNameInput" class="input-field" placeholder="Nama Room (contoh: workspace)" style="text-align: center;" autocomplete="off">
+                <input type="password" id="passwordInput" class="input-field" placeholder="4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; letter-spacing: 2px;" autocomplete="off">
+                <button id="loginBtn" class="btn btn-primary" style="width: 100%;">Masuk Room</button>
             </div>
         </div>
 
-        <!-- Google Session Locked Screen (requires lock password to unlock UI) -->
+        <!-- Google Session Locked Screen -->
         <div id="googleLockedContainer" class="auth-box hidden">
             <h1 style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; margin-bottom: 8px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="url(#brandGrad2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <defs>
-                        <linearGradient id="brandGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="var(--primary)" />
-                            <stop offset="100%" stop-color="#8b5cf6" />
-                        </linearGradient>
-                    </defs>
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                 </svg>
                 Clipboardy
             </h1>
-            <p class="text-muted" style="margin-bottom: 16px;">Application Locked</p>
+            <p class="text-muted" style="margin-bottom: 16px;">Aplikasi Terkunci</p>
             
-            <div style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 16px; background: rgba(0,0,0,0.02); border-radius: var(--radius-md); margin-bottom: 20px; border: 1px solid var(--border-color); box-sizing: border-box; width: 100%;">
-                <img id="lockedUserAvatar" src="https://via.placeholder.com/64" alt="Avatar" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid var(--primary); display: block;">
-                <h4 id="lockedUserName" style="margin: 0 0 4px 0; font-weight: 600; color: var(--text);">Google User</h4>
+            <div style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px; background: var(--bg-base); border-radius: var(--radius-md); margin-bottom: 16px; border: 1px solid var(--border); width: 100%;">
+                <img id="lockedUserAvatar" src="https://via.placeholder.com/64" alt="Avatar" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid var(--primary); display: block;">
+                <h4 id="lockedUserName" style="margin: 0 0 4px 0; font-weight: 600; color: var(--text-main);">Google User</h4>
                 <p id="lockedUserEmail" class="text-muted" style="margin: 0; font-size: 0.85em; word-break: break-all;">user@email.com</p>
             </div>
             
             <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
-                <input type="password" id="lockPasswordInput" class="input-field" placeholder="Enter 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.2em; letter-spacing: 2px; margin-bottom: 8px;">
-                <button id="btnUnlockGoogle" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">Unlock Screen</button>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; box-sizing: border-box; width: 100%;">
-                    <button id="btnForgotPassword" class="btn" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.85em; font-weight: 500; padding: 6px 10px;">Forgot Password?</button>
-                    <button id="btnSwitchAccount" class="btn" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85em; font-weight: 500; padding: 6px 10px;">Sign Out / Switch Account</button>
-                </div>
+                <input type="password" id="lockPasswordInput" class="input-field" placeholder="Masukkan 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; font-size: 1.1em; letter-spacing: 2px;">
+                <button id="btnUnlockGoogle" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">Buka Kunci</button>
+                <button id="btnSwitchAccount" class="btn" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85em; font-weight: 500; margin-top: 4px;">Keluar / Ganti Akun</button>
             </div>
         </div>
     </div>
@@ -121,550 +107,98 @@
     <!-- Main App Layout -->
     <div id="appScreen" class="hidden">
         
-        <!-- Mobile Sidebar Backdrop -->
-        <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+        <!-- Header -->
+        <header>
+            <div class="brand">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                <span id="headerTitleText">Clipboardy</span>
+                <span id="syncIndicator" class="status-dot" title="Live Sync Active"></span>
+            </div>
 
-        <!-- Sidebar for Folders -->
-        <aside class="sidebar">
-            <div class="brand" style="display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-                    <span>Clipboardy</span>
-                    <span id="syncIndicator" class="status-dot" title="Live Sync Active"></span>
-                </div>
-                <button id="btnSidebarCollapse" class="btn btn-icon" title="Collapse Sidebar" aria-label="Collapse Sidebar" style="width: 32px; height: 32px; padding: 0; background: transparent; border: none; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            <!-- Cold Storage Search Container (Explisite Search Button Only) -->
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Cari di cold storage..." aria-label="Cari klip">
+                <button id="btnSearch" class="btn-search" title="Cari di Cold Storage">Cari</button>
+                <button id="btnClearSearch" class="btn-clear hidden" title="Clear Search" aria-label="Clear Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
-            
-            <div class="sidebar-content">
-                <button id="btnAddNote" class="btn btn-primary btn-add-note-sidebar" title="New Note" aria-label="New Note">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    New Note
+
+            <div style="display: flex; gap: 6px; align-items: center;">
+                <button id="btnThemeToggle" class="btn" title="Toggle Theme" aria-label="Toggle Theme" style="padding: 8px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.07" x2="5.64" y2="17.64"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
                 </button>
-                <div class="section-title">
-                    <span>Folders</span>
-                    <div style="display: flex; gap: 4px; align-items: center;">
-                        <button id="btnSelectFolders" class="add-folder-btn" title="Select Folders to Delete" aria-label="Select Folders to Delete" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        </button>
-                        <button id="btnAddFolder" class="add-folder-btn" title="Add New Folder" aria-label="Add New Folder">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        </button>
-                    </div>
-                </div>
-                <ul id="folderList" class="folder-list">
-                    <!-- Folders render here via JS -->
-                </ul>
-            </div>
-            
-            <div class="sidebar-footer">
-
-                <!-- Trash Button -->
-                <button id="btnToggleTrash" class="btn" title="View Trash" aria-label="View Trash" style="width: 100%; justify-content: center; padding: 10px; border-radius: var(--radius-md); background: rgba(0,0,0,0.03); border: 1px solid var(--border-color); display: inline-flex; align-items: center; gap: 8px; transition: background 0.2s; margin-bottom: 8px;">
-                    <span class="btn-svg" style="display:inline-flex; align-items:center; color:currentColor;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    </span>
-                    <span id="btnToggleTrashText">Trash</span>
-                </button>
-                
-                
-                <!-- Profile Card Button (Google only) -->
-                <div id="sidebarProfileCard" class="sidebar-profile-card" style="margin-top: 16px; padding: 10px; border-radius: var(--radius-md); background: rgba(0,0,0,0.03); border: 1px solid var(--border-color); display: none; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.2s;">
-                    <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; width: calc(100% - 20px);">
-                        <img id="sidebarAvatar" src="https://via.placeholder.com/32" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;">
-                        <div style="display: flex; flex-direction: column; overflow: hidden; line-height: 1.2; text-align: left;">
-                            <span id="sidebarUserName" style="font-weight: 600; font-size: 0.85rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Guest User</span>
-                            <span id="sidebarUserEmail" style="font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Room Mode</span>
-                        </div>
-                    </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                </div>
-                
-                <!-- Guest Warning Sidebar Widget (Guest only) -->
-                <div id="sidebarGuestWarning" style="margin-top: 16px; padding: 10px; border-radius: var(--radius-md); background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.18); color: #b45309; text-align: left; font-size: 0.75rem; cursor: pointer; display: none; align-items: center; gap: 8px; transition: all 0.2s;">
-                    <span>⚠️</span>
-                    <div style="flex-grow: 1; overflow: hidden;">
-                        <strong style="display: block; font-weight: 700;">Guest Mode (24h)</strong>
-                        <span style="font-size: 0.7rem; color: #d97706;">Click to Connect Google & Import</span>
-                    </div>
-                </div>
-
-                <!-- Theme Toggle and Lock/Settings Buttons -->
-                <div style="display: flex; gap: 8px; margin-top: 16px; width: 100%;">
-                    <!-- Theme Toggle Button -->
-                    <button id="btnThemeToggle" class="btn" title="Toggle Theme" aria-label="Toggle Theme" style="flex: 0 0 40px; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; color: var(--text-main); transition: all 0.2s;">
-                        <!-- Sun Icon (for light theme, shown when in dark mode) -->
-                        <svg id="themeIconSun" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.07" x2="5.64" y2="17.64"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-                        <!-- Moon Icon (for dark theme, shown when in light mode) -->
-                        <svg id="themeIconMoon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-                    </button>
-                    <!-- Lock & Settings Split Container -->
-                    <div style="flex: 1; display: flex; gap: 4px; margin: 0; min-width: 0;">
-                        <!-- Lock Button (70%) -->
-                        <button id="btnLock" class="btn btn-danger" title="Lock Application" aria-label="Lock Application" style="flex: 7; justify-content: center; display: inline-flex; align-items: center; gap: 6px; padding: 10px 4px; height: 40px; margin: 0; min-width: 0; font-size: 0.85rem; font-weight: 600;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                            Lock
-                        </button>
-                        <!-- App Lock Settings Button (30%) -->
-                        <button id="btnOpenLockSettings" class="btn" title="App Lock Settings" aria-label="App Lock Settings" style="flex: 3; justify-content: center; display: inline-flex; align-items: center; padding: 10px 0; height: 40px; margin: 0; min-width: 0; color: var(--text-main);">
-                            <!-- Gear/Gerigi Icon -->
-                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main Content Area -->
-        <main class="main-content">
-            <header>
-                <div class="header-title" style="display:flex; align-items:center; gap:12px;">
-                    <button id="btnMobileMenu" class="btn btn-icon" title="Toggle Sidebar" aria-label="Toggle Sidebar">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-                    </button>
-                    <h2 id="headerTitleText" style="margin: 0; white-space: nowrap;">General</h2>
-                </div>
-                <div class="header-actions">
-                    <div class="search-container">
-                        <span class="search-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        </span>
-                        <input type="text" id="searchInput" placeholder="Search notes..." aria-label="Search notes">
-                        <button id="btnClearSearch" class="btn-clear hidden" title="Clear Search" aria-label="Clear Search">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </button>
-                    </div>
-                    <!-- Layout Toggle Button (Grid/List) -->
-                    <button id="btnToggleLayout" class="btn" title="Toggle Layout" aria-label="Toggle Layout" style="padding: 8px; width: 38px; height: 38px; justify-content: center; flex-shrink: 0;">
-                        <!-- List icon (shown when in grid mode) -->
-                        <svg id="layoutIconList" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-                        <!-- Grid icon (shown when in list mode) -->
-                        <svg id="layoutIconGrid" class="hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                    </button>
-                    <!-- Desktop Header New Note button, only visible when sidebar collapsed on desktop -->
-                    <button id="btnAddNoteHeader" class="btn btn-primary btn-add-note-header" title="New Note" aria-label="New Note">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        New Note
-                    </button>
-                    <button id="btnEmptyTrash" class="btn btn-danger hidden" title="Empty Trash" aria-label="Empty Trash" style="display: none; align-items: center; gap: 4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        Empty Trash
-                    </button>
-                </div>
-            </header>
-
-            <div class="main-scroll">
-                <!-- Pull to Refresh Spinner -->
-                <div id="pullToRefreshSpinner" class="ptr-spinner" style="display: none;">
-                    <svg class="ptr-svg" viewBox="0 0 24 24">
-                        <circle class="ptr-bg" cx="12" cy="12" r="10"></circle>
-                        <path class="ptr-indicator" d="M12 2a10 10 0 0 1 10 10h-2a8 8 0 0 0-8-8V2z"></path>
-                    </svg>
-                </div>
-
-                <div id="clipGrid">
-                    <!-- Cards render here via JS -->
-                </div>
-                <div id="emptyState" class="empty-state hidden">
-                    <div class="empty-state-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-svg" style="opacity: 0.5;">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                            <polyline points="10 9 9 9 8 9"></polyline>
-                        </svg>
-                    </div>
-                    <h3>No notes yet</h3>
-                    <p>Click "+ New Note" to start writing in this folder.</p>
-                </div>
-            </div>
-        </main>
-        <button id="btnEmptyTrashMobile" class="btn btn-danger fab-mobile hidden" title="Empty Trash" aria-label="Empty Trash" style="display: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-        </button>
-
-        <!-- Bottom Navigation Tab Bar (Mobile Only) -->
-        <nav class="bottom-nav">
-            <button id="tabNotes" class="nav-tab active">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                <span>Notes</span>
-            </button>
-            <button id="tabFolders" class="nav-tab">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                <span>Folders</span>
-            </button>
-            
-            <!-- Center Floating Action Button (FAB) -->
-            <button id="btnMobileFAB" class="nav-tab-fab" title="New Note" aria-label="New Note">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </button>
-
-            <button id="tabTrash" class="nav-tab">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                <span>Trash</span>
-            </button>
-            <button id="tabSettings" class="nav-tab">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                <span>Settings</span>
-            </button>
-        </nav>
-
-        <!-- Mobile Folder Selector Bottom Sheet -->
-        <div id="mobileFolderSelectorBackdrop" class="mobile-sheet-backdrop"></div>
-        <div id="mobileFolderSelectorSheet" class="mobile-sheet">
-            <div class="mobile-sheet-drag-handle"></div>
-            <div class="mobile-sheet-header">
-                <span class="mobile-sheet-title">Select Folder</span>
-                <button id="btnAddNewFolderMobile" class="add-folder-btn" title="Add New Folder" style="margin-left: auto;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                </button>
-            </div>
-            <div id="mobileFolderSelectorList" class="mobile-sheet-content" style="padding: 10px 0 24px 0;">
-                <!-- dynamic folders switch render -->
-            </div>
-        </div>
-
-        <!-- Mobile Settings Bottom Sheet -->
-        <div id="mobileSettingsBackdrop" class="mobile-sheet-backdrop"></div>
-        <div id="mobileSettingsSheet" class="mobile-sheet">
-            <div class="mobile-sheet-drag-handle"></div>
-            <div class="mobile-sheet-header">
-                <span class="mobile-sheet-title">Settings & Profile</span>
-            </div>
-            <div class="mobile-sheet-content" style="padding: 16px 20px 32px 20px; display: flex; flex-direction: column; gap: 20px;">
-                <div id="mobileSettingsProfileSection" style="display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
-                    <img id="mobileSettingsAvatar" src="https://via.placeholder.com/48" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary);">
-                    <div style="display: flex; flex-direction: column; text-align: left;">
-                        <span id="mobileSettingsName" style="font-weight: 700; font-size: 1.1em; color: var(--text);">Guest User</span>
-                        <span id="mobileSettingsEmail" class="text-muted" style="font-size: 0.85em;">Local Session</span>
-                    </div>
-                </div>
-                
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <button id="btnMobileSettingsLock" class="mobile-menu-item" style="border-radius: var(--radius-md); padding: 12px 16px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                        Lock Application
-                    </button>
-                    <button id="btnMobileSettingsChangePwd" class="mobile-menu-item" style="border-radius: var(--radius-md); padding: 12px 16px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                        Change Lock PIN
-                    </button>
-                    <button id="btnMobileSettingsReset" class="mobile-menu-item" style="border-radius: var(--radius-md); padding: 12px 16px; color: var(--danger);">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        Reset Workspace
-                    </button>
-                    <button id="btnMobileSettingsTheme" class="mobile-menu-item" style="border-radius: var(--radius-md); padding: 12px 16px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-                        Toggle Theme
-                    </button>
-                    <button id="btnMobileSettingsSignOut" class="mobile-menu-item" style="border-radius: var(--radius-md); padding: 12px 16px; color: var(--danger);">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                        Sign Out / Switch Account
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Profile Modal (Only for Google Users) -->
-    <div id="profileModal" class="modal-overlay hidden" style="z-index: 2500;">
-        <div class="modal" style="max-width: 360px; padding: 24px; border-radius: var(--radius-lg);">
-            <h3 style="margin-bottom: 16px; font-weight: 700; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                My Profile
-            </h3>
-            
-            <div class="profile-modal-card" style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 16px; background: rgba(0,0,0,0.02); border-radius: var(--radius-md); margin-bottom: 16px; border: 1px solid var(--border-color); box-sizing: border-box; width: 100%;">
-                <img id="profileModalAvatar" src="https://via.placeholder.com/64" alt="Avatar" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; border: 2px solid var(--primary); display: block;">
-                <h4 id="profileModalName" style="margin: 0 0 4px 0; font-weight: 600; font-size: 1.05em; color: var(--text);">Google User</h4>
-                <p id="profileModalEmail" class="text-muted" style="margin: 0; font-size: 0.85em; word-break: break-all;">user@email.com</p>
-                <div id="profileModalBadge" style="margin-top: 8px; font-size: 0.75em; padding: 4px 10px; border-radius: 12px; font-weight: 600; background: var(--primary); color: white; display: inline-block;">Google Account</div>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; box-sizing: border-box; text-align: left;">
-                <div style="font-size: 0.8em; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.05em;">Session Info</div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.85em; padding: 6px 0; border-bottom: 1px dashed var(--border-color); overflow: hidden;">
-                    <span style="color: var(--text-muted);">Room ID:</span>
-                    <span id="profileModalRoomId" style="font-family: monospace; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">google_room</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.85em; padding: 6px 0;">
-                    <span style="color: var(--text-muted);">Login Type:</span>
-                    <span id="profileModalAuthType" style="font-weight: 600; color: var(--text);">Google Sign-In</span>
-                </div>
-            </div>
-            <div class="modal-actions" style="flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;">
-                <button id="btnOpenChangePassword" class="btn" style="width: 100%; justify-content: center; font-size: 0.85rem; padding: 8px; display: inline-flex; align-items: center; gap: 6px; box-sizing: border-box;">
+                <button id="btnLock" class="btn btn-danger" title="Kunci Aplikasi" style="padding: 8px 12px; font-size: 0.85rem;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    Change Lock Password
+                    Lock
                 </button>
-                <button id="btnResetData" class="btn btn-danger" style="width: 100%; justify-content: center; font-size: 0.85rem; padding: 8px; display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--danger); color: var(--danger); box-sizing: border-box;">
-                    Reset Room Data
+            </div>
+        </header>
+
+        <!-- Main Scroll Area -->
+        <div class="main-scroll">
+            <!-- Pull to Refresh Spinner -->
+            <div id="pullToRefreshSpinner" style="display: none; text-align: center; padding: 6px;">
+                <span class="status-dot saving"></span>
+            </div>
+
+            <!-- Search Mode Notification Banner -->
+            <div id="searchBanner" class="search-banner hidden">
+                <span id="searchBannerText">Hasil pencarian cold storage...</span>
+                <button id="btnResetSearchBanner" class="btn" style="padding: 2px 8px; font-size: 0.75rem; background: var(--bg-surface);">Kembali ke Stream Realtime</button>
+            </div>
+
+            <!-- Clips Grid -->
+            <div id="clipGrid">
+                <!-- Cards render here dynamically via JS -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.4;">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                </svg>
+                <h3>Belum ada klip</h3>
+                <p>Tulis atau tempel teks di form bawah untuk membuat klip baru.</p>
+            </div>
+        </div>
+
+        <!-- STICKY BOTTOM INPUT AREA (Thumb-Friendly Mobile First) -->
+        <div id="quickInputContainer" class="sticky-input-container">
+            <div class="sticky-input-box">
+                <textarea id="txtQuickInput" class="sticky-textarea" placeholder="Ketik atau tempel teks klip di sini..." rows="1"></textarea>
+                <button id="btnQuickInputPaste" class="btn-paste-clip" title="Tempel dari Clipboard">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                    Tempel
                 </button>
-                <hr style="border: none; border-top: 1px solid var(--border-color); width: 100%; margin: 4px 0;">
-                <button id="btnSignOut" class="btn btn-danger" style="width: 100%; justify-content: center; padding: 10px; box-sizing: border-box; display: inline-flex; align-items: center;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                    Logout & Lock
+                <button id="btnQuickInputSend" class="btn-send-clip" title="Simpan Klip">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    Kirim
                 </button>
-                <button id="btnCloseProfile" class="btn" style="width: 100%; justify-content: center; padding: 10px; box-sizing: border-box;">Close</button>
             </div>
         </div>
     </div>
 
-    <!-- Setup Lock Password Modal (First-time google login setup) -->
-    <div id="setupLockPasswordModal" class="modal-overlay hidden" style="z-index: 2800;">
-        <div class="modal" style="max-width: 360px; padding: 24px; border-radius: var(--radius-lg);">
-            <h3 style="margin-bottom: 12px; font-weight: 700; font-size: 1.15em; display: flex; align-items: center; gap: 8px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                Create Lock Password
-            </h3>
-            <p class="text-muted" style="font-size: 0.85em; margin-bottom: 16px; line-height: 1.4; text-align: left;">
-                This is your first Google login! Please set a lock password. You will use this password to unlock your screen when Clipboardy locks.
-            </p>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; width: 100%; box-sizing: border-box;">
-                <input type="password" id="newLockPassword" class="input-field" placeholder="New 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
-                <input type="password" id="confirmLockPassword" class="input-field" placeholder="Confirm 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
-            </div>
-            <button id="btnSaveLockPassword" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight: 600;">Save & Unlock</button>
-        </div>
-    </div>
-
-    <!-- Change Lock Password Modal -->
-    <div id="changeLockPasswordModal" class="modal-overlay hidden" style="z-index: 2800;">
-        <div class="modal" style="max-width: 360px; padding: 24px; border-radius: var(--radius-lg);">
-            <h3 style="margin-bottom: 12px; font-weight: 700; font-size: 1.15em; display: flex; align-items: center; gap: 8px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                Change Lock Password
-            </h3>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; width: 100%; box-sizing: border-box;">
-                <input type="password" id="changeOldPassword" class="input-field" placeholder="Current 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
-                <input type="password" id="changeNewPassword" class="input-field" placeholder="New 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
-                <input type="password" id="changeConfirmPassword" class="input-field" placeholder="Confirm New 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="box-sizing: border-box; text-align: center; font-size: 1.1em; letter-spacing: 2px;">
-            </div>
-            <div style="display: flex; justify-content: flex-end; margin-top: -5px; margin-bottom: 15px; width: 100%;">
-                <button id="btnChangeModalForgotPassword" class="btn" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.85em; font-weight: 500; padding: 6px 0;">Forgot Password?</button>
-            </div>
-            <div class="modal-actions" style="flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;">
-                <button id="btnSubmitChangePassword" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight: 600;">Update Password</button>
-                <button id="btnCancelChangePassword" class="btn" style="width: 100%; justify-content: center; padding: 10px; box-sizing: border-box;">Cancel</button>
-            </div>
-
-        </div>
-    </div>
-
-    <!-- App Lock Settings Modal -->
-    <div id="appLockSettingsModal" class="modal-overlay hidden" style="z-index: 2500;">
-        <div class="modal" style="max-width: 360px; padding: 24px; border-radius: var(--radius-lg);">
-            <h3 style="margin-bottom: 16px; font-weight: 700; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                App Lock Settings
-            </h3>
-            
-            <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; text-align: left;">
-                <!-- Strict Lock Setting -->
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span style="font-weight: 600; font-size: 0.95rem; color: var(--text);">Strict Lock</span>
-                        <label class="toggle-container">
-                            <input type="checkbox" id="strictLockToggle">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <p class="text-muted" style="margin: 0; font-size: 0.75rem; line-height: 1.3;">
-                        Locks the application instantly when you switch tabs, minimize the window, or focus away.
-                    </p>
-                </div>
-                
-                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 0;">
-                
-                <!-- Idle Auto-Lock Setting -->
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span style="font-weight: 600; font-size: 0.95rem; color: var(--text);">Idle Auto-Lock</span>
-                        <label class="toggle-container">
-                            <input type="checkbox" id="idleLockToggle">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <p class="text-muted" style="margin: 0; font-size: 0.75rem; line-height: 1.3;">
-                        Automatically locks the application after a specified period of inactivity.
-                    </p>
-                <div id="idleLockDurationSetting" style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 0.8rem; background: rgba(0,0,0,0.02); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); position: relative;">
-                    <span style="color: var(--text-muted);">Inactivity Timeout:</span>
-                    <div style="position: relative; display: inline-block;">
-                        <button id="btnSettingsIdleTimeout" class="btn" style="padding: 6px 12px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 500; outline: none;">
-                            <span id="settingsIdleTimeoutText">5 Min</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                        </button>
-                        
-                        <!-- Custom Timeout Dropdown -->
-                        <div id="timeoutDropdown" class="dropdown-menu">
-                            <button class="dropdown-item" data-value="1">1 Minute</button>
-                            <button class="dropdown-item" data-value="2">2 Minutes</button>
-                            <button class="dropdown-item" data-value="5">5 Minutes</button>
-                            <button class="dropdown-item" data-value="10">10 Minutes</button>
-                            <button class="dropdown-item" data-value="30">30 Minutes</button>
-                            <button class="dropdown-item" data-value="60">1 Hour</button>
-                        </div>
-                    </div>
-                </div>
-                </div>
-            </div>
-            
-            <div class="modal-actions" style="justify-content: flex-end; width: 100%;">
-                <button id="btnCloseLockSettings" class="btn btn-primary" style="padding: 10px 20px;">Save & Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Folder Creation Modal -->
-    <div id="folderModal" class="modal-overlay hidden">
+    <!-- First-Time Setup Lock Password Modal -->
+    <div id="setupLockPasswordModal" class="modal-overlay hidden">
         <div class="modal">
-            <h3>Create New Folder</h3>
-            <input type="text" id="folderNameInput" class="input-field" placeholder="Folder Name (e.g. Work)" autocomplete="off" aria-label="New Folder Name">
-            <div class="modal-actions">
-                <button id="btnCancelFolder" class="btn" title="Cancel" aria-label="Cancel">Cancel</button>
-                <button id="btnSaveFolder" class="btn btn-primary" title="Save Folder" aria-label="Save Folder">Save</button>
+            <h3 style="margin-bottom: 12px; font-weight: 700; font-size: 1.15em;">Buat PIN Akses</h3>
+            <p class="text-muted" style="font-size: 0.85em; margin-bottom: 16px; text-align: left;">
+                Setel 4-digit PIN untuk mengamankan sesi Clipboardy Anda.
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+                <input type="password" id="newLockPassword" class="input-field" placeholder="PIN Baru (4-digit)" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; letter-spacing: 2px;">
+                <input type="password" id="confirmLockPassword" class="input-field" placeholder="Konfirmasi PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; letter-spacing: 2px;">
             </div>
-        </div>
-    </div>
-
-
-
-    <div id="lightboxModal" class="modal-overlay hidden" style="background: rgba(0,0,0,0.95); z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-        <div class="lightbox-toolbar" style="position: absolute; top: 0; left: 0; right: 0; height: 60px; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; z-index: 3010; backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1); box-sizing: border-box;">
-            <button id="btnDownloadLightbox" class="btn btn-primary" title="Download Image" aria-label="Download Image" style="background: var(--primary); border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.9em; color: white;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Download
-            </button>
-            <button id="closeLightbox" class="btn btn-icon" title="Close Preview" aria-label="Close Preview" style="background: rgba(255,255,255,0.15); border: none; color: white; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; transition: background 0.2s; padding: 0;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-        </div>
-        <div class="lightbox-image-container" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding-top: 60px; box-sizing: border-box;">
-            <img id="lightboxImage" src="" style="max-width: 95%; max-height: calc(100vh - 100px); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); object-fit: contain; transform: scale(0.95); transition: transform 0.3s ease-out;" alt="Image Preview">
-        </div>
-    </div>
-
-
-    <!-- Custom Confirm Modal -->
-    <div id="confirmModal" class="modal-overlay hidden" style="z-index: 2500;">
-        <div class="modal" style="max-width: 380px; text-align: center; padding: 28px; border-radius: var(--radius-lg);">
-            <div id="confirmIcon" style="margin-bottom: 16px; color: var(--danger); display: flex; justify-content: center; align-items: center;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            </div>
-            <h3 id="confirmTitle" style="margin-bottom: 8px; font-weight: 700;">Are you sure?</h3>
-            <p id="confirmMessage" class="text-muted" style="font-size: 0.95em; margin-bottom: 24px; line-height: 1.5;"></p>
-            <div class="modal-actions" style="justify-content: center; gap: 12px; width: 100%;">
-                <button id="confirmCancelBtn" class="btn" style="flex: 1; justify-content: center; padding: 10px 16px;">Cancel</button>
-                <button id="confirmConfirmBtn" class="btn btn-primary" style="flex: 1; justify-content: center; padding: 10px 16px;">Confirm</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Mobile Bottom Sheets -->
-    <div id="mobileNoteEditorBackdrop" class="mobile-sheet-backdrop"></div>
-    <div id="mobileNoteEditorSheet" class="mobile-sheet">
-        <div class="mobile-sheet-drag-handle"></div>
-        <div class="mobile-sheet-header">
-            <span class="mobile-sheet-title">Edit Note</span>
-            <button id="btnDoneMobileEditor" class="btn btn-primary" style="padding: 6px 16px; font-weight: 600; border-radius: 20px;">Done</button>
-        </div>
-        <div class="mobile-sheet-content">
-            <div id="mobileEditorImageWrapper" class="card-image-wrapper" style="height: 180px; display: none;">
-                <img id="mobileEditorImage" class="card-image" style="cursor: default;" alt="Note Image">
-                <button id="btnMobileRemoveImage" class="btn-remove-image" title="Delete Image"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-            <div id="mobileEditorDocumentWrapper" class="card-document-wrapper" style="margin-top: 0; margin-bottom: 12px; padding: 10px 14px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--radius-md); display: none; align-items: center; justify-content: space-between; font-size: 0.85em; font-weight: 500;">
-                <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary); flex-shrink: 0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                    <span id="mobileEditorDocumentName" style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; opacity: 0.8;">Doc</span>
-                </div>
-                <button id="btnMobileRemoveDocument" style="background: none; border: none; cursor: pointer; color: var(--danger); display: inline-flex; align-items: center; flex-shrink: 0;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-            <input type="text" id="mobileEditorTitle" placeholder="Title" style="width: 100%; border: none; background: transparent; outline: none; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.25rem; margin-bottom: 12px; color: var(--text-main); padding: 0;" autocomplete="off">
-            <textarea id="mobileEditorTextarea" placeholder="Note" style="font-size: 1rem;"></textarea>
-        </div>
-        <div class="mobile-sheet-toolbar">
-            <span id="mobileEditorStats" class="text-muted" style="font-size: 0.8rem;">0 words | 0 chars</span>
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <button id="btnMobileAttach" class="btn btn-icon" style="background: transparent; border: none; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button>
-                <div class="attachment-dropdown hidden" id="mobileAttachDropdown" style="position: absolute; bottom: 60px; right: 20px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 100; min-width: 140px; display: none; flex-direction: column; overflow: hidden; padding: 4px 0;">
-                    <button class="dropdown-item" id="optMobileAddImage" style="background: none; border: none; padding: 8px 12px; font-size: 0.85em; font-weight: 500; text-align: left; cursor: pointer; color: var(--text-main); display: flex; align-items: center; gap: 8px; width: 100%;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                        Media/Image
-                    </button>
-                    <button class="dropdown-item" id="optMobileAddDocument" style="background: none; border: none; padding: 8px 12px; font-size: 0.85em; font-weight: 500; text-align: left; cursor: pointer; color: var(--text-main); display: flex; align-items: center; gap: 8px; width: 100%;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                        Document
-                    </button>
-                </div>
-            </div>
-            <input type="file" id="mobileEditorImageInput" accept="image/*" style="display: none;">
-            <input type="file" id="mobileEditorDocumentInput" accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv" style="display: none;">
-        </div>
-    </div>
-
-    <div id="mobileContextMenuBackdrop" class="mobile-sheet-backdrop"></div>
-    <div id="mobileContextMenuSheet" class="mobile-sheet">
-        <div class="mobile-sheet-drag-handle"></div>
-        <div class="mobile-sheet-content" style="padding: 10px 0 24px 0;">
-            <div id="mobileMenuNotePreview" style="padding: 16px 20px; font-size: 0.9em; font-weight: 500; border-bottom: 1px solid var(--border); margin-bottom: 8px; color: var(--text-muted); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                Note preview content
-            </div>
-            <button id="btnMobileMenuCopy" class="mobile-menu-item">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                Copy Content
-            </button>
-            <button id="btnMobileMenuPin" class="mobile-menu-item">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A.5.5 0 0 0 6.36 14h11.28a.5.5 0 0 0 .25-.56l-1.78-.89a2 2 0 0 1-1.11-1.79V4H9v6.76zM8 4h8M10 2h4"/></svg>
-                <span id="mobileMenuPinText">Pin Note</span>
-            </button>
-            <button id="btnMobileMenuMove" class="mobile-menu-item">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                Move to Folder...
-            </button>
-            <button id="btnMobileMenuDelete" class="mobile-menu-item" style="color: var(--danger);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                Delete Note
-            </button>
-        </div>
-    </div>
-
-    <div id="mobileFolderActionsBackdrop" class="mobile-sheet-backdrop"></div>
-    <div id="mobileFolderActionsSheet" class="mobile-sheet">
-        <div class="mobile-sheet-drag-handle"></div>
-        <div class="mobile-sheet-content" style="padding: 10px 0 24px 0;">
-            <div id="mobileFolderActionsTitle" style="padding: 16px 20px; font-size: 0.9em; font-weight: 700; border-bottom: 1px solid var(--border); margin-bottom: 8px; color: var(--text-muted); text-align: left;">
-                Folder Options
-            </div>
-            <button id="btnMobileFolderRename" class="mobile-menu-item">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                Rename Folder
-            </button>
-            <button id="btnMobileFolderDelete" class="mobile-menu-item" style="color: var(--danger);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                Delete Folder
-            </button>
-        </div>
-    </div>
-
-    <div id="mobileFolderPickerBackdrop" class="mobile-sheet-backdrop"></div>
-    <div id="mobileFolderPickerSheet" class="mobile-sheet">
-        <div class="mobile-sheet-drag-handle"></div>
-        <div class="mobile-sheet-header">
-            <span class="mobile-sheet-title">Move to Folder</span>
-        </div>
-        <div id="mobileFolderList" class="mobile-sheet-content" style="padding: 10px 0 24px 0;">
-            <!-- Folder items render here dynamically -->
+            <button id="btnSaveLockPassword" class="btn btn-primary" style="width: 100%; padding: 12px;">Simpan & Buka</button>
         </div>
     </div>
 
     <!-- Toast Notification -->
     <div id="toast"></div>
 
-    <!-- Scripts -->
+    <!-- Main Logic Script -->
     <script type="module" src="app.js"></script>
 </body>
 </html>
