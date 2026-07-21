@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, updateDoc, onSnapshot, serverTimestamp, collection, query, limit, addDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, updateDoc, onSnapshot, serverTimestamp, collection, query, limit, addDoc, deleteDoc, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // ==========================================
 // 🔧 FIREBASE CONFIGURATION
@@ -36,11 +36,12 @@ export let currentDeviceId = getOrCreateDeviceId();
 export let unsubscribeRoomRequests = null;
 export let unsubscribeMyRequest = null;
 export let activePendingRequestId = null;
+let heartbeatInterval = null;
 
 // Gboard-style Clip Creation Mode Tab State: 'text' | 'image' | 'file'
 export let currentEditorTab = 'text';
 
-// Attachments state: { kind: 'image'|'file', data: string, fileName?: string, fileSize?: number, mimeType?: string }
+// Attachments state
 export let editorAttachment = null;
 export let previewAttachment = null;
 
@@ -279,7 +280,6 @@ export async function compressImageToDataUrl(file, maxKb = 128) {
     });
 }
 
-// Read document file & verify <= 128 KB
 export async function readDocumentFile(file, maxKb = 128) {
     const maxBytes = maxKb * 1024;
     if (file.size > maxBytes) {
@@ -296,13 +296,11 @@ export async function readDocumentFile(file, maxKb = 128) {
     };
 }
 
-// Read system clipboard for Text, Image, or File content
 export async function readClipboardContent() {
     if (navigator.clipboard && navigator.clipboard.read) {
         try {
             const items = await navigator.clipboard.read();
             for (const item of items) {
-                // 1. Check for image item
                 const imageType = item.types.find(t => t.startsWith('image/'));
                 if (imageType) {
                     try {
@@ -310,12 +308,9 @@ export async function readClipboardContent() {
                         const file = new File([blob], "pasted-image.jpg", { type: imageType });
                         const compressedDataUrl = await compressImageToDataUrl(file, 128);
                         return { kind: 'image', data: compressedDataUrl };
-                    } catch (e) {
-                        console.warn("Failed to read clipboard image blob:", e);
-                    }
+                    } catch (e) {}
                 }
                 
-                // 2. Check for text or file item
                 for (const type of item.types) {
                     if (type === 'text/plain') {
                         try {
@@ -504,6 +499,10 @@ document.addEventListener('keydown', (e) => {
 export function lockApp() {
     isAppLocked = true;
     
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    }
     if (unsubscribeClips) {
         unsubscribeClips();
         unsubscribeClips = null;
@@ -531,6 +530,7 @@ export function unlockApp() {
     startClipsRealtimeSync();
     if (isGuestRoom) {
         listenForIncomingAccessRequests();
+        startDeviceHeartbeat();
     }
 }
 
@@ -552,6 +552,22 @@ function renderSavedGoogleUser() {
         if (DOM.quickGoogleUserContainer) DOM.quickGoogleUserContainer.classList.add('hidden');
         if (DOM.btnGoogleLoginText) DOM.btnGoogleLoginText.textContent = "Sign in with Google";
     }
+}
+
+// Device Heartbeat for Guest Room active status
+function startDeviceHeartbeat() {
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(async () => {
+        if (!isAppLocked && isGuestRoom && currentRoomHash) {
+            try {
+                const roomRef = doc(db, 'guestRooms', currentRoomHash);
+                await setDoc(roomRef, {
+                    activeDeviceId: currentDeviceId,
+                    lastActiveTime: serverTimestamp()
+                }, { merge: true });
+            } catch (e) {}
+        }
+    }, 2 * 60 * 1000);
 }
 
 // ==========================================
@@ -584,20 +600,38 @@ async function handleGuestRoomLogin(rawCode) {
     const roomRef = doc(db, 'guestRooms', currentRoomHash);
     
     try {
-        const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
-        const snapshot = await getDocs(query(notesRef, limit(10)));
+        const roomDocSnap = await getDoc(roomRef);
+        const nowMs = Date.now();
         
-        if (snapshot.empty) {
+        // If room does NOT exist OR Device B is already registered active device -> Grant access immediately!
+        if (!roomDocSnap.exists() || (roomDocSnap.data().activeDeviceId === currentDeviceId)) {
             await setDoc(roomRef, {
                 roomCode: roomCode,
                 activeDeviceId: currentDeviceId,
                 activeDeviceName: getDeviceName(),
                 lastActiveTime: serverTimestamp()
-            });
+            }, { merge: true });
             unlockApp();
             return;
         }
         
+        const roomData = roomDocSnap.data();
+        const lastActiveMs = getTimeMs(roomData.lastActiveTime);
+        const isDeviceAActive = (nowMs - lastActiveMs) < (5 * 60 * 1000); // 5 minutes activity window
+        
+        if (!isDeviceAActive) {
+            // Device A went offline -> Device B takes over
+            await setDoc(roomRef, {
+                roomCode: roomCode,
+                activeDeviceId: currentDeviceId,
+                activeDeviceName: getDeviceName(),
+                lastActiveTime: serverTimestamp()
+            }, { merge: true });
+            unlockApp();
+            return;
+        }
+        
+        // Device A is actively online -> Create access request for Device A
         const requestRef = doc(db, 'guestRooms', currentRoomHash, 'requests', currentDeviceId);
         await setDoc(requestRef, {
             deviceId: currentDeviceId,
@@ -610,14 +644,22 @@ async function handleGuestRoomLogin(rawCode) {
         if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.remove('hidden');
         
         if (unsubscribeMyRequest) unsubscribeMyRequest();
-        unsubscribeMyRequest = onSnapshot(requestRef, (docSnap) => {
+        unsubscribeMyRequest = onSnapshot(requestRef, async (docSnap) => {
             if (!docSnap.exists()) return;
             const data = docSnap.data();
             
             if (data.status === 'approved') {
                 if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.add('hidden');
                 if (unsubscribeMyRequest) unsubscribeMyRequest();
-                showToast("Access granted!");
+                
+                await setDoc(roomRef, {
+                    roomCode: roomCode,
+                    activeDeviceId: currentDeviceId,
+                    activeDeviceName: getDeviceName(),
+                    lastActiveTime: serverTimestamp()
+                }, { merge: true });
+                
+                showToast("Access granted by active device!");
                 unlockApp();
             } else if (data.status === 'denied') {
                 if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.add('hidden');
@@ -640,13 +682,11 @@ function listenForIncomingAccessRequests() {
     
     unsubscribeRoomRequests = onSnapshot(requestsRef, (snapshot) => {
         snapshot.docChanges().forEach(change => {
-            if (change.type === 'added' || change.type === 'modified') {
-                const data = change.doc.data();
-                if (data.status === 'pending' && data.deviceId !== currentDeviceId) {
-                    activePendingRequestId = change.doc.id;
-                    if (DOM.requestingDeviceName) DOM.requestingDeviceName.textContent = data.deviceName || 'Device';
-                    if (DOM.accessRequestModal) DOM.accessRequestModal.classList.remove('hidden');
-                }
+            const data = change.doc.data();
+            if (data.status === 'pending' && data.deviceId !== currentDeviceId) {
+                activePendingRequestId = change.doc.id;
+                if (DOM.requestingDeviceName) DOM.requestingDeviceName.textContent = data.deviceName || 'Device';
+                if (DOM.accessRequestModal) DOM.accessRequestModal.classList.remove('hidden');
             }
         });
     });
