@@ -385,6 +385,17 @@ export function updateUndoRedoUI() {
     }
 }
 
+export function closeUndoRedoPopup() {
+    if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+    if (DOM.btnToggleUndoRedo) DOM.btnToggleUndoRedo.classList.remove('active');
+}
+
+export function openUndoRedoPopup() {
+    if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.remove('hidden');
+    if (DOM.btnToggleUndoRedo) DOM.btnToggleUndoRedo.classList.add('active');
+    updateUndoRedoUI();
+}
+
 export async function performUndo() {
     if (undoStack.length === 0) {
         showToast("Nothing to undo");
@@ -1442,7 +1453,7 @@ if (DOM.btnCancelWaitingRequest) {
 if (DOM.btnLock) {
     DOM.btnLock.addEventListener('click', () => {
         closeSearchOverlay();
-        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+        closeUndoRedoPopup();
         lockApp();
     });
 }
@@ -1455,8 +1466,11 @@ if (DOM.btnToggleUndoRedo) {
         e.stopPropagation();
         closeSearchOverlay();
         if (DOM.undoRedoPopup) {
-            DOM.undoRedoPopup.classList.toggle('hidden');
-            updateUndoRedoUI();
+            if (DOM.undoRedoPopup.classList.contains('hidden')) {
+                openUndoRedoPopup();
+            } else {
+                closeUndoRedoPopup();
+            }
         }
     });
 }
@@ -1465,7 +1479,7 @@ if (DOM.btnDoUndo) {
     DOM.btnDoUndo.addEventListener('click', async (e) => {
         e.stopPropagation();
         await performUndo();
-        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+        closeUndoRedoPopup();
     });
 }
 
@@ -1473,7 +1487,7 @@ if (DOM.btnDoRedo) {
     DOM.btnDoRedo.addEventListener('click', async (e) => {
         e.stopPropagation();
         await performRedo();
-        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+        closeUndoRedoPopup();
     });
 }
 
@@ -1483,7 +1497,7 @@ if (DOM.btnDoRedo) {
 if (DOM.btnOpenSearch) {
     DOM.btnOpenSearch.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+        closeUndoRedoPopup();
         if (DOM.headerNormalView) DOM.headerNormalView.classList.add('hidden');
         if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.remove('hidden');
         if (DOM.fabContainer) DOM.fabContainer.classList.add('hidden');
@@ -1534,7 +1548,7 @@ document.addEventListener('click', (e) => {
         const isClickInsidePopup = DOM.undoRedoPopup.contains(e.target);
         const isClickToggleBtn = DOM.btnToggleUndoRedo?.contains(e.target);
         if (!isClickInsidePopup && !isClickToggleBtn) {
-            DOM.undoRedoPopup.classList.add('hidden');
+            closeUndoRedoPopup();
         }
     }
 });
@@ -1547,7 +1561,7 @@ document.addEventListener('click', (e) => {
 if (DOM.btnFabEditor) {
     DOM.btnFabEditor.addEventListener('click', () => {
         closeSearchOverlay();
-        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+        closeUndoRedoPopup();
         openAddClipModalWithTab('text');
     });
 }
@@ -1610,7 +1624,7 @@ if (DOM.btnFullEditorSend) {
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         closeSearchOverlay();
-        if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+        closeUndoRedoPopup();
         
         try {
             const content = await readClipboardContent();
@@ -1627,8 +1641,6 @@ if (DOM.btnFabQuickPaste) {
                 }
             }
             
-            // SMART MITIGATION FALLBACK:
-            // Clipboard is empty, file from file-manager, or unreadable format
             showToast("File/Empty clipboard detected. Opening File Picker...");
             openAddClipModalWithTab('file');
             
