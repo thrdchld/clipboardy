@@ -207,16 +207,17 @@ export function escapeHtml(str) {
 }
 
 function getTimeMs(ts) {
-    if (!ts) return Date.now();
+    if (!ts) return 0;
     if (typeof ts === 'number') return ts;
     if (ts.toMillis) return ts.toMillis();
     if (ts.seconds) return ts.seconds * 1000;
-    return Date.now();
+    return 0;
 }
 
 function formatTime(timestamp) {
     if (!timestamp) return 'Just now';
     const ms = getTimeMs(timestamp);
+    if (!ms) return 'Just now';
     const date = new Date(ms);
     
     const now = new Date();
@@ -563,11 +564,12 @@ function startDeviceHeartbeat() {
                 const roomRef = doc(db, 'guestRooms', currentRoomHash);
                 await setDoc(roomRef, {
                     activeDeviceId: currentDeviceId,
+                    activeDeviceName: getDeviceName(),
                     lastActiveTime: serverTimestamp()
                 }, { merge: true });
             } catch (e) {}
         }
-    }, 2 * 60 * 1000);
+    }, 60 * 1000); // 1 minute heartbeat
 }
 
 // ==========================================
@@ -603,8 +605,25 @@ async function handleGuestRoomLogin(rawCode) {
         const roomDocSnap = await getDoc(roomRef);
         const nowMs = Date.now();
         
-        // If room does NOT exist OR Device B is already registered active device -> Grant access immediately!
-        if (!roomDocSnap.exists() || (roomDocSnap.data().activeDeviceId === currentDeviceId)) {
+        // Check if room document exists and if there is an active device registered
+        let needsApproval = false;
+        
+        if (roomDocSnap.exists()) {
+            const roomData = roomDocSnap.data();
+            const activeId = roomData.activeDeviceId;
+            
+            // If active device is NOT this device
+            if (activeId && activeId !== currentDeviceId) {
+                const lastActiveMs = getTimeMs(roomData.lastActiveTime);
+                // Check if active device has been online in the last 5 minutes
+                if (lastActiveMs && (nowMs - lastActiveMs) < (5 * 60 * 1000)) {
+                    needsApproval = true;
+                }
+            }
+        }
+        
+        if (!needsApproval) {
+            // First device in room OR active device timed out -> Become primary active device directly!
             await setDoc(roomRef, {
                 roomCode: roomCode,
                 activeDeviceId: currentDeviceId,
@@ -615,23 +634,7 @@ async function handleGuestRoomLogin(rawCode) {
             return;
         }
         
-        const roomData = roomDocSnap.data();
-        const lastActiveMs = getTimeMs(roomData.lastActiveTime);
-        const isDeviceAActive = (nowMs - lastActiveMs) < (5 * 60 * 1000); // 5 minutes activity window
-        
-        if (!isDeviceAActive) {
-            // Device A went offline -> Device B takes over
-            await setDoc(roomRef, {
-                roomCode: roomCode,
-                activeDeviceId: currentDeviceId,
-                activeDeviceName: getDeviceName(),
-                lastActiveTime: serverTimestamp()
-            }, { merge: true });
-            unlockApp();
-            return;
-        }
-        
-        // Device A is actively online -> Create access request for Device A
+        // Active Device exists & is online -> Must request approval!
         const requestRef = doc(db, 'guestRooms', currentRoomHash, 'requests', currentDeviceId);
         await setDoc(requestRef, {
             deviceId: currentDeviceId,
@@ -670,7 +673,8 @@ async function handleGuestRoomLogin(rawCode) {
         
     } catch (err) {
         console.error("Guest room authorization error:", err);
-        unlockApp();
+        showToast("Error connecting to Guest Room: " + (err.message || err));
+        // DO NOT UNLOCK APP ON ERROR! Keep locked to enforce security!
     }
 }
 
@@ -682,11 +686,13 @@ function listenForIncomingAccessRequests() {
     
     unsubscribeRoomRequests = onSnapshot(requestsRef, (snapshot) => {
         snapshot.docChanges().forEach(change => {
-            const data = change.doc.data();
-            if (data.status === 'pending' && data.deviceId !== currentDeviceId) {
-                activePendingRequestId = change.doc.id;
-                if (DOM.requestingDeviceName) DOM.requestingDeviceName.textContent = data.deviceName || 'Device';
-                if (DOM.accessRequestModal) DOM.accessRequestModal.classList.remove('hidden');
+            if (change.type === 'added' || change.type === 'modified') {
+                const data = change.doc.data();
+                if (data.status === 'pending' && data.deviceId !== currentDeviceId) {
+                    activePendingRequestId = change.doc.id;
+                    if (DOM.requestingDeviceName) DOM.requestingDeviceName.textContent = data.deviceName || 'Device';
+                    if (DOM.accessRequestModal) DOM.accessRequestModal.classList.remove('hidden');
+                }
             }
         });
     });
@@ -718,7 +724,7 @@ function startClipsRealtimeSync() {
             const data = docSnap.data();
             const clipTs = getTimeMs(data.timestamp);
             
-            if (isGuestRoom && clipTs < startOfTodayWib) {
+            if (isGuestRoom && clipTs > 0 && clipTs < startOfTodayWib) {
                 return;
             }
             
