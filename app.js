@@ -31,6 +31,10 @@ export let isAppLocked = true;
 export let isSearchMode = false;
 export let activePreviewClipId = null;
 
+// Attachments state
+export let editorAttachment = null;   // { type: 'image'|'file', data: string, name?: string, size?: number }
+export let previewAttachment = null;  // { type: 'image'|'file', data: string, name?: string, size?: number }
+
 // DOM Elements
 const DOM = {
     authScreen: document.getElementById('authScreen'),
@@ -77,12 +81,22 @@ const DOM = {
     
     fullPageEditorModal: document.getElementById('fullPageEditorModal'),
     btnCloseFullPageEditor: document.getElementById('btnCloseFullPageEditor'),
+    btnAttachImage: document.getElementById('btnAttachImage'),
+    btnAttachFile: document.getElementById('btnAttachFile'),
+    inputEditorImage: document.getElementById('inputEditorImage'),
+    inputEditorFile: document.getElementById('inputEditorFile'),
+    editorAttachmentPreview: document.getElementById('editorAttachmentPreview'),
     btnFullEditorPaste: document.getElementById('btnFullEditorPaste'),
     btnFullEditorSend: document.getElementById('btnFullEditorSend'),
     txtFullPageEditor: document.getElementById('txtFullPageEditor'),
     
     fullPagePreviewModal: document.getElementById('fullPagePreviewModal'),
     btnClosePreviewModal: document.getElementById('btnClosePreviewModal'),
+    btnPreviewAttachImage: document.getElementById('btnPreviewAttachImage'),
+    btnPreviewAttachFile: document.getElementById('btnPreviewAttachFile'),
+    inputPreviewImage: document.getElementById('inputPreviewImage'),
+    inputPreviewFile: document.getElementById('inputPreviewFile'),
+    previewAttachmentDisplay: document.getElementById('previewAttachmentDisplay'),
     btnPreviewCopy: document.getElementById('btnPreviewCopy'),
     btnPreviewDelete: document.getElementById('btnPreviewDelete'),
     btnPreviewSave: document.getElementById('btnPreviewSave'),
@@ -92,7 +106,7 @@ const DOM = {
 };
 
 // ==========================================
-// 🔐 AUTH & CRYPTO UTILITIES
+// 🔐 UTILITIES & ATTACHMENT COMPRESSION
 // ==========================================
 export async function hashPassword(str) {
     const encoder = new TextEncoder();
@@ -152,6 +166,81 @@ function formatTime(timestamp) {
     return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${timeStr}`;
 }
 
+// Compress image file automatically to under 128 KB
+export async function compressImageToDataUrl(file, maxKb = 128) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                
+                // Downscale if very high resolution
+                const maxDim = 1000;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                let quality = 0.8;
+                let dataUrl = canvas.toDataURL('image/jpeg', quality);
+                
+                // Iteratively reduce quality if exceeding limit
+                while (dataUrl.length > maxKb * 1024 * 1.33 && quality > 0.15) {
+                    quality -= 0.1;
+                    dataUrl = canvas.toDataURL('image/jpeg', quality);
+                }
+                
+                if (dataUrl.length > maxKb * 1024 * 1.33) {
+                    canvas.width = Math.round(width * 0.6);
+                    canvas.height = Math.round(height * 0.6);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+                }
+                
+                resolve(dataUrl);
+            };
+            img.onerror = () => reject(new Error("Failed to load image"));
+            img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+    });
+}
+
+// Read document file & verify <= 128 KB
+export async function readDocumentFile(file, maxKb = 128) {
+    const maxBytes = maxKb * 1024;
+    if (file.size > maxBytes) {
+        const kbSize = Math.round(file.size / 1024);
+        throw new Error(`File size (${kbSize} KB) exceeds maximum allowed limit of ${maxKb} KB!`);
+    }
+    
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/octet-stream',
+            data: reader.result
+        });
+        reader.onerror = () => reject(new Error("Failed to read document file"));
+        reader.readAsDataURL(file);
+    });
+}
+
 // ==========================================
 // 🔒 LOCK & SCREEN MANAGEMENT
 // ==========================================
@@ -207,11 +296,12 @@ function startClipsRealtimeSync() {
             clipsArray.push({
                 id: docSnap.id,
                 text: data.text || data.content || '',
-                timestamp: data.timestamp
+                timestamp: data.timestamp,
+                imageData: data.imageData || null,
+                fileData: data.fileData || null
             });
         });
         
-        // Client-side LIFO sorting (newest first)
         clipsArray.sort((a, b) => getTimeMs(b.timestamp) - getTimeMs(a.timestamp));
         
         if (DOM.syncIndicator) {
@@ -233,16 +323,19 @@ function startClipsRealtimeSync() {
     });
 }
 
-async function createNewClip(text) {
-    if (!text || !text.trim()) return;
-    const cleanText = text.trim();
+async function createNewClip(text, attachment = null) {
+    const cleanText = (text || '').trim();
+    
+    if (!cleanText && !attachment) {
+        showToast("Write clip text or attach a file first!");
+        return;
+    }
     
     if (!currentRoomHash) {
         showToast("Room is required!");
         return;
     }
     
-    // Ensure Firebase Auth session is ready
     if (!auth.currentUser) {
         try {
             const cred = await signInAnonymously(auth);
@@ -258,13 +351,31 @@ async function createNewClip(text) {
         if (DOM.syncIndicator) DOM.syncIndicator.classList.add('saving');
         const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
         
-        await addDoc(notesRef, {
+        const payload = {
             text: cleanText,
             timestamp: serverTimestamp(),
             userId: auth.currentUser ? auth.currentUser.uid : 'guest'
-        });
+        };
+        
+        if (attachment) {
+            if (attachment.type === 'image') {
+                payload.imageData = attachment.data;
+            } else if (attachment.type === 'file') {
+                payload.fileData = {
+                    name: attachment.name,
+                    size: attachment.size,
+                    type: attachment.type,
+                    data: attachment.data
+                };
+            }
+        }
+        
+        await addDoc(notesRef, payload);
         
         if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
+        editorAttachment = null;
+        renderEditorAttachment();
+        
         showToast("Clip saved!");
     } catch (err) {
         console.error("Failed to save clip:", err);
@@ -274,14 +385,34 @@ async function createNewClip(text) {
     }
 }
 
-async function updateClip(clipId, newText) {
-    if (!clipId || !newText || !newText.trim()) return;
+async function updateClip(clipId, newText, attachment = null) {
+    if (!clipId) return;
     try {
         const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', clipId);
-        await updateDoc(docRef, {
-            text: newText.trim(),
+        const payload = {
+            text: (newText || '').trim(),
             timestamp: serverTimestamp()
-        });
+        };
+        
+        if (attachment === 'DELETE') {
+            payload.imageData = null;
+            payload.fileData = null;
+        } else if (attachment) {
+            if (attachment.type === 'image') {
+                payload.imageData = attachment.data;
+                payload.fileData = null;
+            } else if (attachment.type === 'file') {
+                payload.fileData = {
+                    name: attachment.name,
+                    size: attachment.size,
+                    type: attachment.type,
+                    data: attachment.data
+                };
+                payload.imageData = null;
+            }
+        }
+        
+        await updateDoc(docRef, payload);
         showToast("Clip updated!");
     } catch (err) {
         console.error("Failed to update clip:", err);
@@ -301,7 +432,6 @@ async function deleteClip(clipId) {
 }
 
 // Search across clips in history
-// ponytail: [search query limit 200] -> [integrate full-text search engine if room exceeds 10,000 clips]
 async function performSearch() {
     const term = (DOM.searchInput?.value || '').trim().toLowerCase();
     
@@ -324,11 +454,14 @@ async function performSearch() {
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
             const text = data.text || data.content || '';
-            if (text.toLowerCase().includes(term)) {
+            const fileName = data.fileData?.name || '';
+            if (text.toLowerCase().includes(term) || fileName.toLowerCase().includes(term)) {
                 matchedClips.push({
                     id: docSnap.id,
                     text: text,
-                    timestamp: data.timestamp
+                    timestamp: data.timestamp,
+                    imageData: data.imageData || null,
+                    fileData: data.fileData || null
                 });
             }
         });
@@ -363,7 +496,6 @@ function closeSearchOverlay() {
 // 🎨 FRONTEND UI RENDERING
 // ==========================================
 
-// Card text limited to 3 lines clamp & non-selectable; clicking opens preview modal
 function renderClips(clipsList, isSearchResult = false) {
     if (!DOM.clipGrid) return;
     DOM.clipGrid.innerHTML = '';
@@ -389,9 +521,23 @@ function renderClips(clipsList, isSearchResult = false) {
         
         const timeStr = formatTime(clip.timestamp);
         
+        let attachmentHtml = '';
+        if (clip.imageData) {
+            attachmentHtml = `<img src="${clip.imageData}" class="clip-card-attachment-thumb" alt="Attachment Image">`;
+        } else if (clip.fileData) {
+            const kbSize = Math.round((clip.fileData.size || 0) / 1024);
+            attachmentHtml = `
+                <div class="clip-card-attachment-file">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                    <span>${escapeHtml(clip.fileData.name)} (${kbSize} KB)</span>
+                </div>
+            `;
+        }
+        
         card.innerHTML = `
             <div class="clip-body" title="Click to view & edit full clip">
-                <div class="clip-text">${escapeHtml(clip.text)}</div>
+                ${attachmentHtml}
+                <div class="clip-text">${escapeHtml(clip.text || '(No text)')}</div>
                 <div class="clip-meta">${timeStr}</div>
             </div>
             <div class="clip-actions">
@@ -407,10 +553,6 @@ function renderClips(clipsList, isSearchResult = false) {
         
         // Open Full Page Preview & Edit Modal on card click
         card.addEventListener('click', (e) => {
-            // Auto-close topbar search if active
-            closeSearchOverlay();
-            
-            // Do not trigger if clicking copy or delete action buttons
             if (e.target.closest('.btn-copy') || e.target.closest('.btn-delete-clip')) {
                 return;
             }
@@ -422,7 +564,8 @@ function renderClips(clipsList, isSearchResult = false) {
         copyBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
-                await navigator.clipboard.writeText(clip.text);
+                const textToCopy = clip.text || (clip.fileData ? clip.fileData.name : 'Clip Attachment');
+                await navigator.clipboard.writeText(textToCopy);
                 showToast("Clip copied to clipboard!");
                 copyBtn.innerHTML = `✓ Copied`;
                 setTimeout(() => {
@@ -445,11 +588,106 @@ function renderClips(clipsList, isSearchResult = false) {
     });
 }
 
+// Attachment UI Rendering inside Editor
+function renderEditorAttachment() {
+    if (!DOM.editorAttachmentPreview) return;
+    
+    if (!editorAttachment) {
+        DOM.editorAttachmentPreview.classList.add('hidden');
+        DOM.editorAttachmentPreview.innerHTML = '';
+        return;
+    }
+    
+    DOM.editorAttachmentPreview.classList.remove('hidden');
+    if (editorAttachment.type === 'image') {
+        DOM.editorAttachmentPreview.innerHTML = `
+            <img src="${editorAttachment.data}" class="attachment-image-display" alt="Attached Image">
+            <button id="btnRemoveEditorAttachment" class="btn-detach" title="Remove attachment">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                Remove
+            </button>
+        `;
+    } else if (editorAttachment.type === 'file') {
+        const kbSize = Math.round((editorAttachment.size || 0) / 1024);
+        DOM.editorAttachmentPreview.innerHTML = `
+            <div class="attachment-file-info">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                <span class="attachment-file-name">${escapeHtml(editorAttachment.name)} (${kbSize} KB)</span>
+            </div>
+            <button id="btnRemoveEditorAttachment" class="btn-detach" title="Remove attachment">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                Remove
+            </button>
+        `;
+    }
+    
+    const removeBtn = document.getElementById('btnRemoveEditorAttachment');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+            editorAttachment = null;
+            renderEditorAttachment();
+        });
+    }
+}
+
+// Attachment UI Rendering inside Preview Modal
+function renderPreviewAttachment() {
+    if (!DOM.previewAttachmentDisplay) return;
+    
+    if (!previewAttachment) {
+        DOM.previewAttachmentDisplay.classList.add('hidden');
+        DOM.previewAttachmentDisplay.innerHTML = '';
+        return;
+    }
+    
+    DOM.previewAttachmentDisplay.classList.remove('hidden');
+    if (previewAttachment.type === 'image') {
+        DOM.previewAttachmentDisplay.innerHTML = `
+            <img src="${previewAttachment.data}" class="attachment-image-display" alt="Attached Image">
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <a href="${previewAttachment.data}" download="attachment.jpg" class="btn" style="padding: 4px 10px; font-size: 0.8rem;" title="Download image">Download</a>
+                <button id="btnRemovePreviewAttachment" class="btn-detach" title="Remove attachment">Remove</button>
+            </div>
+        `;
+    } else if (previewAttachment.type === 'file') {
+        const kbSize = Math.round((previewAttachment.size || 0) / 1024);
+        DOM.previewAttachmentDisplay.innerHTML = `
+            <div class="attachment-file-info">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                <span class="attachment-file-name">${escapeHtml(previewAttachment.name)} (${kbSize} KB)</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <a href="${previewAttachment.data}" download="${escapeHtml(previewAttachment.name)}" class="btn" style="padding: 4px 10px; font-size: 0.8rem;" title="Download file">Download</a>
+                <button id="btnRemovePreviewAttachment" class="btn-detach" title="Remove attachment">Remove</button>
+            </div>
+        `;
+    }
+    
+    const removeBtn = document.getElementById('btnRemovePreviewAttachment');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+            previewAttachment = 'DELETE';
+            renderPreviewAttachment();
+        });
+    }
+}
+
 function openPreviewModal(clip) {
     activePreviewClipId = clip.id;
     if (DOM.txtPreviewText) {
         DOM.txtPreviewText.value = clip.text;
     }
+    
+    if (clip.imageData) {
+        previewAttachment = { type: 'image', data: clip.imageData };
+    } else if (clip.fileData) {
+        previewAttachment = { type: 'file', ...clip.fileData };
+    } else {
+        previewAttachment = null;
+    }
+    
+    renderPreviewAttachment();
+    
     if (DOM.fullPagePreviewModal) {
         DOM.fullPagePreviewModal.classList.remove('hidden');
     }
@@ -457,6 +695,7 @@ function openPreviewModal(clip) {
 
 function closePreviewModal() {
     activePreviewClipId = null;
+    previewAttachment = null;
     if (DOM.fullPagePreviewModal) {
         DOM.fullPagePreviewModal.classList.add('hidden');
     }
@@ -608,7 +847,7 @@ if (DOM.btnLock) {
 }
 
 // ==========================================
-// 🔍 EXPANDABLE TOP BAR SEARCH LISTENERS & AUTO-CLOSE
+// 🔍 EXPANDABLE TOP BAR SEARCH LISTENERS
 // ==========================================
 if (DOM.btnOpenSearch) {
     DOM.btnOpenSearch.addEventListener('click', (e) => {
@@ -667,6 +906,8 @@ document.addEventListener('click', (e) => {
 if (DOM.btnFabEditor) {
     DOM.btnFabEditor.addEventListener('click', () => {
         closeSearchOverlay();
+        editorAttachment = null;
+        renderEditorAttachment();
         if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
         if (DOM.txtFullPageEditor) {
             DOM.txtFullPageEditor.value = '';
@@ -675,9 +916,61 @@ if (DOM.btnFabEditor) {
     });
 }
 
+// Editor Attachment Actions
+if (DOM.btnAttachImage) {
+    DOM.btnAttachImage.addEventListener('click', () => {
+        DOM.inputEditorImage?.click();
+    });
+}
+
+if (DOM.inputEditorImage) {
+    DOM.inputEditorImage.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                showToast("Compressing image...");
+                const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                editorAttachment = { type: 'image', data: compressedDataUrl };
+                renderEditorAttachment();
+                showToast("Image attached (compressed <128KB)");
+            } catch (err) {
+                console.error("Image error:", err);
+                showToast("Failed to process image");
+            }
+        }
+        e.target.value = '';
+    });
+}
+
+if (DOM.btnAttachFile) {
+    DOM.btnAttachFile.addEventListener('click', () => {
+        DOM.inputEditorFile?.click();
+    });
+}
+
+if (DOM.inputEditorFile) {
+    DOM.inputEditorFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const fileObj = await readDocumentFile(file, 128);
+                editorAttachment = { type: 'file', ...fileObj };
+                renderEditorAttachment();
+                showToast("File attached (" + Math.round(file.size / 1024) + " KB)");
+            } catch (err) {
+                console.error("File error:", err);
+                showToast(err.message || "File size exceeds 128KB limit!");
+            }
+        }
+        e.target.value = '';
+    });
+}
+
 // Full Page Editor: Close Button
 if (DOM.btnCloseFullPageEditor) {
     DOM.btnCloseFullPageEditor.addEventListener('click', () => {
+        editorAttachment = null;
+        renderEditorAttachment();
         if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.add('hidden');
     });
 }
@@ -702,11 +995,11 @@ if (DOM.btnFullEditorPaste) {
 if (DOM.btnFullEditorSend) {
     DOM.btnFullEditorSend.addEventListener('click', async () => {
         const text = (DOM.txtFullPageEditor?.value || '').trim();
-        if (text) {
-            await createNewClip(text);
+        if (text || editorAttachment) {
+            await createNewClip(text, editorAttachment);
             if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.add('hidden');
         } else {
-            showToast("Write clip text first");
+            showToast("Write text or attach a file first");
         }
     });
 }
@@ -733,6 +1026,55 @@ if (DOM.btnFabQuickPaste) {
 // ==========================================
 // 📖 FULL PAGE PREVIEW MODAL LISTENERS
 // ==========================================
+if (DOM.btnPreviewAttachImage) {
+    DOM.btnPreviewAttachImage.addEventListener('click', () => {
+        DOM.inputPreviewImage?.click();
+    });
+}
+
+if (DOM.inputPreviewImage) {
+    DOM.inputPreviewImage.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                showToast("Compressing image...");
+                const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                previewAttachment = { type: 'image', data: compressedDataUrl };
+                renderPreviewAttachment();
+                showToast("Image attached (compressed <128KB)");
+            } catch (err) {
+                console.error("Image error:", err);
+                showToast("Failed to process image");
+            }
+        }
+        e.target.value = '';
+    });
+}
+
+if (DOM.btnPreviewAttachFile) {
+    DOM.btnPreviewAttachFile.addEventListener('click', () => {
+        DOM.inputPreviewFile?.click();
+    });
+}
+
+if (DOM.inputPreviewFile) {
+    DOM.inputPreviewFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const fileObj = await readDocumentFile(file, 128);
+                previewAttachment = { type: 'file', ...fileObj };
+                renderPreviewAttachment();
+                showToast("File attached (" + Math.round(file.size / 1024) + " KB)");
+            } catch (err) {
+                console.error("File error:", err);
+                showToast(err.message || "File size exceeds 128KB limit!");
+            }
+        }
+        e.target.value = '';
+    });
+}
+
 if (DOM.btnClosePreviewModal) {
     DOM.btnClosePreviewModal.addEventListener('click', () => {
         closePreviewModal();
@@ -755,8 +1097,8 @@ if (DOM.btnPreviewCopy) {
 if (DOM.btnPreviewSave) {
     DOM.btnPreviewSave.addEventListener('click', async () => {
         const text = (DOM.txtPreviewText?.value || '').trim();
-        if (activePreviewClipId && text) {
-            await updateClip(activePreviewClipId, text);
+        if (activePreviewClipId) {
+            await updateClip(activePreviewClipId, text, previewAttachment);
             closePreviewModal();
         }
     });
