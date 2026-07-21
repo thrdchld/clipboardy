@@ -197,7 +197,6 @@ export async function compressImageToDataUrl(file, maxKb = 128) {
                 let quality = 0.8;
                 let dataUrl = canvas.toDataURL('image/jpeg', quality);
                 
-                // Iteratively reduce quality if exceeding limit
                 while (dataUrl.length > maxKb * 1024 * 1.33 && quality > 0.15) {
                     quality -= 0.1;
                     dataUrl = canvas.toDataURL('image/jpeg', quality);
@@ -225,7 +224,7 @@ export async function readDocumentFile(file, maxKb = 128) {
     const maxBytes = maxKb * 1024;
     if (file.size > maxBytes) {
         const kbSize = Math.round(file.size / 1024);
-        throw new Error(`File size (${kbSize} KB) exceeds maximum allowed limit of ${maxKb} KB!`);
+        throw new Error(`File size (${kbSize} KB) exceeds limit of ${maxKb} KB!`);
     }
     
     return new Promise((resolve, reject) => {
@@ -239,6 +238,51 @@ export async function readDocumentFile(file, maxKb = 128) {
         reader.onerror = () => reject(new Error("Failed to read document file"));
         reader.readAsDataURL(file);
     });
+}
+
+// Read clipboard for text, image, or document file
+export async function readClipboardContent() {
+    // 1. Try rich Clipboard API first (supports images)
+    if (navigator.clipboard && navigator.clipboard.read) {
+        try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+                // Check for image types in clipboard
+                const imageType = item.types.find(t => t.startsWith('image/'));
+                if (imageType) {
+                    const blob = await item.getType(imageType);
+                    const file = new File([blob], "clipboard-image.jpg", { type: imageType });
+                    const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                    return { type: 'image', data: compressedDataUrl };
+                }
+                
+                // Check for text
+                if (item.types.includes('text/plain')) {
+                    const blob = await item.getType('text/plain');
+                    const text = await blob.text();
+                    if (text && text.trim()) {
+                        return { type: 'text', text: text.trim() };
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn("navigator.clipboard.read fallback:", err);
+        }
+    }
+    
+    // 2. Fallback to standard readText
+    if (navigator.clipboard && navigator.clipboard.readText) {
+        try {
+            const text = await navigator.clipboard.readText();
+            if (text && text.trim()) {
+                return { type: 'text', text: text.trim() };
+            }
+        } catch (err) {
+            console.warn("navigator.clipboard.readText fallback:", err);
+        }
+    }
+    
+    return null;
 }
 
 // ==========================================
@@ -705,6 +749,67 @@ function closePreviewModal() {
 // 🚀 EVENT LISTENERS & INITIALIZATION
 // ==========================================
 
+// Global Paste Event Listener (supports pasting images/files/text via Ctrl+V or OS paste)
+document.addEventListener('paste', async (e) => {
+    if (isAppLocked) return;
+    
+    const items = e.clipboardData?.items || [];
+    let imageItem = null;
+    let fileItem = null;
+    
+    for (const item of items) {
+        if (item.type.startsWith('image/')) {
+            imageItem = item;
+            break;
+        } else if (item.kind === 'file') {
+            fileItem = item;
+        }
+    }
+    
+    if (imageItem) {
+        e.preventDefault();
+        const file = imageItem.getAsFile();
+        if (file) {
+            try {
+                showToast("Compressing pasted image...");
+                const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                
+                if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+                    editorAttachment = { type: 'image', data: compressedDataUrl };
+                    renderEditorAttachment();
+                    showToast("Image attached to clip");
+                } else {
+                    await createNewClip('', { type: 'image', data: compressedDataUrl });
+                    showToast("Image clip saved from clipboard!");
+                }
+            } catch (err) {
+                console.error("Paste image error:", err);
+                showToast("Failed to process pasted image");
+            }
+        }
+    } else if (fileItem) {
+        e.preventDefault();
+        const file = fileItem.getAsFile();
+        if (file) {
+            try {
+                const fileObj = await readDocumentFile(file, 128);
+                
+                if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+                    editorAttachment = { type: 'file', ...fileObj };
+                    renderEditorAttachment();
+                    showToast("File attached to clip");
+                } else {
+                    await createNewClip('', { type: 'file', ...fileObj });
+                    showToast("File clip saved from clipboard!");
+                }
+            } catch (err) {
+                console.error("Paste file error:", err);
+                showToast(err.message || "File size exceeds 128KB limit!");
+            }
+        }
+    }
+});
+
 // Network connection listeners
 window.addEventListener('online', () => {
     if (DOM.syncIndicator) {
@@ -975,14 +1080,24 @@ if (DOM.btnCloseFullPageEditor) {
     });
 }
 
-// Full Page Editor: Paste Button
+// Full Page Editor: Paste Button (Supports text & images)
 if (DOM.btnFullEditorPaste) {
     DOM.btnFullEditorPaste.addEventListener('click', async () => {
         try {
-            const text = await navigator.clipboard.readText();
-            if (text && DOM.txtFullPageEditor) {
-                DOM.txtFullPageEditor.value = text;
-                showToast("Text pasted from clipboard!");
+            const content = await readClipboardContent();
+            if (content) {
+                if (content.type === 'image') {
+                    editorAttachment = { type: 'image', data: content.data };
+                    renderEditorAttachment();
+                    showToast("Pasted image attached!");
+                } else if (content.type === 'text') {
+                    if (DOM.txtFullPageEditor) {
+                        DOM.txtFullPageEditor.value = content.text;
+                    }
+                    showToast("Pasted text from clipboard!");
+                }
+            } else {
+                showToast("Allow clipboard access or copy content first");
             }
         } catch (err) {
             console.error("Failed to read clipboard:", err);
@@ -1004,17 +1119,22 @@ if (DOM.btnFullEditorSend) {
     });
 }
 
-// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save
+// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save (Supports text & images)
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         closeSearchOverlay();
         try {
-            const text = await navigator.clipboard.readText();
-            if (text && text.trim()) {
-                await createNewClip(text.trim());
-                showToast("Clip saved from clipboard!");
+            const content = await readClipboardContent();
+            if (content) {
+                if (content.type === 'image') {
+                    await createNewClip('', { type: 'image', data: content.data });
+                    showToast("Pasted image saved to clips!");
+                } else if (content.type === 'text') {
+                    await createNewClip(content.text);
+                    showToast("Pasted clip saved!");
+                }
             } else {
-                showToast("Clipboard is empty!");
+                showToast("Clipboard is empty or inaccessible!");
             }
         } catch (err) {
             console.error("Failed to read clipboard:", err);
