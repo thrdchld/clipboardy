@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Clipboardy - Multi-Device Clipboard</title>
+    
+    <!-- Favicon and PWA Meta -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#F7F5F0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- Modern Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registered', reg))
+                    .catch(err => console.error('Service Worker registration failed', err));
+            });
+        }
+    </script>
+</head>
+<body>
+
+    <!-- Lock / Login Screen -->
+    <div id="authScreen">
+        <div id="initialAuthContainer" class="auth-box">
+            <h1 style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; margin-bottom: 6px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                </svg>
+                Clipboardy
+            </h1>
+            <p class="text-muted" style="margin-bottom: 20px; font-size: 0.9rem;">Instant sync across all your devices.</p>
+            
+            <!-- Quick Resume Previous Google Account -->
+            <div id="quickGoogleUserContainer" class="hidden" style="margin-bottom: 14px; text-align: center; background: var(--bg-base); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px;">
+                    <img id="quickUserAvatar" src="https://via.placeholder.com/40" alt="Avatar" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary);">
+                    <div style="text-align: left;">
+                        <div id="quickUserName" style="font-weight: 700; font-size: 0.9rem;">Google User</div>
+                        <div id="quickUserEmail" class="text-muted" style="font-size: 0.75rem;">user@gmail.com</div>
+                    </div>
+                </div>
+                <button id="btnQuickContinueGoogle" class="btn btn-primary" style="width: 100%; padding: 10px;">
+                    Continue as <span id="quickUserShortName">User</span>
+                </button>
+            </div>
+
+            <!-- Standard Google Login Button -->
+            <button id="btnGoogleLogin" class="btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: white; color: #374151; border: 1px solid #d1d5db; padding: 11px; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17.64 9.205c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+                    <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.938 5.482 18 9 18z" fill="#34A853"/>
+                    <path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71 0-.593.102-1.17.282-1.71V4.958H.956C.347 6.173 0 7.548 0 9s.347 2.827.956 4.042l3.008-2.332z" fill="#FBBC05"/>
+                    <path d="M9 3.58c1.32 0 2.507.454 3.44 1.347l2.582-2.58C13.463.89 11.426 0 9 0 5.482 0 2.438 2.062.956 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+                </svg>
+                <span id="btnGoogleLoginText">Sign in with Google</span>
+            </button>
+            
+            <!-- Or Divider -->
+            <div style="display: flex; align-items: center; margin: 16px 0; color: var(--text-muted); font-size: 0.85rem;">
+                <hr style="flex-grow: 1; border: none; border-top: 1px solid var(--border); margin-right: 10px;">
+                <span>or Guest Room</span>
+                <hr style="flex-grow: 1; border: none; border-top: 1px solid var(--border); margin-left: 10px;">
+            </div>
+            
+            <!-- Guest Room Area -->
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+                <input type="text" id="roomNameInput" class="input-field" placeholder="Enter Room Code (text or number)" style="text-align: center;" autocomplete="off">
+                <button id="loginBtn" class="btn btn-primary" style="width: 100%;">Join Guest Room</button>
+                <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px;">
+                    Guest room clips reset daily at 00:00 WIB (GMT+7).
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Layout -->
+    <div id="appScreen" class="hidden">
+        
+        <!-- Header -->
+        <header>
+            <!-- Normal Header State -->
+            <div id="headerNormalView" class="header-normal-view">
+                <div class="brand">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                    <span id="headerTitleText">Clipboardy</span>
+                    <span id="syncIndicator" class="status-dot" title="Synced"></span>
+                </div>
+
+                <div class="header-actions">
+                    <!-- Search Icon Button -->
+                    <button id="btnOpenSearch" class="btn-icon" title="Search Clips" aria-label="Search Clips">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </button>
+
+                    <!-- History Clock Undo/Redo Button (Between Search & Lock) -->
+                    <div style="position: relative;">
+                        <button id="btnToggleUndoRedo" class="btn-icon" title="History (Undo / Redo)" aria-label="History (Undo / Redo)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>
+                        </button>
+                        
+                        <!-- Dropdown Popup Menu for Undo & Redo -->
+                        <div id="undoRedoPopup" class="undo-redo-popup hidden">
+                            <div class="undo-popup-header">History (50 max)</div>
+                            <button id="btnDoUndo" class="undo-popup-item" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                    <span style="font-weight: 600;">Undo</span>
+                                    <span id="undoSubtext" style="font-size: 0.72rem; opacity: 0.7;">No actions</span>
+                                </div>
+                            </button>
+                            <button id="btnDoRedo" class="undo-popup-item" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>
+                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                    <span style="font-weight: 600;">Redo</span>
+                                    <span id="redoSubtext" style="font-size: 0.72rem; opacity: 0.7;">No actions</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lock Button -->
+                    <button id="btnLock" class="btn btn-danger" title="Lock Application" style="padding: 6px 10px; font-size: 0.82rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        <span class="btn-text">Lock</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Expandable Top Bar Search View -->
+            <div id="headerSearchOverlay" class="header-search-overlay hidden">
+                <div class="search-input-box">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); flex-shrink: 0;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="searchInput" placeholder="Search" aria-label="Search clips">
+                </div>
+                <button id="btnSearch" class="btn-search-trigger" title="Execute Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </button>
+                <button id="btnCloseSearch" class="btn-icon" title="Close Search" aria-label="Close Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Scroll Area -->
+        <div class="main-scroll">
+            <!-- Search Notification Banner -->
+            <div id="searchBanner" class="search-banner hidden">
+                <span id="searchBannerText">Search results...</span>
+                <button id="btnResetSearchBanner" class="btn" style="padding: 2px 8px; font-size: 0.75rem; background: var(--bg-surface);">Show All Clips</button>
+            </div>
+
+            <!-- Clips Grid -->
+            <div id="clipGrid">
+                <!-- Cards render here dynamically via JS -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.4;">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                </svg>
+                <h3>No clips yet</h3>
+                <p>Use the (+) button at bottom right to write a new clip, or the Paste button to auto-save.</p>
+            </div>
+        </div>
+
+        <!-- 2 STACKED FLOATING ACTION BUTTONS (FAB Top & Bottom) -->
+        <div id="fabContainer" class="fab-container">
+            <!-- FAB Top: Plus (+) for Full Page Text Editor Modal -->
+            <button id="btnFabEditor" class="fab fab-top" title="Write New Clip" aria-label="Write New Clip">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+            
+            <!-- FAB Bottom: Paste Icon for Automatic Paste & Instant Save -->
+            <button id="btnFabQuickPaste" class="fab fab-bottom" title="Auto Paste & Save" aria-label="Auto Paste & Save">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- FULL PAGE TEXT EDITOR MODAL -->
+    <div id="fullPageEditorModal" class="fullpage-editor-overlay hidden">
+        <div class="fullpage-editor-container">
+            <!-- Header (Close & Title only) -->
+            <div class="fullpage-editor-header">
+                <button id="btnCloseFullPageEditor" class="btn-icon" title="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+                <span class="fullpage-editor-title">New Clip</span>
+                <div style="width: 32px;"></div> <!-- Spacer for title centering -->
+            </div>
+            
+            <div class="fullpage-editor-body">
+                <!-- Attachment preview container in editor -->
+                <div id="editorAttachmentPreview" class="attachment-preview-box hidden">
+                    <!-- Dynamic preview rendered via JS -->
+                </div>
+                
+                <textarea id="txtFullPageEditor" class="fullpage-textarea" placeholder="Write or edit clip text here..."></textarea>
+            </div>
+
+            <!-- Bottom Bar for Editor Actions -->
+            <div class="fullpage-editor-bottombar">
+                <div class="bottombar-actions-left">
+                    <!-- Single Attachment Button & Popup -->
+                    <div style="position: relative;">
+                        <button id="btnAttachToggle" class="btn" title="Attach Image or File">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                            Attach
+                        </button>
+                        
+                        <!-- Attachment Popup Dropdown -->
+                        <div id="editorAttachmentPopup" class="attachment-popup hidden">
+                            <button id="btnChooseImage" class="attachment-popup-item">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                Image (<128KB)
+                            </button>
+                            <button id="btnChooseFile" class="attachment-popup-item">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                File (<128KB)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Hidden file inputs -->
+                    <input type="file" id="inputEditorImage" accept="image/*" style="display: none;">
+                    <input type="file" id="inputEditorFile" style="display: none;">
+
+                    <button id="btnFullEditorPaste" class="btn" title="Paste from Clipboard">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                        Paste
+                    </button>
+                </div>
+
+                <div class="bottombar-actions-right">
+                    <button id="btnFullEditorSend" class="btn btn-primary" title="Save Clip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FULL PAGE CLIP PREVIEW & EDIT MODAL -->
+    <div id="fullPagePreviewModal" class="fullpage-editor-overlay hidden">
+        <div class="fullpage-editor-container">
+            <!-- Header (Close & Title only) -->
+            <div class="fullpage-editor-header">
+                <button id="btnClosePreviewModal" class="btn-icon" title="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+                <span class="fullpage-editor-title">Clip Preview</span>
+                <div style="width: 32px;"></div>
+            </div>
+            
+            <div class="fullpage-editor-body">
+                <!-- Preview attachment display box -->
+                <div id="previewAttachmentDisplay" class="attachment-preview-box hidden">
+                    <!-- Dynamic preview rendered via JS -->
+                </div>
+
+                <textarea id="txtPreviewText" class="fullpage-textarea" placeholder="Clip content..."></textarea>
+            </div>
+
+            <!-- Bottom Bar for Preview Actions -->
+            <div class="fullpage-editor-bottombar">
+                <div class="bottombar-actions-left">
+                    <!-- Single Attachment Button & Popup -->
+                    <div style="position: relative;">
+                        <button id="btnPreviewAttachToggle" class="btn" title="Add Image or File">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                            Attach
+                        </button>
+                        
+                        <!-- Attachment Popup Dropdown -->
+                        <div id="previewAttachmentPopup" class="attachment-popup hidden">
+                            <button id="btnPreviewChooseImage" class="attachment-popup-item">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                Image (<128KB)
+                            </button>
+                            <button id="btnPreviewChooseFile" class="attachment-popup-item">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                File (<128KB)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Hidden file inputs -->
+                    <input type="file" id="inputPreviewImage" accept="image/*" style="display: none;">
+                    <input type="file" id="inputPreviewFile" style="display: none;">
+
+                    <button id="btnPreviewCopy" class="btn" title="Copy Text">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Copy
+                    </button>
+                    <button id="btnPreviewDelete" class="btn btn-danger" title="Delete Clip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+
+                <div class="bottombar-actions-right">
+                    <button id="btnPreviewSave" class="btn btn-primary" title="Save Changes">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Waiting for Room Approval Modal -->
+    <div id="waitingApprovalModal" class="modal-overlay hidden">
+        <div class="modal" style="text-align: center;">
+            <div class="status-dot saving" style="width: 24px; height: 24px; margin-bottom: 12px;"></div>
+            <h3 style="margin-bottom: 8px; font-weight: 700;">Requesting Room Access</h3>
+            <p class="text-muted" style="font-size: 0.88rem; margin-bottom: 16px;">
+                Another device is currently active in room <strong id="waitingRoomName">...</strong>.<br>
+                Please approve access on the active device.
+            </p>
+            <button id="btnCancelWaitingRequest" class="btn" style="width: 100%;">Cancel Request</button>
+        </div>
+    </div>
+
+    <!-- Access Request Approval Modal -->
+    <div id="accessRequestModal" class="modal-overlay hidden">
+        <div class="modal" style="text-align: center;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 8px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <h3 style="margin-bottom: 8px; font-weight: 700;">Access Request</h3>
+            <p class="text-muted" style="font-size: 0.88rem; margin-bottom: 16px;">
+                Another device (<strong id="requestingDeviceName">Device</strong>) wants to join this Guest Room. Grant access?
+            </p>
+            <div style="display: flex; gap: 10px; width: 100%;">
+                <button id="btnDenyAccessRequest" class="btn btn-danger" style="flex: 1;">Deny</button>
+                <button id="btnApproveAccessRequest" class="btn btn-primary" style="flex: 1;">Approve</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast"></div>
+
+    <!-- Main Logic Script -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

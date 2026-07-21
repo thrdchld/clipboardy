@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clipboardy - Confirm Reset</title>
+    <!-- Modern Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Prevent Theme Flash -->
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        if (savedTheme === 'light') {
+            document.documentElement.classList.add('light');
+        } else {
+            document.documentElement.classList.remove('light');
+        }
+    </script>
+</head>
+<body style="display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; background-color: var(--bg-base); margin: 0;">
+    
+    <div style="text-align: center; max-width: 400px; padding: 32px; border-radius: var(--radius-lg); background: var(--bg-surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); width: 100%; box-sizing: border-box;">
+        <h1 style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; margin-bottom: 24px; font-size: 1.8rem; margin-top: 0;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="url(#brandGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                <defs>
+                    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="var(--primary)" />
+                        <stop offset="100%" stop-color="#8b5cf6" />
+                    </linearGradient>
+                </defs>
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+            </svg>
+            Clipboardy
+        </h1>
+        
+        <div style="margin-bottom: 20px; color: var(--success); display: flex; justify-content: center; align-items: center;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
+        
+        <h3 style="margin-bottom: 12px; font-weight: 700; color: var(--text-main); font-size: 1.35rem; margin-top: 0;">Email Confirmed!</h3>
+        <p class="text-muted" style="font-size: 0.9rem; line-height: 1.6; margin-bottom: 30px; margin-top: 0; color: var(--text-muted);">
+            Your lock password reset request has been verified. You can now return to Clipboardy and log back in to set a new lock password.
+        </p>
+        
+        <a href="index.html" class="btn btn-primary" style="width: 100%; justify-content: center; text-decoration: none; padding: 12px; font-weight: 600; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; height: 44px;">
+            Back to App & Login
+        </a>
+    </div>
+
+    <script>
+        // Set the pending state in shared localStorage
+        localStorage.setItem('resetLockPasswordPending', 'true');
+    </script>
+</body>
+</html>
