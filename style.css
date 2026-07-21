@@ -1,14 +1,8 @@
 :root {
-    /* Palette requested by USER:
-       Tan: #998767
-       Sand: #AD9F85
-       Warm Beige: #C2B7A4
-       Light Gray-Beige: #D6CFC2
-       Cream: #EBE7E1
-    */
-    --bg-base: #1a1815;          /* Deep warm earth dark base */
+    /* Full English & Earth-Tone Single Theme Palette */
+    --bg-base: #1a1815;          /* Deep warm earth base */
     --bg-surface: #24211d;       /* Dark warm surface */
-    --bg-card: #2d2924;          /* Dark warm card */
+    --bg-card: #2d2924;          /* Warm earth card */
     --bg-hover: #38332c;
     
     --text-main: #EBE7E1;        /* Cream */
@@ -34,27 +28,6 @@
     --shadow-md: 0 4px 20px -2px rgba(0,0,0,0.5);
     --shadow-lg: 0 10px 30px -3px rgba(0,0,0,0.7);
     --glass-blur: blur(12px);
-}
-
-.light {
-    --bg-base: #EBE7E1;          /* Cream base */
-    --bg-surface: #D6CFC2;       /* Light Gray-Beige surface */
-    --bg-card: #ffffff;          /* White card for light mode */
-    --bg-hover: #C2B7A4;
-    
-    --text-main: #1a1815;
-    --text-muted: #6e6149;
-    --text: #1a1815;
-    
-    --primary: #998767;          /* Tan accent */
-    --primary-hover: #807054;
-    --primary-light: rgba(153, 135, 103, 0.18);
-    
-    --danger: #dc2626;
-    --danger-hover: #b91c1c;
-    
-    --border: #C2B7A4;
-    --border-color: #C2B7A4;
 }
 
 * {
@@ -160,11 +133,16 @@ body {
     border: none;
     color: var(--text-main);
     cursor: pointer;
-    padding: 6px;
+    padding: 8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    transition: background 0.15s;
+}
+
+.btn-icon:hover {
+    background: var(--bg-hover);
 }
 
 /* Main App Layout */
@@ -191,6 +169,7 @@ header {
     position: sticky;
     top: 0;
     z-index: 100;
+    height: 60px;
 }
 
 .brand {
@@ -200,6 +179,61 @@ header {
     font-size: 1.15rem;
     font-weight: 800;
     color: var(--text-main);
+}
+
+.header-normal-view {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Expandable Top Bar Search Bar */
+.header-search-overlay {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: var(--bg-surface);
+}
+
+.search-input-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    flex: 1;
+}
+
+.search-input-box input {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    outline: none;
+    width: 100%;
+    font-size: 0.95rem;
+    padding: 6px 4px;
+}
+
+.btn-search-trigger {
+    background: var(--primary) !important;
+    color: #1a1815 !important;
+    border: none !important;
+    padding: 6px 12px !important;
+    border-radius: var(--radius-sm) !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 /* Realtime Sync Status Indicator */
@@ -225,55 +259,6 @@ header {
     0% { opacity: 0.3; transform: scale(0.9); }
     50% { opacity: 1; transform: scale(1.1); }
     100% { opacity: 0.3; transform: scale(0.9); }
-}
-
-/* Search Container */
-.search-container {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--bg-base);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 4px 8px;
-    flex: 1;
-    max-width: 380px;
-}
-
-.search-container input {
-    background: transparent;
-    border: none;
-    color: var(--text-main);
-    outline: none;
-    width: 100%;
-    font-size: 0.9rem;
-    padding: 6px 4px;
-}
-
-.btn-search {
-    background: var(--primary) !important;
-    color: #1a1815 !important;
-    border: none !important;
-    padding: 6px 14px !important;
-    border-radius: var(--radius-sm) !important;
-    font-weight: 700 !important;
-    font-size: 0.85rem !important;
-    cursor: pointer !important;
-    white-space: nowrap;
-}
-
-.btn-search:hover {
-    background: var(--primary-hover) !important;
-}
-
-.btn-clear {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 4px;
-    display: inline-flex;
-    align-items: center;
 }
 
 /* Scroll Container */
@@ -307,6 +292,7 @@ header {
     gap: 10px;
 }
 
+/* Non-selectable Clip Cards with 3-line Text Clamp */
 .clip-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -317,6 +303,9 @@ header {
     justify-content: space-between;
     gap: 12px;
     transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
 }
 
 .clip-card:hover {
@@ -326,30 +315,29 @@ header {
 .clip-body {
     flex: 1;
     min-width: 0;
-    cursor: pointer;
 }
 
+/* Truncated text limited strictly to 3 lines */
 .clip-text {
     font-size: 0.95rem;
     color: var(--text-main);
     line-height: 1.4;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     word-break: break-word;
     white-space: pre-wrap;
-}
-
-.clip-text.expanded {
-    display: block;
-    -webkit-line-clamp: unset;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .clip-meta {
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: 4px;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .clip-actions {
@@ -372,6 +360,7 @@ header {
     align-items: center;
     gap: 6px;
     transition: background 0.15s, transform 0.1s;
+    user-select: none;
 }
 
 .btn-copy:hover {
@@ -393,6 +382,7 @@ header {
     align-items: center;
     justify-content: center;
     transition: color 0.15s, border-color 0.15s;
+    user-select: none;
 }
 
 .btn-delete-clip:hover {
@@ -465,7 +455,7 @@ header {
     background: #807054;
 }
 
-/* Full Page Text Editor Modal */
+/* Full Page Text Editor & Full Page Preview Modals */
 .fullpage-editor-overlay {
     position: fixed;
     top: 0;
@@ -523,6 +513,8 @@ header {
     resize: none;
     outline: none;
     transition: border-color 0.2s;
+    user-select: text !important;
+    -webkit-user-select: text !important;
 }
 
 .fullpage-textarea:focus {

@@ -1,9 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp, collection, query, orderBy, limit, addDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, updateDoc, onSnapshot, serverTimestamp, collection, query, limit, addDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // ==========================================
-// 🔧 KONFIGURASI FIREBASE
+// 🔧 FIREBASE CONFIGURATION
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyAIkIoF6iT4LfUbt0C03053vfyDpm3YsuA",
@@ -29,6 +29,7 @@ export let clipsArray = [];
 export let unsubscribeClips = null;
 export let isAppLocked = true;
 export let isSearchMode = false;
+export let activePreviewClipId = null;
 
 // DOM Elements
 const DOM = {
@@ -54,14 +55,16 @@ const DOM = {
     confirmLockPassword: document.getElementById('confirmLockPassword'),
     btnSaveLockPassword: document.getElementById('btnSaveLockPassword'),
     
+    headerNormalView: document.getElementById('headerNormalView'),
+    headerSearchOverlay: document.getElementById('headerSearchOverlay'),
     headerTitleText: document.getElementById('headerTitleText'),
     syncIndicator: document.getElementById('syncIndicator'),
-    btnThemeToggle: document.getElementById('btnThemeToggle'),
     btnLock: document.getElementById('btnLock'),
     
+    btnOpenSearch: document.getElementById('btnOpenSearch'),
     searchInput: document.getElementById('searchInput'),
     btnSearch: document.getElementById('btnSearch'),
-    btnClearSearch: document.getElementById('btnClearSearch'),
+    btnCloseSearch: document.getElementById('btnCloseSearch'),
     searchBanner: document.getElementById('searchBanner'),
     searchBannerText: document.getElementById('searchBannerText'),
     btnResetSearchBanner: document.getElementById('btnResetSearchBanner'),
@@ -77,6 +80,13 @@ const DOM = {
     btnFullEditorPaste: document.getElementById('btnFullEditorPaste'),
     btnFullEditorSend: document.getElementById('btnFullEditorSend'),
     txtFullPageEditor: document.getElementById('txtFullPageEditor'),
+    
+    fullPagePreviewModal: document.getElementById('fullPagePreviewModal'),
+    btnClosePreviewModal: document.getElementById('btnClosePreviewModal'),
+    btnPreviewCopy: document.getElementById('btnPreviewCopy'),
+    btnPreviewDelete: document.getElementById('btnPreviewDelete'),
+    btnPreviewSave: document.getElementById('btnPreviewSave'),
+    txtPreviewText: document.getElementById('txtPreviewText'),
     
     toast: document.getElementById('toast')
 };
@@ -128,7 +138,7 @@ function getTimeMs(ts) {
 }
 
 function formatTime(timestamp) {
-    if (!timestamp) return 'Baru saja';
+    if (!timestamp) return 'Just now';
     const ms = getTimeMs(timestamp);
     const date = new Date(ms);
     
@@ -176,7 +186,6 @@ export function unlockApp() {
 // 📡 FIRESTORE REALTIME STREAM & COLD STORAGE
 // ==========================================
 
-// Target Refactoring Backend 2: Query Utama LIFO + limit(50)
 function startClipsRealtimeSync() {
     if (!currentRoomHash) return;
     if (unsubscribeClips) unsubscribeClips();
@@ -186,7 +195,7 @@ function startClipsRealtimeSync() {
     if (DOM.syncIndicator) {
         DOM.syncIndicator.classList.remove('disconnected');
         DOM.syncIndicator.classList.add('saving');
-        DOM.syncIndicator.title = "Menghubungkan ke live sync...";
+        DOM.syncIndicator.title = "Connecting to live sync...";
     }
     
     const q = query(notesRef, limit(50));
@@ -207,7 +216,7 @@ function startClipsRealtimeSync() {
         
         if (DOM.syncIndicator) {
             DOM.syncIndicator.classList.remove('saving', 'disconnected');
-            DOM.syncIndicator.title = "Live Sync Aktif";
+            DOM.syncIndicator.title = "Live Sync Active";
         }
         
         if (!isSearchMode) {
@@ -218,19 +227,18 @@ function startClipsRealtimeSync() {
         if (DOM.syncIndicator) {
             DOM.syncIndicator.classList.remove('saving');
             DOM.syncIndicator.classList.add('disconnected');
-            DOM.syncIndicator.title = "Koneksi Realtime Terputus";
+            DOM.syncIndicator.title = "Live Sync Disconnected";
         }
-        showToast("Error realtime: " + (error.code || error.message));
+        showToast("Realtime sync error: " + (error.code || error.message));
     });
 }
 
-// Target Refactoring Backend 1: Simplifikasi Skema Data (pure text, timestamp, userId)
 async function createNewClip(text) {
     if (!text || !text.trim()) return;
     const cleanText = text.trim();
     
     if (!currentRoomHash) {
-        showToast("Room belum dipilih!");
+        showToast("Room is required!");
         return;
     }
     
@@ -241,7 +249,7 @@ async function createNewClip(text) {
             currentUser = cred.user;
         } catch (err) {
             console.error("Auth error during clip creation:", err);
-            showToast("Gagal autentikasi room: " + err.message);
+            showToast("Failed to authenticate room: " + err.message);
             return;
         }
     }
@@ -257,12 +265,27 @@ async function createNewClip(text) {
         });
         
         if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
-        showToast("Klip tersimpan!");
+        showToast("Clip saved!");
     } catch (err) {
-        console.error("Gagal menyimpan klip:", err);
-        showToast("Gagal menyimpan klip: " + (err.message || err));
+        console.error("Failed to save clip:", err);
+        showToast("Failed to save clip: " + (err.message || err));
     } finally {
         if (DOM.syncIndicator) DOM.syncIndicator.classList.remove('saving');
+    }
+}
+
+async function updateClip(clipId, newText) {
+    if (!clipId || !newText || !newText.trim()) return;
+    try {
+        const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', clipId);
+        await updateDoc(docRef, {
+            text: newText.trim(),
+            timestamp: serverTimestamp()
+        });
+        showToast("Clip updated!");
+    } catch (err) {
+        console.error("Failed to update clip:", err);
+        showToast("Failed to update clip: " + (err.message || err));
     }
 }
 
@@ -270,14 +293,13 @@ async function deleteClip(clipId) {
     try {
         const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', clipId);
         await deleteDoc(docRef);
-        showToast("Klip dihapus");
+        showToast("Clip deleted");
     } catch (err) {
-        console.error("Gagal menghapus klip:", err);
-        showToast("Gagal menghapus klip: " + (err.message || err));
+        console.error("Failed to delete clip:", err);
+        showToast("Failed to delete clip: " + (err.message || err));
     }
 }
 
-// Target Refactoring Frontend 4: Cold Storage Search Button (CRITICAL RULE)
 // ponytail: [cold storage search query limit 200] -> [integrate full-text search engine (e.g. Algolia/Elastic) if room exceeds 10,000 clips]
 async function performColdStorageSearch() {
     const term = (DOM.searchInput?.value || '').trim().toLowerCase();
@@ -288,10 +310,9 @@ async function performColdStorageSearch() {
     }
     
     isSearchMode = true;
-    showToast("Mencari di cold storage...");
-    if (DOM.btnClearSearch) DOM.btnClearSearch.classList.remove('hidden');
+    showToast("Searching cold storage...");
     if (DOM.searchBanner) DOM.searchBanner.classList.remove('hidden');
-    if (DOM.searchBannerText) DOM.searchBannerText.textContent = `Menampilkan hasil pencarian untuk "${term}"...`;
+    if (DOM.searchBannerText) DOM.searchBannerText.textContent = `Showing search results for "${term}"...`;
     
     try {
         const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
@@ -314,29 +335,34 @@ async function performColdStorageSearch() {
         matchedClips.sort((a, b) => getTimeMs(b.timestamp) - getTimeMs(a.timestamp));
         
         if (DOM.searchBannerText) {
-            DOM.searchBannerText.textContent = `Cold storage: ${matchedClips.length} klip ditemukan untuk "${term}"`;
+            DOM.searchBannerText.textContent = `Cold storage: ${matchedClips.length} clips found for "${term}"`;
         }
         
         renderClips(matchedClips, true);
     } catch (err) {
         console.error("Error searching cold storage:", err);
-        showToast("Gagal mencari di cold storage: " + (err.message || err));
+        showToast("Search error: " + (err.message || err));
     }
 }
 
 function resetSearchMode() {
     isSearchMode = false;
     if (DOM.searchInput) DOM.searchInput.value = '';
-    if (DOM.btnClearSearch) DOM.btnClearSearch.classList.add('hidden');
     if (DOM.searchBanner) DOM.searchBanner.classList.add('hidden');
     renderClips(clipsArray);
+}
+
+function closeSearchOverlay() {
+    if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.add('hidden');
+    if (DOM.headerNormalView) DOM.headerNormalView.classList.remove('hidden');
+    resetSearchMode();
 }
 
 // ==========================================
 // 🎨 FRONTEND UI RENDERING
 // ==========================================
 
-// Target Refactoring Frontend 2: Truncate max 2 lines & 1-tap Copy Button
+// Card text limited to 3 lines clamp & non-selectable; clicking opens preview modal
 function renderClips(clipsList, isSearchResult = false) {
     if (!DOM.clipGrid) return;
     DOM.clipGrid.innerHTML = '';
@@ -347,8 +373,8 @@ function renderClips(clipsList, isSearchResult = false) {
             const subText = DOM.emptyState.querySelector('p');
             if (subText) {
                 subText.textContent = isSearchResult 
-                    ? "Tidak ada klip yang cocok ditemukan di cold storage."
-                    : "Gunakan tombol (+) di kanan bawah untuk membuat klip baru, atau tombol Paste untuk tempel otomatis.";
+                    ? "No matching clips found in cold storage."
+                    : "Use the (+) button at bottom right to write a new clip, or the Paste button to auto-save.";
             }
         }
         return;
@@ -363,7 +389,7 @@ function renderClips(clipsList, isSearchResult = false) {
         const timeStr = formatTime(clip.timestamp);
         
         card.innerHTML = `
-            <div class="clip-body" title="Klik untuk ekspansi / perkecil teks">
+            <div class="clip-body" title="Click to view & edit full clip">
                 <div class="clip-text">${escapeHtml(clip.text)}</div>
                 <div class="clip-meta">${timeStr}</div>
             </div>
@@ -372,17 +398,19 @@ function renderClips(clipsList, isSearchResult = false) {
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                     Copy
                 </button>
-                <button class="btn-delete-clip" title="Hapus klip" aria-label="Delete clip">
+                <button class="btn-delete-clip" title="Delete clip" aria-label="Delete clip">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 </button>
             </div>
         `;
         
-        // Expand/Collapse text on card body click
-        const bodyEl = card.querySelector('.clip-body');
-        const textEl = card.querySelector('.clip-text');
-        bodyEl.addEventListener('click', () => {
-            textEl.classList.toggle('expanded');
+        // Open Full Page Preview & Edit Modal on card click
+        card.addEventListener('click', (e) => {
+            // Do not trigger if clicking copy or delete action buttons
+            if (e.target.closest('.btn-copy') || e.target.closest('.btn-delete-clip')) {
+                return;
+            }
+            openPreviewModal(clip);
         });
         
         // 1-Tap Copy Button Event
@@ -391,14 +419,14 @@ function renderClips(clipsList, isSearchResult = false) {
             e.stopPropagation();
             try {
                 await navigator.clipboard.writeText(clip.text);
-                showToast("Teks berhasil disalin!");
-                copyBtn.innerHTML = `✓ Disalin`;
+                showToast("Clip copied to clipboard!");
+                copyBtn.innerHTML = `✓ Copied`;
                 setTimeout(() => {
                     copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`;
                 }, 1500);
             } catch (err) {
                 console.error("Failed to copy:", err);
-                showToast("Gagal menyalin teks");
+                showToast("Failed to copy text");
             }
         });
         
@@ -413,17 +441,34 @@ function renderClips(clipsList, isSearchResult = false) {
     });
 }
 
+function openPreviewModal(clip) {
+    activePreviewClipId = clip.id;
+    if (DOM.txtPreviewText) {
+        DOM.txtPreviewText.value = clip.text;
+    }
+    if (DOM.fullPagePreviewModal) {
+        DOM.fullPagePreviewModal.classList.remove('hidden');
+    }
+}
+
+function closePreviewModal() {
+    activePreviewClipId = null;
+    if (DOM.fullPagePreviewModal) {
+        DOM.fullPagePreviewModal.classList.add('hidden');
+    }
+}
+
 // ==========================================
 // 🚀 EVENT LISTENERS & INITIALIZATION
 // ==========================================
 
-// Network connection change listeners
+// Network connection listeners
 window.addEventListener('online', () => {
     if (DOM.syncIndicator) {
         DOM.syncIndicator.classList.remove('disconnected');
-        DOM.syncIndicator.title = "Live Sync Aktif";
+        DOM.syncIndicator.title = "Live Sync Active";
     }
-    showToast("Internet terhubung kembali");
+    showToast("Internet reconnected");
     if (!isAppLocked && currentRoomHash) {
         startClipsRealtimeSync();
     }
@@ -433,9 +478,9 @@ window.addEventListener('offline', () => {
     if (DOM.syncIndicator) {
         DOM.syncIndicator.classList.remove('saving');
         DOM.syncIndicator.classList.add('disconnected');
-        DOM.syncIndicator.title = "Koneksi Terputus (Offline)";
+        DOM.syncIndicator.title = "Connection Lost (Offline)";
     }
-    showToast("Koneksi terputus (Offline)");
+    showToast("Connection lost (Offline)");
 });
 
 // Guest / Room Login Handler
@@ -445,11 +490,11 @@ if (DOM.loginBtn) {
         const pin = (DOM.passwordInput?.value || '').trim();
         
         if (!roomName) {
-            showToast("Masukkan Nama Room!");
+            showToast("Please enter Room Name!");
             return;
         }
         if (pin.length !== 4) {
-            showToast("Masukkan 4-Digit PIN!");
+            showToast("Please enter 4-Digit PIN!");
             return;
         }
         
@@ -457,14 +502,13 @@ if (DOM.loginBtn) {
         currentRoomHash = await hashPassword(combined);
         appLockPasswordHash = await hashPassword(pin);
         
-        // Always await Firebase Auth before opening room sync
         if (!auth.currentUser) {
             try {
                 const cred = await signInAnonymously(auth);
                 currentUser = cred.user;
             } catch (err) {
                 console.error("Anonymous auth error:", err);
-                showToast("Gagal masuk ke Firebase Auth: " + err.message);
+                showToast("Failed to authenticate room: " + err.message);
                 return;
             }
         } else {
@@ -495,7 +539,7 @@ if (DOM.btnGoogleLogin) {
             }
         } catch (err) {
             console.error("Google sign in error:", err);
-            showToast("Gagal masuk dengan Google: " + (err.message || err));
+            showToast("Google sign in error: " + (err.message || err));
         }
     });
 }
@@ -507,11 +551,11 @@ if (DOM.btnSaveLockPassword) {
         const confirmPin = (DOM.confirmLockPassword?.value || '').trim();
         
         if (pin.length !== 4) {
-            showToast("PIN harus 4 digit!");
+            showToast("PIN must be 4 digits!");
             return;
         }
         if (pin !== confirmPin) {
-            showToast("PIN konfirmasi tidak cocok!");
+            showToast("PIN confirmation does not match!");
             return;
         }
         
@@ -535,7 +579,7 @@ if (DOM.btnUnlockGoogle) {
             if (DOM.lockPasswordInput) DOM.lockPasswordInput.value = '';
             unlockApp();
         } else {
-            showToast("PIN salah!");
+            showToast("Incorrect PIN!");
         }
     });
 }
@@ -558,7 +602,23 @@ if (DOM.btnLock) {
     });
 }
 
-// Target Refactoring Frontend 4 (CRITICAL RULE): Search Button Click & Enter Key ONLY
+// ==========================================
+// 🔍 EXPANDABLE TOP BAR SEARCH LISTENERS
+// ==========================================
+if (DOM.btnOpenSearch) {
+    DOM.btnOpenSearch.addEventListener('click', () => {
+        if (DOM.headerNormalView) DOM.headerNormalView.classList.add('hidden');
+        if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.remove('hidden');
+        if (DOM.searchInput) DOM.searchInput.focus();
+    });
+}
+
+if (DOM.btnCloseSearch) {
+    DOM.btnCloseSearch.addEventListener('click', () => {
+        closeSearchOverlay();
+    });
+}
+
 if (DOM.btnSearch) {
     DOM.btnSearch.addEventListener('click', () => {
         performColdStorageSearch();
@@ -572,13 +632,6 @@ if (DOM.searchInput) {
             performColdStorageSearch();
         }
     });
-    // NOTE: Strictly NO 'input' or 'keyup' real-time search filtering listener is attached!
-}
-
-if (DOM.btnClearSearch) {
-    DOM.btnClearSearch.addEventListener('click', () => {
-        resetSearchMode();
-    });
 }
 
 if (DOM.btnResetSearchBanner) {
@@ -591,11 +644,12 @@ if (DOM.btnResetSearchBanner) {
 // 🔘 2 FABs MECHANISM LISTENERS
 // ==========================================
 
-// FAB Atas (+ Plus): Open Full Page Text Editor Modal
+// FAB Top (+ Plus): Open Full Page Text Editor Modal
 if (DOM.btnFabEditor) {
     DOM.btnFabEditor.addEventListener('click', () => {
         if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
         if (DOM.txtFullPageEditor) {
+            DOM.txtFullPageEditor.value = '';
             DOM.txtFullPageEditor.focus();
         }
     });
@@ -615,16 +669,16 @@ if (DOM.btnFullEditorPaste) {
             const text = await navigator.clipboard.readText();
             if (text && DOM.txtFullPageEditor) {
                 DOM.txtFullPageEditor.value = text;
-                showToast("Teks ditempel dari clipboard!");
+                showToast("Text pasted from clipboard!");
             }
         } catch (err) {
             console.error("Failed to read clipboard:", err);
-            showToast("Izinkan akses clipboard di browser");
+            showToast("Allow clipboard access in browser");
         }
     });
 }
 
-// Full Page Editor: Send/Save Button
+// Full Page Editor: Save Button
 if (DOM.btnFullEditorSend) {
     DOM.btnFullEditorSend.addEventListener('click', async () => {
         const text = (DOM.txtFullPageEditor?.value || '').trim();
@@ -632,34 +686,67 @@ if (DOM.btnFullEditorSend) {
             await createNewClip(text);
             if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.add('hidden');
         } else {
-            showToast("Tulis teks klip terlebih dahulu");
+            showToast("Write clip text first");
         }
     });
 }
 
-// FAB Bawah (Paste Icon): 1-Tap Automatic Paste & Immediate Save
+// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         try {
             const text = await navigator.clipboard.readText();
             if (text && text.trim()) {
                 await createNewClip(text.trim());
-                showToast("Teks dari clipboard berhasil disimpan!");
+                showToast("Clip saved from clipboard!");
             } else {
-                showToast("Clipboard kosong!");
+                showToast("Clipboard is empty!");
             }
         } catch (err) {
             console.error("Failed to read clipboard:", err);
-            showToast("Izinkan akses clipboard di browser untuk fitur ini");
+            showToast("Allow clipboard access in browser");
         }
     });
 }
 
-// Theme Toggle
-if (DOM.btnThemeToggle) {
-    DOM.btnThemeToggle.addEventListener('click', () => {
-        const isLight = document.documentElement.classList.toggle('light');
-        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+// ==========================================
+// 📖 FULL PAGE PREVIEW MODAL LISTENERS
+// ==========================================
+if (DOM.btnClosePreviewModal) {
+    DOM.btnClosePreviewModal.addEventListener('click', () => {
+        closePreviewModal();
+    });
+}
+
+if (DOM.btnPreviewCopy) {
+    DOM.btnPreviewCopy.addEventListener('click', async () => {
+        const text = DOM.txtPreviewText?.value || '';
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast("Clip copied to clipboard!");
+        } catch (err) {
+            console.error("Failed to copy text:", err);
+            showToast("Failed to copy text");
+        }
+    });
+}
+
+if (DOM.btnPreviewSave) {
+    DOM.btnPreviewSave.addEventListener('click', async () => {
+        const text = (DOM.txtPreviewText?.value || '').trim();
+        if (activePreviewClipId && text) {
+            await updateClip(activePreviewClipId, text);
+            closePreviewModal();
+        }
+    });
+}
+
+if (DOM.btnPreviewDelete) {
+    DOM.btnPreviewDelete.addEventListener('click', async () => {
+        if (activePreviewClipId) {
+            await deleteClip(activePreviewClipId);
+            closePreviewModal();
+        }
     });
 }
 

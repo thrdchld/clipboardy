@@ -18,15 +18,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Prevent Theme Flash -->
-    <script>
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        if (savedTheme === 'light') {
-            document.documentElement.classList.add('light');
-        } else {
-            document.documentElement.classList.remove('light');
-        }
-    </script>
     <link rel="stylesheet" href="style.css">
 
     <!-- Service Worker Registration -->
@@ -68,15 +59,15 @@
             <!-- Or Divider -->
             <div style="display: flex; align-items: center; margin: 18px 0; color: var(--text-muted); font-size: 0.85rem;">
                 <hr style="flex-grow: 1; border: none; border-top: 1px solid var(--border); margin-right: 10px;">
-                <span>atau Guest Room</span>
+                <span>or Guest Room</span>
                 <hr style="flex-grow: 1; border: none; border-top: 1px solid var(--border); margin-left: 10px;">
             </div>
             
             <!-- Guest Login Area -->
             <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
-                <input type="text" id="roomNameInput" class="input-field" placeholder="Nama Room (contoh: workspace)" style="text-align: center;" autocomplete="off">
+                <input type="text" id="roomNameInput" class="input-field" placeholder="Room Name (e.g. workspace)" style="text-align: center;" autocomplete="off">
                 <input type="password" id="passwordInput" class="input-field" placeholder="4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; letter-spacing: 2px;" autocomplete="off">
-                <button id="loginBtn" class="btn btn-primary" style="width: 100%;">Masuk Room</button>
+                <button id="loginBtn" class="btn btn-primary" style="width: 100%;">Join Room</button>
             </div>
         </div>
 
@@ -88,7 +79,7 @@
                 </svg>
                 Clipboardy
             </h1>
-            <p class="text-muted" style="margin-bottom: 16px;">Aplikasi Terkunci</p>
+            <p class="text-muted" style="margin-bottom: 16px;">Application Locked</p>
             
             <div style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px; background: var(--bg-base); border-radius: var(--radius-md); margin-bottom: 16px; border: 1px solid var(--border); width: 100%;">
                 <img id="lockedUserAvatar" src="https://via.placeholder.com/64" alt="Avatar" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid var(--primary); display: block;">
@@ -97,9 +88,9 @@
             </div>
             
             <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
-                <input type="password" id="lockPasswordInput" class="input-field" placeholder="Masukkan 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; font-size: 1.1em; letter-spacing: 2px;">
-                <button id="btnUnlockGoogle" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">Buka Kunci</button>
-                <button id="btnSwitchAccount" class="btn" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85em; font-weight: 500; margin-top: 4px;">Keluar / Ganti Akun</button>
+                <input type="password" id="lockPasswordInput" class="input-field" placeholder="Enter 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; font-size: 1.1em; letter-spacing: 2px;">
+                <button id="btnUnlockGoogle" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">Unlock Screen</button>
+                <button id="btnSwitchAccount" class="btn" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85em; font-weight: 500; margin-top: 4px;">Sign Out / Switch Account</button>
             </div>
         </div>
     </div>
@@ -109,28 +100,38 @@
         
         <!-- Header -->
         <header>
-            <div class="brand">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-                <span id="headerTitleText">Clipboardy</span>
-                <span id="syncIndicator" class="status-dot" title="Live Sync Active"></span>
+            <!-- Normal Header State -->
+            <div id="headerNormalView" class="header-normal-view">
+                <div class="brand">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                    <span id="headerTitleText">Clipboardy</span>
+                    <span id="syncIndicator" class="status-dot" title="Live Sync Active"></span>
+                </div>
+
+                <div class="header-actions">
+                    <!-- Search Icon Button (Triggers Expandable Top Bar Search) -->
+                    <button id="btnOpenSearch" class="btn-icon" title="Search Cold Storage" aria-label="Open Search">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </button>
+                    <!-- Lock Button -->
+                    <button id="btnLock" class="btn btn-danger" title="Lock Application" style="padding: 8px 12px; font-size: 0.85rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        Lock
+                    </button>
+                </div>
             </div>
 
-            <!-- Cold Storage Search Container (Explicit Search Button Only) -->
-            <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Cari di cold storage..." aria-label="Cari klip">
-                <button id="btnSearch" class="btn-search" title="Cari di Cold Storage">Cari</button>
-                <button id="btnClearSearch" class="btn-clear hidden" title="Clear Search" aria-label="Clear Search">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <!-- Expandable Top Bar Search View (Shown when Search Icon is clicked) -->
+            <div id="headerSearchOverlay" class="header-search-overlay hidden">
+                <div class="search-input-box">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); flex-shrink: 0;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="searchInput" placeholder="Search" aria-label="Search clips">
+                </div>
+                <button id="btnSearch" class="btn-search-trigger" title="Execute Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 </button>
-            </div>
-
-            <div style="display: flex; gap: 6px; align-items: center;">
-                <button id="btnThemeToggle" class="btn" title="Toggle Theme" aria-label="Toggle Theme" style="padding: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.07" x2="5.64" y2="17.64"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-                </button>
-                <button id="btnLock" class="btn btn-danger" title="Kunci Aplikasi" style="padding: 8px 12px; font-size: 0.85rem;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    Lock
+                <button id="btnCloseSearch" class="btn-icon" title="Close Search" aria-label="Close Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
         </header>
@@ -139,8 +140,8 @@
         <div class="main-scroll">
             <!-- Search Mode Notification Banner -->
             <div id="searchBanner" class="search-banner hidden">
-                <span id="searchBannerText">Hasil pencarian cold storage...</span>
-                <button id="btnResetSearchBanner" class="btn" style="padding: 2px 8px; font-size: 0.75rem; background: var(--bg-surface);">Kembali ke Stream Realtime</button>
+                <span id="searchBannerText">Cold storage search results...</span>
+                <button id="btnResetSearchBanner" class="btn" style="padding: 2px 8px; font-size: 0.75rem; background: var(--bg-surface);">Back to Realtime Stream</button>
             </div>
 
             <!-- Clips Grid -->
@@ -154,46 +155,75 @@
                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                 </svg>
-                <h3>Belum ada klip</h3>
-                <p>Gunakan tombol (+) di kanan bawah untuk menulis klip baru, atau tombol Paste untuk tempel otomatis.</p>
+                <h3>No clips yet</h3>
+                <p>Use the (+) button at bottom right to write a new clip, or the Paste button to auto-save.</p>
             </div>
         </div>
 
-        <!-- 2 STACKED FLOATING ACTION BUTTONS (FAB Atas & Bawah) -->
+        <!-- 2 STACKED FLOATING ACTION BUTTONS (FAB Top & Bottom) -->
         <div id="fabContainer" class="fab-container">
-            <!-- FAB Atas: Plus (+) for Fullpage Text Editor Modal -->
-            <button id="btnFabEditor" class="fab fab-top" title="Tulis Klip Baru (Full Editor)" aria-label="Tulis Klip Baru">
+            <!-- FAB Top: Plus (+) for Full Page Text Editor Modal -->
+            <button id="btnFabEditor" class="fab fab-top" title="Write New Clip" aria-label="Write New Clip">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
             
-            <!-- FAB Bawah: Paste Icon for Automatic Paste & Instant Save -->
-            <button id="btnFabQuickPaste" class="fab fab-bottom" title="Tempel & Simpan Otomatis" aria-label="Tempel dan Simpan Otomatis">
+            <!-- FAB Bottom: Paste Icon for Automatic Paste & Instant Save -->
+            <button id="btnFabQuickPaste" class="fab fab-bottom" title="Auto Paste & Save" aria-label="Auto Paste & Save">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
             </button>
         </div>
     </div>
 
-    <!-- FULL PAGE TEXT EDITOR MODAL -->
+    <!-- FULL PAGE TEXT EDITOR MODAL (For creating a new clip) -->
     <div id="fullPageEditorModal" class="fullpage-editor-overlay hidden">
         <div class="fullpage-editor-container">
             <div class="fullpage-editor-header">
-                <button id="btnCloseFullPageEditor" class="btn-icon" title="Tutup">
+                <button id="btnCloseFullPageEditor" class="btn-icon" title="Close">
                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
-                <span class="fullpage-editor-title">Tulis / Edit Klip</span>
+                <span class="fullpage-editor-title">New Clip</span>
                 <div style="display: flex; gap: 8px;">
-                    <button id="btnFullEditorPaste" class="btn" title="Tempel dari Clipboard">
+                    <button id="btnFullEditorPaste" class="btn" title="Paste from Clipboard">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-                        Tempel
+                        Paste
                     </button>
-                    <button id="btnFullEditorSend" class="btn btn-primary" title="Simpan Klip">
+                    <button id="btnFullEditorSend" class="btn btn-primary" title="Save Clip">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                        Kirim
+                        Save
                     </button>
                 </div>
             </div>
             <div class="fullpage-editor-body">
-                <textarea id="txtFullPageEditor" class="fullpage-textarea" placeholder="Tulis atau edit teks klip di sini..."></textarea>
+                <textarea id="txtFullPageEditor" class="fullpage-textarea" placeholder="Write or edit clip text here..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- FULL PAGE CLIP PREVIEW & EDIT MODAL (For inspecting/editing an existing clip) -->
+    <div id="fullPagePreviewModal" class="fullpage-editor-overlay hidden">
+        <div class="fullpage-editor-container">
+            <div class="fullpage-editor-header">
+                <button id="btnClosePreviewModal" class="btn-icon" title="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+                <span class="fullpage-editor-title">Clip Preview</span>
+                <div style="display: flex; gap: 8px;">
+                    <button id="btnPreviewCopy" class="btn" title="Copy Text">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Copy
+                    </button>
+                    <button id="btnPreviewDelete" class="btn btn-danger" title="Delete Clip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        Delete
+                    </button>
+                    <button id="btnPreviewSave" class="btn btn-primary" title="Save Changes">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        Save
+                    </button>
+                </div>
+            </div>
+            <div class="fullpage-editor-body">
+                <textarea id="txtPreviewText" class="fullpage-textarea" placeholder="Clip content..."></textarea>
             </div>
         </div>
     </div>
@@ -201,15 +231,15 @@
     <!-- First-Time Setup Lock Password Modal -->
     <div id="setupLockPasswordModal" class="modal-overlay hidden">
         <div class="modal">
-            <h3 style="margin-bottom: 12px; font-weight: 700; font-size: 1.15em;">Buat PIN Akses</h3>
+            <h3 style="margin-bottom: 12px; font-weight: 700; font-size: 1.15em;">Create Lock PIN</h3>
             <p class="text-muted" style="font-size: 0.85em; margin-bottom: 16px; text-align: left;">
-                Setel 4-digit PIN untuk mengamankan sesi Clipboardy Anda.
+                Set a 4-digit PIN to secure your Clipboardy session.
             </p>
             <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
-                <input type="password" id="newLockPassword" class="input-field" placeholder="PIN Baru (4-digit)" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; letter-spacing: 2px;">
-                <input type="password" id="confirmLockPassword" class="input-field" placeholder="Konfirmasi PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; letter-spacing: 2px;">
+                <input type="password" id="newLockPassword" class="input-field" placeholder="New 4-Digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; letter-spacing: 2px;">
+                <input type="password" id="confirmLockPassword" class="input-field" placeholder="Confirm PIN" inputmode="numeric" pattern="[0-9]*" maxlength="4" style="text-align: center; letter-spacing: 2px;">
             </div>
-            <button id="btnSaveLockPassword" class="btn btn-primary" style="width: 100%; padding: 12px;">Simpan & Buka</button>
+            <button id="btnSaveLockPassword" class="btn btn-primary" style="width: 100%; padding: 12px;">Save & Unlock</button>
         </div>
     </div>
 
