@@ -160,7 +160,6 @@ function getStartOfTodayWibMs() {
     return wibDate.getTime() - wibOffsetMs;
 }
 
-// Helper Blob to DataURL
 function readBlobAsDataUrl(blob) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -302,12 +301,10 @@ export async function readDocumentFile(file, maxKb = 128) {
 
 // Read system clipboard for Text, Image, or File content
 export async function readClipboardContent() {
-    // 1. Try rich Clipboard API first (supports images & files)
     if (navigator.clipboard && navigator.clipboard.read) {
         try {
             const items = await navigator.clipboard.read();
             for (const item of items) {
-                // Check for image types in clipboard
                 const imageType = item.types.find(t => t.startsWith('image/'));
                 if (imageType) {
                     const blob = await item.getType(imageType);
@@ -316,7 +313,6 @@ export async function readClipboardContent() {
                     return { type: 'image', data: compressedDataUrl };
                 }
                 
-                // Check for file types or plain text
                 for (const type of item.types) {
                     if (type === 'text/plain') {
                         const blob = await item.getType('text/plain');
@@ -339,7 +335,6 @@ export async function readClipboardContent() {
         }
     }
     
-    // 2. Fallback to readText
     if (navigator.clipboard && navigator.clipboard.readText) {
         try {
             const text = await navigator.clipboard.readText();
@@ -713,16 +708,34 @@ function startClipsRealtimeSync() {
     });
 }
 
+// STRICT EXCLUSIVE SINGLE CONTENT RULE: Every clip is ONLY image, OR ONLY file, OR ONLY text.
 async function createNewClip(text, attachment = null, trackHistory = true) {
-    const cleanText = (text || '').trim();
-    
-    if (!cleanText && !attachment) {
-        showToast("Write clip text or attach a file first!");
+    if (!currentRoomHash) {
+        showToast("Room is required!");
         return;
     }
     
-    if (!currentRoomHash) {
-        showToast("Room is required!");
+    const payload = {
+        timestamp: serverTimestamp(),
+        userId: auth.currentUser ? auth.currentUser.uid : 'guest',
+        text: '',
+        imageData: null,
+        fileData: null
+    };
+
+    if (attachment && attachment.type === 'image') {
+        payload.imageData = attachment.data;
+    } else if (attachment && attachment.type === 'file') {
+        payload.fileData = {
+            name: attachment.name,
+            size: attachment.size,
+            type: attachment.type,
+            data: attachment.data
+        };
+    } else if (text && text.trim()) {
+        payload.text = text.trim();
+    } else {
+        showToast("Write text or attach a file first!");
         return;
     }
     
@@ -741,25 +754,6 @@ async function createNewClip(text, attachment = null, trackHistory = true) {
         if (DOM.syncIndicator) DOM.syncIndicator.classList.add('saving');
         const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
         
-        const payload = {
-            text: cleanText,
-            timestamp: serverTimestamp(),
-            userId: auth.currentUser ? auth.currentUser.uid : 'guest'
-        };
-        
-        if (attachment) {
-            if (attachment.type === 'image') {
-                payload.imageData = attachment.data;
-            } else if (attachment.type === 'file') {
-                payload.fileData = {
-                    name: attachment.name,
-                    size: attachment.size,
-                    type: attachment.type,
-                    data: attachment.data
-                };
-            }
-        }
-        
         const newDocRef = await addDoc(notesRef, payload);
         
         if (trackHistory) {
@@ -767,7 +761,7 @@ async function createNewClip(text, attachment = null, trackHistory = true) {
                 type: 'ADD',
                 clipId: newDocRef.id,
                 afterState: payload,
-                title: 'New Clip'
+                title: payload.imageData ? 'Image Clip' : (payload.fileData ? 'File Clip' : 'Text Clip')
             });
         }
         
@@ -775,7 +769,7 @@ async function createNewClip(text, attachment = null, trackHistory = true) {
         editorAttachment = null;
         renderEditorAttachment();
         
-        showToast("Clip saved!");
+        showToast(payload.imageData ? "Image clip saved!" : (payload.fileData ? "File clip saved!" : "Text clip saved!"));
     } catch (err) {
         console.error("Failed to save clip:", err);
         showToast("Failed to save clip: " + (err.message || err));
@@ -788,27 +782,27 @@ async function updateClip(clipId, newText, attachment = null, trackHistory = tru
     if (!clipId) return;
     try {
         const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', clipId);
+        
         const payload = {
-            text: (newText || '').trim(),
-            timestamp: serverTimestamp()
+            timestamp: serverTimestamp(),
+            text: '',
+            imageData: null,
+            fileData: null
         };
         
         if (attachment === 'DELETE') {
-            payload.imageData = null;
-            payload.fileData = null;
-        } else if (attachment) {
-            if (attachment.type === 'image') {
-                payload.imageData = attachment.data;
-                payload.fileData = null;
-            } else if (attachment.type === 'file') {
-                payload.fileData = {
-                    name: attachment.name,
-                    size: attachment.size,
-                    type: attachment.type,
-                    data: attachment.data
-                };
-                payload.imageData = null;
-            }
+            payload.text = (newText || '').trim();
+        } else if (attachment && attachment.type === 'image') {
+            payload.imageData = attachment.data;
+        } else if (attachment && attachment.type === 'file') {
+            payload.fileData = {
+                name: attachment.name,
+                size: attachment.size,
+                type: attachment.type,
+                data: attachment.data
+            };
+        } else if (newText && newText.trim()) {
+            payload.text = newText.trim();
         }
         
         if (trackHistory) {
@@ -956,27 +950,28 @@ function renderClips(clipsList, isSearchResult = false) {
         
         const timeStr = formatTime(clip.timestamp);
         
-        let attachmentHtml = '';
+        let contentHtml = '';
         if (clip.imageData) {
-            attachmentHtml = `<img src="${clip.imageData}" class="clip-card-attachment-thumb" alt="Attachment Image">`;
+            contentHtml = `<img src="${clip.imageData}" class="clip-card-attachment-thumb" alt="Image Clip">`;
         } else if (clip.fileData) {
             const kbSize = Math.round((clip.fileData.size || 0) / 1024);
-            attachmentHtml = `
+            contentHtml = `
                 <div class="clip-card-attachment-file">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
                     <span>${escapeHtml(clip.fileData.name)} (${kbSize} KB)</span>
                 </div>
             `;
+        } else {
+            contentHtml = `<div class="clip-text">${escapeHtml(clip.text || '(Empty Clip)')}</div>`;
         }
         
         card.innerHTML = `
-            <div class="clip-body" title="Click to view & edit full clip">
-                ${attachmentHtml}
-                <div class="clip-text">${escapeHtml(clip.text || '(No text)')}</div>
+            <div class="clip-body" title="Click to view full clip">
+                ${contentHtml}
                 <div class="clip-meta">${timeStr}</div>
             </div>
             <div class="clip-actions">
-                <button class="btn-copy" aria-label="Copy clip text">
+                <button class="btn-copy" aria-label="Copy clip content">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                     Copy
                 </button>
@@ -997,7 +992,10 @@ function renderClips(clipsList, isSearchResult = false) {
         copyBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
-                const textToCopy = clip.text || (clip.fileData ? clip.fileData.name : 'Clip Attachment');
+                let textToCopy = clip.text;
+                if (clip.imageData) textToCopy = clip.imageData;
+                else if (clip.fileData) textToCopy = clip.fileData.data || clip.fileData.name;
+                
                 await navigator.clipboard.writeText(textToCopy);
                 showToast("Clip copied to clipboard!");
                 copyBtn.innerHTML = `✓ Copied`;
@@ -1027,10 +1025,16 @@ function renderEditorAttachment() {
     if (!editorAttachment) {
         DOM.editorAttachmentPreview.classList.add('hidden');
         DOM.editorAttachmentPreview.innerHTML = '';
+        if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.disabled = false;
         return;
     }
     
     DOM.editorAttachmentPreview.classList.remove('hidden');
+    // Clear text if attachment selected (Exclusive single content)
+    if (DOM.txtFullPageEditor) {
+        DOM.txtFullPageEditor.value = '';
+    }
+    
     if (editorAttachment.type === 'image') {
         DOM.editorAttachmentPreview.innerHTML = `
             <img src="${editorAttachment.data}" class="attachment-image-display" alt="Attached Image">
@@ -1077,7 +1081,7 @@ function renderPreviewAttachment() {
         DOM.previewAttachmentDisplay.innerHTML = `
             <img src="${previewAttachment.data}" class="attachment-image-display" alt="Attached Image">
             <div style="display: flex; gap: 8px; align-items: center;">
-                <a href="${previewAttachment.data}" download="attachment.jpg" class="btn" style="padding: 4px 10px; font-size: 0.8rem;" title="Download image">Download</a>
+                <a href="${previewAttachment.data}" download="image-clip.jpg" class="btn" style="padding: 4px 10px; font-size: 0.8rem;" title="Download image">Download</a>
                 <button id="btnRemovePreviewAttachment" class="btn-detach" title="Remove attachment">Remove</button>
             </div>
         `;
@@ -1107,7 +1111,7 @@ function renderPreviewAttachment() {
 function openPreviewModal(clip) {
     activePreviewClipId = clip.id;
     if (DOM.txtPreviewText) {
-        DOM.txtPreviewText.value = clip.text;
+        DOM.txtPreviewText.value = clip.text || '';
     }
     
     if (clip.imageData) {
@@ -1136,6 +1140,16 @@ function closePreviewModal() {
 // ==========================================
 // 🚀 EVENT LISTENERS & INITIALIZATION
 // ==========================================
+
+// Auto detach editor attachment if user begins typing text (Exclusive single content rule)
+if (DOM.txtFullPageEditor) {
+    DOM.txtFullPageEditor.addEventListener('input', () => {
+        if (editorAttachment && DOM.txtFullPageEditor.value.trim().length > 0) {
+            editorAttachment = null;
+            renderEditorAttachment();
+        }
+    });
+}
 
 // Global Paste Event Listener
 document.addEventListener('paste', async (e) => {
@@ -1168,7 +1182,7 @@ document.addEventListener('paste', async (e) => {
                     showToast("Image attached to clip");
                 } else {
                     await createNewClip('', { type: 'image', data: compressedDataUrl });
-                    showToast("Image clip saved from clipboard!");
+                    showToast("Image clip saved!");
                 }
             } catch (err) {
                 console.error("Paste image error:", err);
@@ -1188,7 +1202,7 @@ document.addEventListener('paste', async (e) => {
                     showToast("File attached to clip");
                 } else {
                     await createNewClip('', { type: 'file', ...fileObj });
-                    showToast("File clip saved from clipboard!");
+                    showToast("File clip saved!");
                 }
             } catch (err) {
                 console.error("Paste file error:", err);
@@ -1358,7 +1372,7 @@ if (DOM.btnOpenSearch) {
         if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
         if (DOM.headerNormalView) DOM.headerNormalView.classList.add('hidden');
         if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.remove('hidden');
-        if (DOM.fabContainer) DOM.fabContainer.classList.add('hidden'); // FAB disappears when search is active!
+        if (DOM.fabContainer) DOM.fabContainer.classList.add('hidden');
         if (DOM.searchInput) DOM.searchInput.focus();
     });
 }
@@ -1392,7 +1406,7 @@ if (DOM.btnResetSearchBanner) {
     });
 }
 
-// Global click listener to auto-close search bar, undo/redo popup, and attachment popups on outside click
+// Global click listener to auto-close search bar, undo/redo popup, and attachment popups
 document.addEventListener('click', (e) => {
     if (DOM.headerSearchOverlay && !DOM.headerSearchOverlay.classList.contains('hidden')) {
         const isClickInsideSearch = DOM.headerSearchOverlay.contains(e.target);
@@ -1475,7 +1489,7 @@ if (DOM.inputEditorImage) {
                 const compressedDataUrl = await compressImageToDataUrl(file, 128);
                 editorAttachment = { type: 'image', data: compressedDataUrl };
                 renderEditorAttachment();
-                showToast("Image attached (compressed <128KB)");
+                showToast("Image clip attached (<128KB)");
             } catch (err) {
                 console.error("Image error:", err);
                 showToast("Failed to process image");
@@ -1493,7 +1507,7 @@ if (DOM.inputEditorFile) {
                 const fileObj = await readDocumentFile(file, 128);
                 editorAttachment = { type: 'file', ...fileObj };
                 renderEditorAttachment();
-                showToast("File attached (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
+                showToast("File clip attached (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
             } catch (err) {
                 console.error("File error:", err);
                 showToast(err.message || "File size exceeds 128KB limit!");
@@ -1527,6 +1541,8 @@ if (DOM.btnFullEditorPaste) {
                     renderEditorAttachment();
                     showToast("Pasted file attached!");
                 } else if (content.type === 'text') {
+                    editorAttachment = null;
+                    renderEditorAttachment();
                     if (DOM.txtFullPageEditor) {
                         DOM.txtFullPageEditor.value = content.text;
                     }
@@ -1555,7 +1571,7 @@ if (DOM.btnFullEditorSend) {
     });
 }
 
-// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save (Text, Image & File!)
+// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save (Exclusive single content)
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         closeSearchOverlay();
@@ -1565,13 +1581,13 @@ if (DOM.btnFabQuickPaste) {
             if (content) {
                 if (content.type === 'image') {
                     await createNewClip('', { type: 'image', data: content.data });
-                    showToast("Pasted image saved to clips!");
+                    showToast("Pasted image saved!");
                 } else if (content.type === 'file') {
                     await createNewClip('', { type: 'file', ...content });
-                    showToast("Pasted file saved to clips!");
+                    showToast("Pasted file saved!");
                 } else if (content.type === 'text') {
                     await createNewClip(content.text);
-                    showToast("Pasted clip saved!");
+                    showToast("Pasted text saved!");
                 }
             } else {
                 showToast("Clipboard is empty or inaccessible!");
@@ -1619,8 +1635,9 @@ if (DOM.inputPreviewImage) {
                 showToast("Compressing image...");
                 const compressedDataUrl = await compressImageToDataUrl(file, 128);
                 previewAttachment = { type: 'image', data: compressedDataUrl };
+                if (DOM.txtPreviewText) DOM.txtPreviewText.value = '';
                 renderPreviewAttachment();
-                showToast("Image attached (compressed <128KB)");
+                showToast("Converted to Image Clip (<128KB)");
             } catch (err) {
                 console.error("Image error:", err);
                 showToast("Failed to process image");
@@ -1637,8 +1654,9 @@ if (DOM.inputPreviewFile) {
             try {
                 const fileObj = await readDocumentFile(file, 128);
                 previewAttachment = { type: 'file', ...fileObj };
+                if (DOM.txtPreviewText) DOM.txtPreviewText.value = '';
                 renderPreviewAttachment();
-                showToast("File attached (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
+                showToast("Converted to File Clip (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
             } catch (err) {
                 console.error("File error:", err);
                 showToast(err.message || "File size exceeds 128KB limit!");
@@ -1656,9 +1674,12 @@ if (DOM.btnClosePreviewModal) {
 
 if (DOM.btnPreviewCopy) {
     DOM.btnPreviewCopy.addEventListener('click', async () => {
-        const text = DOM.txtPreviewText?.value || '';
+        let textToCopy = DOM.txtPreviewText?.value || '';
+        if (previewAttachment && previewAttachment.type === 'image') textToCopy = previewAttachment.data;
+        else if (previewAttachment && previewAttachment.type === 'file') textToCopy = previewAttachment.data || previewAttachment.name;
+        
         try {
-            await navigator.clipboard.writeText(text);
+            await navigator.clipboard.writeText(textToCopy);
             showToast("Clip copied to clipboard!");
         } catch (err) {
             console.error("Failed to copy text:", err);
