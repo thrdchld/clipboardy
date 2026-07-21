@@ -419,6 +419,34 @@ export async function performRedo() {
     }
 }
 
+// Global Keyboard Shortcut Listener for Ctrl+Z (Undo) and Ctrl+Y / Ctrl+Shift+Z (Redo)
+document.addEventListener('keydown', (e) => {
+    if (isAppLocked) return;
+    
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    if (!isCtrlOrCmd) return;
+    
+    const activeElem = document.activeElement;
+    const isTypingInTextarea = activeElem && (activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'INPUT');
+    
+    const key = e.key.toLowerCase();
+    
+    // Ctrl + Shift + Z  OR  Ctrl + Y -> REDO
+    if ((key === 'z' && e.shiftKey) || key === 'y') {
+        if (!isTypingInTextarea) {
+            e.preventDefault();
+            performRedo();
+        }
+    } 
+    // Ctrl + Z -> UNDO
+    else if (key === 'z' && !e.shiftKey) {
+        if (!isTypingInTextarea) {
+            e.preventDefault();
+            performUndo();
+        }
+    }
+});
+
 // ==========================================
 // 🔒 LOCK & SCREEN MANAGEMENT
 // ==========================================
@@ -924,67 +952,6 @@ function closePreviewModal() {
 // ==========================================
 // 🚀 EVENT LISTENERS & INITIALIZATION
 // ==========================================
-
-// Global Paste Event Listener
-document.addEventListener('paste', async (e) => {
-    if (isAppLocked) return;
-    
-    const items = e.clipboardData?.items || [];
-    let imageItem = null;
-    let fileItem = null;
-    
-    for (const item of items) {
-        if (item.type.startsWith('image/')) {
-            imageItem = item;
-            break;
-        } else if (item.kind === 'file') {
-            fileItem = item;
-        }
-    }
-    
-    if (imageItem) {
-        e.preventDefault();
-        const file = imageItem.getAsFile();
-        if (file) {
-            try {
-                showToast("Compressing pasted image...");
-                const compressedDataUrl = await compressImageToDataUrl(file, 128);
-                
-                if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
-                    editorAttachment = { type: 'image', data: compressedDataUrl };
-                    renderEditorAttachment();
-                    showToast("Image attached to clip");
-                } else {
-                    await createNewClip('', { type: 'image', data: compressedDataUrl });
-                    showToast("Image clip saved from clipboard!");
-                }
-            } catch (err) {
-                console.error("Paste image error:", err);
-                showToast("Failed to process pasted image");
-            }
-        }
-    } else if (fileItem) {
-        e.preventDefault();
-        const file = fileItem.getAsFile();
-        if (file) {
-            try {
-                const fileObj = await readDocumentFile(file, 128);
-                
-                if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
-                    editorAttachment = { type: 'file', ...fileObj };
-                    renderEditorAttachment();
-                    showToast("File attached to clip");
-                } else {
-                    await createNewClip('', { type: 'file', ...fileObj });
-                    showToast("File clip saved from clipboard!");
-                }
-            } catch (err) {
-                console.error("Paste file error:", err);
-                showToast(err.message || "File size exceeds 128KB limit!");
-            }
-        }
-    }
-});
 
 // Network connection listeners
 window.addEventListener('online', () => {
