@@ -601,21 +601,14 @@ header {
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
-    height: 56px;
+    height: 54px;
 }
 
 .fullpage-editor-title {
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 1.05rem;
     color: var(--text-main);
     white-space: nowrap;
-}
-
-.editor-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
 }
 
 .fullpage-editor-body {
@@ -648,6 +641,70 @@ header {
 
 .fullpage-textarea:focus {
     border-color: var(--primary);
+}
+
+/* Modal Bottom Toolbar */
+.fullpage-editor-bottombar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    height: 60px;
+    position: relative;
+}
+
+.bottombar-actions-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bottombar-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Attachment Popup Dropdown in Bottom Toolbar */
+.attachment-popup {
+    position: absolute;
+    bottom: 64px;
+    left: 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    width: 180px;
+    padding: 6px;
+    z-index: 2600;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.attachment-popup-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-main);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 0.15s;
+}
+
+.attachment-popup-item:hover {
+    background: var(--bg-hover);
 }
 
 /* Professional Attachment Containers inside Modals */
@@ -766,26 +823,4 @@ header {
 
 .text-muted {
     color: var(--text-muted);
-}
-
-/* Mobile Responsive Adjustments (< 520px) */
-@media (max-width: 520px) {
-    .editor-header-actions .btn-text {
-        display: none;
-    }
-    
-    .editor-header-actions .btn {
-        padding: 8px;
-        min-width: 36px;
-        height: 36px;
-        justify-content: center;
-    }
-    
-    .fullpage-editor-title {
-        font-size: 0.95rem;
-    }
-    
-    .attachment-file-name {
-        max-width: 130px;
-    }
 }

@@ -88,13 +88,17 @@ const DOM = {
     clipGrid: document.getElementById('clipGrid'),
     emptyState: document.getElementById('emptyState'),
     
+    fabContainer: document.getElementById('fabContainer'),
     btnFabEditor: document.getElementById('btnFabEditor'),
     btnFabQuickPaste: document.getElementById('btnFabQuickPaste'),
     
     fullPageEditorModal: document.getElementById('fullPageEditorModal'),
     btnCloseFullPageEditor: document.getElementById('btnCloseFullPageEditor'),
-    btnAttachImage: document.getElementById('btnAttachImage'),
-    btnAttachFile: document.getElementById('btnAttachFile'),
+    
+    btnAttachToggle: document.getElementById('btnAttachToggle'),
+    editorAttachmentPopup: document.getElementById('editorAttachmentPopup'),
+    btnChooseImage: document.getElementById('btnChooseImage'),
+    btnChooseFile: document.getElementById('btnChooseFile'),
     inputEditorImage: document.getElementById('inputEditorImage'),
     inputEditorFile: document.getElementById('inputEditorFile'),
     editorAttachmentPreview: document.getElementById('editorAttachmentPreview'),
@@ -104,8 +108,10 @@ const DOM = {
     
     fullPagePreviewModal: document.getElementById('fullPagePreviewModal'),
     btnClosePreviewModal: document.getElementById('btnClosePreviewModal'),
-    btnPreviewAttachImage: document.getElementById('btnPreviewAttachImage'),
-    btnPreviewAttachFile: document.getElementById('btnPreviewAttachFile'),
+    btnPreviewAttachToggle: document.getElementById('btnPreviewAttachToggle'),
+    previewAttachmentPopup: document.getElementById('previewAttachmentPopup'),
+    btnPreviewChooseImage: document.getElementById('btnPreviewChooseImage'),
+    btnPreviewChooseFile: document.getElementById('btnPreviewChooseFile'),
     inputPreviewImage: document.getElementById('inputPreviewImage'),
     inputPreviewFile: document.getElementById('inputPreviewFile'),
     previewAttachmentDisplay: document.getElementById('previewAttachmentDisplay'),
@@ -126,7 +132,7 @@ const DOM = {
     toast: document.getElementById('toast')
 };
 
-// Unique device ID generator & helper
+// Unique device ID generator
 function getOrCreateDeviceId() {
     let id = localStorage.getItem('clipboardy_device_id');
     if (!id) {
@@ -145,7 +151,6 @@ function getDeviceName() {
     return "Web Browser";
 }
 
-// Get 00:00 WIB (GMT+7) timestamp for today
 function getStartOfTodayWibMs() {
     const now = new Date();
     const wibOffsetMs = 7 * 60 * 60 * 1000;
@@ -153,6 +158,16 @@ function getStartOfTodayWibMs() {
     const wibDate = new Date(utcMs + wibOffsetMs);
     wibDate.setHours(0, 0, 0, 0);
     return wibDate.getTime() - wibOffsetMs;
+}
+
+// Helper Blob to DataURL
+function readBlobAsDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Failed to read blob"));
+        reader.readAsDataURL(blob);
+    });
 }
 
 // ==========================================
@@ -276,38 +291,46 @@ export async function readDocumentFile(file, maxKb = 128) {
         throw new Error(`File size (${kbSize} KB) exceeds limit of ${maxKb} KB!`);
     }
     
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve({
-            name: file.name,
-            size: file.size,
-            type: file.type || 'application/octet-stream',
-            data: reader.result
-        });
-        reader.onerror = () => reject(new Error("Failed to read document file"));
-        reader.readAsDataURL(file);
-    });
+    const dataUrl = await readBlobAsDataUrl(file);
+    return {
+        name: file.name || 'document',
+        size: file.size || dataUrl.length,
+        type: file.type || 'application/octet-stream',
+        data: dataUrl
+    };
 }
 
-// Read clipboard content
+// Read system clipboard for Text, Image, or File content
 export async function readClipboardContent() {
+    // 1. Try rich Clipboard API first (supports images & files)
     if (navigator.clipboard && navigator.clipboard.read) {
         try {
             const items = await navigator.clipboard.read();
             for (const item of items) {
+                // Check for image types in clipboard
                 const imageType = item.types.find(t => t.startsWith('image/'));
                 if (imageType) {
                     const blob = await item.getType(imageType);
-                    const file = new File([blob], "clipboard-image.jpg", { type: imageType });
+                    const file = new File([blob], "pasted-image.jpg", { type: imageType });
                     const compressedDataUrl = await compressImageToDataUrl(file, 128);
                     return { type: 'image', data: compressedDataUrl };
                 }
                 
-                if (item.types.includes('text/plain')) {
-                    const blob = await item.getType('text/plain');
-                    const text = await blob.text();
-                    if (text && text.trim()) {
-                        return { type: 'text', text: text.trim() };
+                // Check for file types or plain text
+                for (const type of item.types) {
+                    if (type === 'text/plain') {
+                        const blob = await item.getType('text/plain');
+                        const text = await blob.text();
+                        if (text && text.trim()) {
+                            return { type: 'text', text: text.trim() };
+                        }
+                    } else if (type !== 'text/html') {
+                        try {
+                            const blob = await item.getType(type);
+                            const file = new File([blob], `pasted-file`, { type: type });
+                            const fileObj = await readDocumentFile(file, 128);
+                            return { type: 'file', ...fileObj };
+                        } catch (e) {}
                     }
                 }
             }
@@ -316,6 +339,7 @@ export async function readClipboardContent() {
         }
     }
     
+    // 2. Fallback to readText
     if (navigator.clipboard && navigator.clipboard.readText) {
         try {
             const text = await navigator.clipboard.readText();
@@ -510,7 +534,6 @@ export function unlockApp() {
     }
 }
 
-// Check and render saved Google user on login screen
 function renderSavedGoogleUser() {
     const savedStr = localStorage.getItem('last_google_user');
     if (savedStr) {
@@ -565,7 +588,6 @@ async function handleGuestRoomLogin(rawCode) {
         const snapshot = await getDocs(query(notesRef, limit(10)));
         
         if (snapshot.empty) {
-            // First device in room - register as active device directly
             await setDoc(roomRef, {
                 roomCode: roomCode,
                 activeDeviceId: currentDeviceId,
@@ -576,10 +598,6 @@ async function handleGuestRoomLogin(rawCode) {
             return;
         }
         
-        // Room already exists & has data -> Check active device status
-        const roomSnap = await getDocs(query(collection(db, 'guestRooms'), limit(1)));
-        
-        // Submit access request to primary active device
         const requestRef = doc(db, 'guestRooms', currentRoomHash, 'requests', currentDeviceId);
         await setDoc(requestRef, {
             deviceId: currentDeviceId,
@@ -591,7 +609,6 @@ async function handleGuestRoomLogin(rawCode) {
         if (DOM.waitingRoomName) DOM.waitingRoomName.textContent = roomCode;
         if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.remove('hidden');
         
-        // Listen to approval response
         if (unsubscribeMyRequest) unsubscribeMyRequest();
         unsubscribeMyRequest = onSnapshot(requestRef, (docSnap) => {
             if (!docSnap.exists()) return;
@@ -611,12 +628,10 @@ async function handleGuestRoomLogin(rawCode) {
         
     } catch (err) {
         console.error("Guest room authorization error:", err);
-        // Fallback unlock if security rules allow
         unlockApp();
     }
 }
 
-// Active Device A: Listen for incoming access requests from Device B
 function listenForIncomingAccessRequests() {
     if (!currentRoomHash || !isGuestRoom) return;
     
@@ -663,7 +678,6 @@ function startClipsRealtimeSync() {
             const data = docSnap.data();
             const clipTs = getTimeMs(data.timestamp);
             
-            // If Guest Room, filter out clips older than today's 00:00 WIB
             if (isGuestRoom && clipTs < startOfTodayWib) {
                 return;
             }
@@ -909,6 +923,7 @@ function resetSearchMode() {
 function closeSearchOverlay() {
     if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.add('hidden');
     if (DOM.headerNormalView) DOM.headerNormalView.classList.remove('hidden');
+    if (DOM.fabContainer) DOM.fabContainer.classList.remove('hidden');
     resetSearchMode();
 }
 
@@ -1204,7 +1219,7 @@ window.addEventListener('offline', () => {
     showToast("Connection lost (Offline)");
 });
 
-// Guest Room Login Handler (Accepts any code / text or numbers)
+// Guest Room Login Handler
 if (DOM.loginBtn) {
     DOM.loginBtn.addEventListener('click', async () => {
         const roomCode = (DOM.roomNameInput?.value || '').trim();
@@ -1223,7 +1238,6 @@ if (DOM.btnGoogleLogin) {
             
             currentRoomHash = await hashPassword('google_user_' + currentUser.uid);
             
-            // Save last Google user state to localStorage
             const userObj = {
                 displayName: currentUser.displayName,
                 email: currentUser.email,
@@ -1266,7 +1280,7 @@ if (DOM.btnQuickContinueGoogle) {
     });
 }
 
-// Access Request Response Handlers on Active Device A
+// Access Request Response Handlers
 if (DOM.btnApproveAccessRequest) {
     DOM.btnApproveAccessRequest.addEventListener('click', async () => {
         if (activePendingRequestId && currentRoomHash) {
@@ -1296,7 +1310,7 @@ if (DOM.btnCancelWaitingRequest) {
     });
 }
 
-// Lock button (Returns to login screen)
+// Lock button
 if (DOM.btnLock) {
     DOM.btnLock.addEventListener('click', () => {
         closeSearchOverlay();
@@ -1344,6 +1358,7 @@ if (DOM.btnOpenSearch) {
         if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
         if (DOM.headerNormalView) DOM.headerNormalView.classList.add('hidden');
         if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.remove('hidden');
+        if (DOM.fabContainer) DOM.fabContainer.classList.add('hidden'); // FAB disappears when search is active!
         if (DOM.searchInput) DOM.searchInput.focus();
     });
 }
@@ -1377,7 +1392,7 @@ if (DOM.btnResetSearchBanner) {
     });
 }
 
-// Global click listener to auto-close search bar and undo/redo popup on outside click
+// Global click listener to auto-close search bar, undo/redo popup, and attachment popups on outside click
 document.addEventListener('click', (e) => {
     if (DOM.headerSearchOverlay && !DOM.headerSearchOverlay.classList.contains('hidden')) {
         const isClickInsideSearch = DOM.headerSearchOverlay.contains(e.target);
@@ -1392,6 +1407,18 @@ document.addEventListener('click', (e) => {
         const isClickToggleBtn = DOM.btnToggleUndoRedo?.contains(e.target);
         if (!isClickInsidePopup && !isClickToggleBtn) {
             DOM.undoRedoPopup.classList.add('hidden');
+        }
+    }
+    
+    if (DOM.editorAttachmentPopup && !DOM.editorAttachmentPopup.classList.contains('hidden')) {
+        if (!DOM.editorAttachmentPopup.contains(e.target) && !DOM.btnAttachToggle?.contains(e.target)) {
+            DOM.editorAttachmentPopup.classList.add('hidden');
+        }
+    }
+    
+    if (DOM.previewAttachmentPopup && !DOM.previewAttachmentPopup.classList.contains('hidden')) {
+        if (!DOM.previewAttachmentPopup.contains(e.target) && !DOM.btnPreviewAttachToggle?.contains(e.target)) {
+            DOM.previewAttachmentPopup.classList.add('hidden');
         }
     }
 });
@@ -1415,10 +1442,27 @@ if (DOM.btnFabEditor) {
     });
 }
 
-// Editor Attachment Actions
-if (DOM.btnAttachImage) {
-    DOM.btnAttachImage.addEventListener('click', () => {
+// Single Attachment Button & Popup Handlers (Editor)
+if (DOM.btnAttachToggle) {
+    DOM.btnAttachToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (DOM.editorAttachmentPopup) DOM.editorAttachmentPopup.classList.toggle('hidden');
+    });
+}
+
+if (DOM.btnChooseImage) {
+    DOM.btnChooseImage.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (DOM.editorAttachmentPopup) DOM.editorAttachmentPopup.classList.add('hidden');
         DOM.inputEditorImage?.click();
+    });
+}
+
+if (DOM.btnChooseFile) {
+    DOM.btnChooseFile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (DOM.editorAttachmentPopup) DOM.editorAttachmentPopup.classList.add('hidden');
+        DOM.inputEditorFile?.click();
     });
 }
 
@@ -1441,12 +1485,6 @@ if (DOM.inputEditorImage) {
     });
 }
 
-if (DOM.btnAttachFile) {
-    DOM.btnAttachFile.addEventListener('click', () => {
-        DOM.inputEditorFile?.click();
-    });
-}
-
 if (DOM.inputEditorFile) {
     DOM.inputEditorFile.addEventListener('change', async (e) => {
         const file = e.target.files[0];
@@ -1455,7 +1493,7 @@ if (DOM.inputEditorFile) {
                 const fileObj = await readDocumentFile(file, 128);
                 editorAttachment = { type: 'file', ...fileObj };
                 renderEditorAttachment();
-                showToast("File attached (" + Math.round(file.size / 1024) + " KB)");
+                showToast("File attached (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
             } catch (err) {
                 console.error("File error:", err);
                 showToast(err.message || "File size exceeds 128KB limit!");
@@ -1484,6 +1522,10 @@ if (DOM.btnFullEditorPaste) {
                     editorAttachment = { type: 'image', data: content.data };
                     renderEditorAttachment();
                     showToast("Pasted image attached!");
+                } else if (content.type === 'file') {
+                    editorAttachment = { type: 'file', ...content };
+                    renderEditorAttachment();
+                    showToast("Pasted file attached!");
                 } else if (content.type === 'text') {
                     if (DOM.txtFullPageEditor) {
                         DOM.txtFullPageEditor.value = content.text;
@@ -1513,7 +1555,7 @@ if (DOM.btnFullEditorSend) {
     });
 }
 
-// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save
+// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save (Text, Image & File!)
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         closeSearchOverlay();
@@ -1524,6 +1566,9 @@ if (DOM.btnFabQuickPaste) {
                 if (content.type === 'image') {
                     await createNewClip('', { type: 'image', data: content.data });
                     showToast("Pasted image saved to clips!");
+                } else if (content.type === 'file') {
+                    await createNewClip('', { type: 'file', ...content });
+                    showToast("Pasted file saved to clips!");
                 } else if (content.type === 'text') {
                     await createNewClip(content.text);
                     showToast("Pasted clip saved!");
@@ -1541,9 +1586,28 @@ if (DOM.btnFabQuickPaste) {
 // ==========================================
 // 📖 FULL PAGE PREVIEW MODAL LISTENERS
 // ==========================================
-if (DOM.btnPreviewAttachImage) {
-    DOM.btnPreviewAttachImage.addEventListener('click', () => {
+
+// Single Attachment Button & Popup Handlers (Preview)
+if (DOM.btnPreviewAttachToggle) {
+    DOM.btnPreviewAttachToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (DOM.previewAttachmentPopup) DOM.previewAttachmentPopup.classList.toggle('hidden');
+    });
+}
+
+if (DOM.btnPreviewChooseImage) {
+    DOM.btnPreviewChooseImage.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (DOM.previewAttachmentPopup) DOM.previewAttachmentPopup.classList.add('hidden');
         DOM.inputPreviewImage?.click();
+    });
+}
+
+if (DOM.btnPreviewChooseFile) {
+    DOM.btnPreviewChooseFile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (DOM.previewAttachmentPopup) DOM.previewAttachmentPopup.classList.add('hidden');
+        DOM.inputPreviewFile?.click();
     });
 }
 
@@ -1566,12 +1630,6 @@ if (DOM.inputPreviewImage) {
     });
 }
 
-if (DOM.btnPreviewAttachFile) {
-    DOM.btnPreviewAttachFile.addEventListener('click', () => {
-        DOM.inputPreviewFile?.click();
-    });
-}
-
 if (DOM.inputPreviewFile) {
     DOM.inputPreviewFile.addEventListener('change', async (e) => {
         const file = e.target.files[0];
@@ -1580,7 +1638,7 @@ if (DOM.inputPreviewFile) {
                 const fileObj = await readDocumentFile(file, 128);
                 previewAttachment = { type: 'file', ...fileObj };
                 renderPreviewAttachment();
-                showToast("File attached (" + Math.round(file.size / 1024) + " KB)");
+                showToast("File attached (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
             } catch (err) {
                 console.error("File error:", err);
                 showToast(err.message || "File size exceeds 128KB limit!");
