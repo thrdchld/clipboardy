@@ -704,8 +704,8 @@ function startClipsRealtimeSync() {
     });
 }
 
-// STRICT EXCLUSIVE SINGLE CONTENT RULE PER CLIP:
-// A clip is EITHER Image ONLY, File ONLY, OR Text ONLY. Never combined!
+// ABSOLUTELY STRICT SINGLE CONTENT CREATION:
+// Priority: 1. Image Clip  2. File Clip  3. Text Clip (Never combination!)
 async function createNewClip(text, attachment = null, trackHistory = true) {
     if (!currentRoomHash) {
         showToast("Room is required!");
@@ -1076,7 +1076,7 @@ function renderEditorAttachment() {
 function renderPreviewAttachment() {
     if (!DOM.previewAttachmentDisplay) return;
     
-    if (!previewAttachment) {
+    if (!previewAttachment || previewAttachment === 'DELETE') {
         DOM.previewAttachmentDisplay.classList.add('hidden');
         DOM.previewAttachmentDisplay.innerHTML = '';
         if (DOM.txtPreviewText) DOM.txtPreviewText.disabled = false;
@@ -1190,7 +1190,7 @@ document.addEventListener('paste', async (e) => {
                 if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
                     editorAttachment = { type: 'image', data: compressedDataUrl };
                     renderEditorAttachment();
-                    showToast("Image attached to clip");
+                    showToast("Converted to Image Clip");
                 } else {
                     await createNewClip('', { type: 'image', data: compressedDataUrl });
                     showToast("Image clip saved!");
@@ -1210,7 +1210,7 @@ document.addEventListener('paste', async (e) => {
                 if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
                     editorAttachment = { type: 'file', ...fileObj };
                     renderEditorAttachment();
-                    showToast("File attached to clip");
+                    showToast("Converted to File Clip");
                 } else {
                     await createNewClip('', { type: 'file', ...fileObj });
                     showToast("File clip saved!");
@@ -1462,6 +1462,7 @@ if (DOM.btnFabEditor) {
         if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
         if (DOM.txtFullPageEditor) {
             DOM.txtFullPageEditor.value = '';
+            DOM.txtFullPageEditor.disabled = false;
             DOM.txtFullPageEditor.focus();
         }
     });
@@ -1555,6 +1556,7 @@ if (DOM.btnFullEditorPaste) {
                     editorAttachment = null;
                     renderEditorAttachment();
                     if (DOM.txtFullPageEditor) {
+                        DOM.txtFullPageEditor.disabled = false;
                         DOM.txtFullPageEditor.value = content.text;
                     }
                     showToast("Pasted text from clipboard!");
@@ -1573,7 +1575,7 @@ if (DOM.btnFullEditorPaste) {
 if (DOM.btnFullEditorSend) {
     DOM.btnFullEditorSend.addEventListener('click', async () => {
         const text = (DOM.txtFullPageEditor?.value || '').trim();
-        if (text || editorAttachment) {
+        if (editorAttachment || text) {
             await createNewClip(text, editorAttachment);
             if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.add('hidden');
         } else {
