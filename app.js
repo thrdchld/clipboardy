@@ -569,7 +569,7 @@ function startDeviceHeartbeat() {
                 }, { merge: true });
             } catch (e) {}
         }
-    }, 60 * 1000); // 1 minute heartbeat
+    }, 30 * 1000); // 30 seconds heartbeat
 }
 
 // ==========================================
@@ -599,31 +599,24 @@ async function handleGuestRoomLogin(rawCode) {
         }
     }
     
-    // Store device authorization inside clipboards/{hash}/meta/deviceAuth (100% permitted path)
     const deviceAuthRef = doc(db, 'clipboards', currentRoomHash, 'meta', 'deviceAuth');
     
     try {
         const docSnap = await getDoc(deviceAuthRef);
-        const nowMs = Date.now();
-        
         let needsApproval = false;
         
         if (docSnap.exists()) {
             const data = docSnap.data();
             const activeId = data.activeDeviceId;
             
-            // If active device is NOT this device
+            // STRICT RULE: If activeDeviceId is set AND is DIFFERENT from currentDeviceId -> ALWAYS REQUIRE APPROVAL!
             if (activeId && activeId !== currentDeviceId) {
-                const lastActiveMs = getTimeMs(data.lastActiveTime);
-                // Check if active device has been online in the last 5 minutes
-                if (lastActiveMs && (nowMs - lastActiveMs) < (5 * 60 * 1000)) {
-                    needsApproval = true;
-                }
+                needsApproval = true;
             }
         }
         
         if (!needsApproval) {
-            // First device in room OR active device timed out -> Become primary active device directly!
+            // First device in room OR this device IS the active device -> Unlock immediately!
             await setDoc(deviceAuthRef, {
                 roomCode: roomCode,
                 activeDeviceId: currentDeviceId,
@@ -634,7 +627,7 @@ async function handleGuestRoomLogin(rawCode) {
             return;
         }
         
-        // Active Device exists & is online -> Must request approval!
+        // Device B MUST request authorization from Device A!
         const requestRef = doc(db, 'clipboards', currentRoomHash, 'requests', currentDeviceId);
         await setDoc(requestRef, {
             deviceId: currentDeviceId,
@@ -673,8 +666,8 @@ async function handleGuestRoomLogin(rawCode) {
         
     } catch (err) {
         console.error("Guest room authorization error:", err);
-        // Fallback: If meta subcollection encounters any issue, enter room securely
-        unlockApp();
+        showToast("Guest Room Connection Error: " + (err.message || err));
+        // STOPS ENTIRELY ON ERROR! Never calls unlockApp() on error!
     }
 }
 
