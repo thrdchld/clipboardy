@@ -40,9 +40,9 @@ export let activePendingRequestId = null;
 // Gboard-style Clip Creation Mode Tab State: 'text' | 'image' | 'file'
 export let currentEditorTab = 'text';
 
-// Attachment state
-export let editorAttachment = null;   // { type: 'image'|'file', data: string, name?: string, size?: number }
-export let previewAttachment = null;  // { type: 'image'|'file', data: string, name?: string, size?: number }
+// Attachments state: { kind: 'image'|'file', data: string, fileName?: string, fileSize?: number, mimeType?: string }
+export let editorAttachment = null;
+export let previewAttachment = null;
 
 // Undo / Redo History Stack (Max 50 actions)
 export let undoStack = [];
@@ -279,6 +279,7 @@ export async function compressImageToDataUrl(file, maxKb = 128) {
     });
 }
 
+// Read document file & verify <= 128 KB
 export async function readDocumentFile(file, maxKb = 128) {
     const maxBytes = maxKb * 1024;
     if (file.size > maxBytes) {
@@ -288,39 +289,48 @@ export async function readDocumentFile(file, maxKb = 128) {
     
     const dataUrl = await readBlobAsDataUrl(file);
     return {
-        name: file.name || 'document',
-        size: file.size || dataUrl.length,
-        type: file.type || 'application/octet-stream',
+        fileName: file.name || 'document',
+        fileSize: file.size || dataUrl.length,
+        mimeType: file.type || 'application/octet-stream',
         data: dataUrl
     };
 }
 
+// Read system clipboard for Text, Image, or File content
 export async function readClipboardContent() {
     if (navigator.clipboard && navigator.clipboard.read) {
         try {
             const items = await navigator.clipboard.read();
             for (const item of items) {
+                // 1. Check for image item
                 const imageType = item.types.find(t => t.startsWith('image/'));
                 if (imageType) {
-                    const blob = await item.getType(imageType);
-                    const file = new File([blob], "pasted-image.jpg", { type: imageType });
-                    const compressedDataUrl = await compressImageToDataUrl(file, 128);
-                    return { type: 'image', data: compressedDataUrl };
+                    try {
+                        const blob = await item.getType(imageType);
+                        const file = new File([blob], "pasted-image.jpg", { type: imageType });
+                        const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                        return { kind: 'image', data: compressedDataUrl };
+                    } catch (e) {
+                        console.warn("Failed to read clipboard image blob:", e);
+                    }
                 }
                 
+                // 2. Check for text or file item
                 for (const type of item.types) {
                     if (type === 'text/plain') {
-                        const blob = await item.getType('text/plain');
-                        const text = await blob.text();
-                        if (text && text.trim()) {
-                            return { type: 'text', text: text.trim() };
-                        }
-                    } else if (type !== 'text/html') {
+                        try {
+                            const blob = await item.getType('text/plain');
+                            const text = await blob.text();
+                            if (text && text.trim()) {
+                                return { kind: 'text', text: text.trim() };
+                            }
+                        } catch (e) {}
+                    } else if (!type.includes('html')) {
                         try {
                             const blob = await item.getType(type);
                             const file = new File([blob], `pasted-file`, { type: type });
                             const fileObj = await readDocumentFile(file, 128);
-                            return { type: 'file', ...fileObj };
+                            return { kind: 'file', ...fileObj };
                         } catch (e) {}
                     }
                 }
@@ -334,7 +344,7 @@ export async function readClipboardContent() {
         try {
             const text = await navigator.clipboard.readText();
             if (text && text.trim()) {
-                return { type: 'text', text: text.trim() };
+                return { kind: 'text', text: text.trim() };
             }
         } catch (err) {
             console.warn("navigator.clipboard.readText fallback:", err);
@@ -719,13 +729,13 @@ async function createNewClip(text, attachment = null, trackHistory = true) {
         fileData: null
     };
 
-    if (attachment && attachment.type === 'image') {
+    if (attachment && (attachment.kind === 'image' || attachment.type === 'image')) {
         payload.imageData = attachment.data;
-    } else if (attachment && attachment.type === 'file') {
+    } else if (attachment && (attachment.kind === 'file' || attachment.type === 'file')) {
         payload.fileData = {
-            name: attachment.name,
-            size: attachment.size,
-            type: attachment.type,
+            name: attachment.fileName || attachment.name || 'file',
+            size: attachment.fileSize || attachment.size || 0,
+            type: attachment.mimeType || attachment.type || 'application/octet-stream',
             data: attachment.data
         };
     } else if (text && text.trim()) {
@@ -790,13 +800,13 @@ async function updateClip(clipId, newText, attachment = null, trackHistory = tru
         
         if (attachment === 'DELETE') {
             payload.text = (newText || '').trim();
-        } else if (attachment && attachment.type === 'image') {
+        } else if (attachment && (attachment.kind === 'image' || attachment.type === 'image')) {
             payload.imageData = attachment.data;
-        } else if (attachment && attachment.type === 'file') {
+        } else if (attachment && (attachment.kind === 'file' || attachment.type === 'file')) {
             payload.fileData = {
-                name: attachment.name,
-                size: attachment.size,
-                type: attachment.type,
+                name: attachment.fileName || attachment.name || 'file',
+                size: attachment.fileSize || attachment.size || 0,
+                type: attachment.mimeType || attachment.type || 'application/octet-stream',
                 data: attachment.data
             };
         } else if (newText && newText.trim()) {
@@ -1032,13 +1042,13 @@ function setEditorTab(tabType) {
     } else if (tabType === 'image') {
         if (DOM.panelTypeText) DOM.panelTypeText.classList.add('hidden');
         if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
-        if (!editorAttachment || editorAttachment.type !== 'image') {
+        if (!editorAttachment || (editorAttachment.kind !== 'image' && editorAttachment.type !== 'image')) {
             DOM.inputEditorImage?.click();
         }
     } else if (tabType === 'file') {
         if (DOM.panelTypeText) DOM.panelTypeText.classList.add('hidden');
         if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
-        if (!editorAttachment || editorAttachment.type !== 'file') {
+        if (!editorAttachment || (editorAttachment.kind !== 'file' && editorAttachment.type !== 'file')) {
             DOM.inputEditorFile?.click();
         }
     }
@@ -1057,24 +1067,28 @@ function renderEditorAttachment() {
     DOM.editorAttachmentPreview.classList.remove('hidden');
     if (DOM.panelTypeText) DOM.panelTypeText.classList.add('hidden');
     
-    if (editorAttachment.type === 'image') {
+    const attKind = editorAttachment.kind || editorAttachment.type;
+    
+    if (attKind === 'image') {
         DOM.editorAttachmentPreview.innerHTML = `
             <img src="${editorAttachment.data}" class="attachment-image-display" alt="Attached Image">
             <button id="btnRemoveEditorAttachment" class="btn-detach" title="Remove attachment">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                Remove
+                Remove Image
             </button>
         `;
-    } else if (editorAttachment.type === 'file') {
-        const kbSize = Math.round((editorAttachment.size || 0) / 1024);
+    } else if (attKind === 'file') {
+        const name = editorAttachment.fileName || editorAttachment.name || 'document';
+        const size = editorAttachment.fileSize || editorAttachment.size || 0;
+        const kbSize = Math.round(size / 1024);
         DOM.editorAttachmentPreview.innerHTML = `
             <div class="attachment-file-info">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                <span class="attachment-file-name">${escapeHtml(editorAttachment.name)} (${kbSize} KB)</span>
+                <span class="attachment-file-name">${escapeHtml(name)} (${kbSize} KB)</span>
             </div>
             <button id="btnRemoveEditorAttachment" class="btn-detach" title="Remove attachment">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                Remove
+                Remove File
             </button>
         `;
     }
@@ -1103,22 +1117,26 @@ function renderPreviewAttachment() {
     DOM.previewAttachmentDisplay.classList.remove('hidden');
     if (DOM.txtPreviewText) DOM.txtPreviewText.classList.add('hidden');
     
-    if (previewAttachment.type === 'image') {
+    const attKind = previewAttachment.kind || previewAttachment.type;
+    
+    if (attKind === 'image') {
         DOM.previewAttachmentDisplay.innerHTML = `
             <img src="${previewAttachment.data}" class="attachment-image-display" alt="Attached Image">
             <div style="display: flex; gap: 8px; align-items: center;">
                 <a href="${previewAttachment.data}" download="image-clip.jpg" class="btn" style="padding: 6px 12px; font-size: 0.82rem;" title="Download image">Download Image</a>
             </div>
         `;
-    } else if (previewAttachment.type === 'file') {
-        const kbSize = Math.round((previewAttachment.size || 0) / 1024);
+    } else if (attKind === 'file') {
+        const name = previewAttachment.fileName || previewAttachment.name || 'file';
+        const size = previewAttachment.fileSize || previewAttachment.size || 0;
+        const kbSize = Math.round(size / 1024);
         DOM.previewAttachmentDisplay.innerHTML = `
             <div class="attachment-file-info">
                 <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                <span class="attachment-file-name">${escapeHtml(previewAttachment.name)} (${kbSize} KB)</span>
+                <span class="attachment-file-name">${escapeHtml(name)} (${kbSize} KB)</span>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
-                <a href="${previewAttachment.data}" download="${escapeHtml(previewAttachment.name)}" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" title="Download file">Download File</a>
+                <a href="${previewAttachment.data}" download="${escapeHtml(name)}" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" title="Download file">Download File</a>
             </div>
         `;
     }
@@ -1128,9 +1146,9 @@ function openPreviewModal(clip) {
     activePreviewClipId = clip.id;
     
     if (clip.imageData) {
-        previewAttachment = { type: 'image', data: clip.imageData };
+        previewAttachment = { kind: 'image', data: clip.imageData };
     } else if (clip.fileData) {
-        previewAttachment = { type: 'file', ...clip.fileData };
+        previewAttachment = { kind: 'file', fileName: clip.fileData.name, fileSize: clip.fileData.size, mimeType: clip.fileData.type, data: clip.fileData.data };
     } else {
         previewAttachment = null;
         if (DOM.txtPreviewText) {
@@ -1170,7 +1188,7 @@ if (DOM.inputEditorImage) {
             try {
                 showToast("Compressing image...");
                 const compressedDataUrl = await compressImageToDataUrl(file, 128);
-                editorAttachment = { type: 'image', data: compressedDataUrl };
+                editorAttachment = { kind: 'image', data: compressedDataUrl };
                 renderEditorAttachment();
                 showToast("Image clip selected (<128KB)");
             } catch (err) {
@@ -1189,9 +1207,9 @@ if (DOM.inputEditorFile) {
         if (file) {
             try {
                 const fileObj = await readDocumentFile(file, 128);
-                editorAttachment = { type: 'file', ...fileObj };
+                editorAttachment = { kind: 'file', ...fileObj };
                 renderEditorAttachment();
-                showToast("File clip selected (" + Math.round((fileObj.size || file.size) / 1024) + " KB)");
+                showToast("File clip selected (" + Math.round((fileObj.fileSize || file.size) / 1024) + " KB)");
             } catch (err) {
                 console.error("File error:", err);
                 showToast(err.message || "File size exceeds 128KB limit!");
@@ -1228,12 +1246,12 @@ document.addEventListener('paste', async (e) => {
                 const compressedDataUrl = await compressImageToDataUrl(file, 128);
                 
                 if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
-                    editorAttachment = { type: 'image', data: compressedDataUrl };
+                    editorAttachment = { kind: 'image', data: compressedDataUrl };
                     renderEditorAttachment();
                     if (DOM.tabTypeImage) setEditorTab('image');
                     showToast("Pasted image clip");
                 } else {
-                    await createNewClip('', { type: 'image', data: compressedDataUrl });
+                    await createNewClip('', { kind: 'image', data: compressedDataUrl });
                     showToast("Pasted image saved to clipboard!");
                 }
             } catch (err) {
@@ -1249,12 +1267,12 @@ document.addEventListener('paste', async (e) => {
                 const fileObj = await readDocumentFile(file, 128);
                 
                 if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
-                    editorAttachment = { type: 'file', ...fileObj };
+                    editorAttachment = { kind: 'file', ...fileObj };
                     renderEditorAttachment();
                     if (DOM.tabTypeFile) setEditorTab('file');
                     showToast("Pasted file clip");
                 } else {
-                    await createNewClip('', { type: 'file', ...fileObj });
+                    await createNewClip('', { kind: 'file', ...fileObj });
                     showToast("Pasted file saved to clipboard!");
                 }
             } catch (err) {
@@ -1507,23 +1525,24 @@ if (DOM.btnCloseFullPageEditor) {
     });
 }
 
-// Full Page Editor: Paste Button (Detects text vs image vs file on system clipboard)
+// Full Page Editor: Paste Button
 if (DOM.btnFullEditorPaste) {
     DOM.btnFullEditorPaste.addEventListener('click', async () => {
         try {
             const content = await readClipboardContent();
             if (content) {
-                if (content.type === 'image') {
-                    editorAttachment = { type: 'image', data: content.data };
+                const kind = content.kind || content.type;
+                if (kind === 'image') {
+                    editorAttachment = { kind: 'image', data: content.data };
                     renderEditorAttachment();
                     setEditorTab('image');
                     showToast("Pasted image clip!");
-                } else if (content.type === 'file') {
-                    editorAttachment = { type: 'file', ...content };
+                } else if (kind === 'file') {
+                    editorAttachment = { kind: 'file', ...content };
                     renderEditorAttachment();
                     setEditorTab('file');
                     showToast("Pasted file clip!");
-                } else if (content.type === 'text') {
+                } else if (kind === 'text') {
                     editorAttachment = null;
                     renderEditorAttachment();
                     setEditorTab('text');
@@ -1555,7 +1574,7 @@ if (DOM.btnFullEditorSend) {
     });
 }
 
-// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save (Direct Gboard Style!)
+// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         closeSearchOverlay();
@@ -1563,13 +1582,14 @@ if (DOM.btnFabQuickPaste) {
         try {
             const content = await readClipboardContent();
             if (content) {
-                if (content.type === 'image') {
-                    await createNewClip('', { type: 'image', data: content.data });
+                const kind = content.kind || content.type;
+                if (kind === 'image') {
+                    await createNewClip('', { kind: 'image', data: content.data });
                     showToast("Pasted image saved to clipboard!");
-                } else if (content.type === 'file') {
-                    await createNewClip('', { type: 'file', ...content });
+                } else if (kind === 'file') {
+                    await createNewClip('', { kind: 'file', ...content });
                     showToast("Pasted file saved to clipboard!");
-                } else if (content.type === 'text') {
+                } else if (kind === 'text') {
                     await createNewClip(content.text);
                     showToast("Pasted text saved to clipboard!");
                 }
@@ -1596,8 +1616,8 @@ if (DOM.btnClosePreviewModal) {
 if (DOM.btnPreviewCopy) {
     DOM.btnPreviewCopy.addEventListener('click', async () => {
         let textToCopy = DOM.txtPreviewText?.value || '';
-        if (previewAttachment && previewAttachment.type === 'image') textToCopy = previewAttachment.data;
-        else if (previewAttachment && previewAttachment.type === 'file') textToCopy = previewAttachment.data || previewAttachment.name;
+        if (previewAttachment && (previewAttachment.kind === 'image' || previewAttachment.type === 'image')) textToCopy = previewAttachment.data;
+        else if (previewAttachment && (previewAttachment.kind === 'file' || previewAttachment.type === 'file')) textToCopy = previewAttachment.data || previewAttachment.fileName || previewAttachment.name;
         
         try {
             await navigator.clipboard.writeText(textToCopy);
