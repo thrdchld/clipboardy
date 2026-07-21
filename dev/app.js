@@ -168,6 +168,22 @@ function readBlobAsDataUrl(blob) {
     });
 }
 
+// Mobile Virtual Keyboard Resizing Adapter using VisualViewport API
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+        const h = window.visualViewport.height;
+        const offsetTop = window.visualViewport.offsetTop;
+        if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+            DOM.fullPageEditorModal.style.height = `${h}px`;
+            DOM.fullPageEditorModal.style.top = `${offsetTop}px`;
+        }
+        if (DOM.fullPagePreviewModal && !DOM.fullPagePreviewModal.classList.contains('hidden')) {
+            DOM.fullPagePreviewModal.style.height = `${h}px`;
+            DOM.fullPagePreviewModal.style.top = `${offsetTop}px`;
+        }
+    });
+}
+
 // ==========================================
 // 🔐 UTILITIES & ATTACHMENT COMPRESSION
 // ==========================================
@@ -563,13 +579,13 @@ function renderSavedGoogleUser() {
     }
 }
 
-// Device Heartbeat for Guest Room active status
+// Device Heartbeat for Guest Room active status (stored inside notes collection to guarantee permissions)
 function startDeviceHeartbeat() {
     if (heartbeatInterval) clearInterval(heartbeatInterval);
     heartbeatInterval = setInterval(async () => {
         if (!isAppLocked && isGuestRoom && currentRoomHash) {
             try {
-                const deviceAuthRef = doc(db, 'clipboards', currentRoomHash, 'meta', 'deviceAuth');
+                const deviceAuthRef = doc(db, 'clipboards', currentRoomHash, 'notes', '_meta_deviceAuth');
                 await setDoc(deviceAuthRef, {
                     activeDeviceId: currentDeviceId,
                     activeDeviceName: getDeviceName(),
@@ -577,7 +593,7 @@ function startDeviceHeartbeat() {
                 }, { merge: true });
             } catch (e) {}
         }
-    }, 30 * 1000); // 30 seconds heartbeat
+    }, 30 * 1000);
 }
 
 // ==========================================
@@ -607,7 +623,8 @@ async function handleGuestRoomLogin(rawCode) {
         }
     }
     
-    const deviceAuthRef = doc(db, 'clipboards', currentRoomHash, 'meta', 'deviceAuth');
+    // Store metadata strictly inside notes collection to match Firestore Security Rules!
+    const deviceAuthRef = doc(db, 'clipboards', currentRoomHash, 'notes', '_meta_deviceAuth');
     
     try {
         const docSnap = await getDoc(deviceAuthRef);
@@ -636,7 +653,7 @@ async function handleGuestRoomLogin(rawCode) {
         }
         
         // Device B MUST request authorization from Device A!
-        const requestRef = doc(db, 'clipboards', currentRoomHash, 'requests', currentDeviceId);
+        const requestRef = doc(db, 'clipboards', currentRoomHash, 'notes', '_req_' + currentDeviceId);
         await setDoc(requestRef, {
             deviceId: currentDeviceId,
             deviceName: getDeviceName(),
@@ -681,17 +698,19 @@ async function handleGuestRoomLogin(rawCode) {
 function listenForIncomingAccessRequests() {
     if (!currentRoomHash || !isGuestRoom) return;
     
-    const requestsRef = collection(db, 'clipboards', currentRoomHash, 'requests');
+    const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
     if (unsubscribeRoomRequests) unsubscribeRoomRequests();
     
-    unsubscribeRoomRequests = onSnapshot(requestsRef, (snapshot) => {
+    unsubscribeRoomRequests = onSnapshot(notesRef, (snapshot) => {
         snapshot.docChanges().forEach(change => {
-            if (change.type === 'added' || change.type === 'modified') {
-                const data = change.doc.data();
-                if (data.status === 'pending' && data.deviceId !== currentDeviceId) {
-                    activePendingRequestId = change.doc.id;
-                    if (DOM.requestingDeviceName) DOM.requestingDeviceName.textContent = data.deviceName || 'Device';
-                    if (DOM.accessRequestModal) DOM.accessRequestModal.classList.remove('hidden');
+            if (change.doc.id.startsWith('_req_')) {
+                if (change.type === 'added' || change.type === 'modified') {
+                    const data = change.doc.data();
+                    if (data.status === 'pending' && data.deviceId !== currentDeviceId) {
+                        activePendingRequestId = change.doc.id;
+                        if (DOM.requestingDeviceName) DOM.requestingDeviceName.textContent = data.deviceName || 'Device';
+                        if (DOM.accessRequestModal) DOM.accessRequestModal.classList.remove('hidden');
+                    }
                 }
             }
         });
@@ -721,6 +740,11 @@ function startClipsRealtimeSync() {
         const startOfTodayWib = getStartOfTodayWibMs();
         
         snapshot.forEach(docSnap => {
+            // Filter out system metadata and request documents
+            if (docSnap.id.startsWith('_')) {
+                return;
+            }
+            
             const data = docSnap.data();
             const clipTs = getTimeMs(data.timestamp);
             
@@ -933,6 +957,8 @@ async function performSearch() {
         
         const matchedClips = [];
         snapshot.forEach(docSnap => {
+            if (docSnap.id.startsWith('_')) return; // Filter out system docs
+            
             const data = docSnap.data();
             const text = data.text || data.content || '';
             const fileName = data.fileData?.name || '';
@@ -1423,7 +1449,7 @@ if (DOM.btnQuickContinueGoogle) {
 if (DOM.btnApproveAccessRequest) {
     DOM.btnApproveAccessRequest.addEventListener('click', async () => {
         if (activePendingRequestId && currentRoomHash) {
-            const reqRef = doc(db, 'clipboards', currentRoomHash, 'requests', activePendingRequestId);
+            const reqRef = doc(db, 'clipboards', currentRoomHash, 'notes', activePendingRequestId);
             await updateDoc(reqRef, { status: 'approved' });
             if (DOM.accessRequestModal) DOM.accessRequestModal.classList.add('hidden');
             showToast("Device access approved!");
@@ -1434,7 +1460,7 @@ if (DOM.btnApproveAccessRequest) {
 if (DOM.btnDenyAccessRequest) {
     DOM.btnDenyAccessRequest.addEventListener('click', async () => {
         if (activePendingRequestId && currentRoomHash) {
-            const reqRef = doc(db, 'clipboards', currentRoomHash, 'requests', activePendingRequestId);
+            const reqRef = doc(db, 'clipboards', currentRoomHash, 'notes', activePendingRequestId);
             await updateDoc(reqRef, { status: 'denied' });
             if (DOM.accessRequestModal) DOM.accessRequestModal.classList.add('hidden');
             showToast("Device access denied.");
