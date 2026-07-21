@@ -8,9 +8,9 @@
     <!-- Favicon and PWA Meta -->
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1a1815">
+    <meta name="theme-color" content="#F7F5F0">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="apple-touch-icon" href="icon-192.png">
 
     <!-- Modern Google Fonts -->
@@ -43,7 +43,7 @@
                 </svg>
                 Clipboardy
             </h1>
-            <p class="text-muted" style="margin-bottom: 20px; font-size: 0.9rem;">Multi-device transient clipboard sync.</p>
+            <p class="text-muted" style="margin-bottom: 20px; font-size: 0.9rem;">Instant sync across all your devices.</p>
             
             <!-- Google Login Button -->
             <button id="btnGoogleLogin" class="btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: white; color: #374151; border: 1px solid #d1d5db; padding: 12px; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; transition: all 0.2s;">
@@ -105,12 +105,12 @@
                 <div class="brand">
                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
                     <span id="headerTitleText">Clipboardy</span>
-                    <span id="syncIndicator" class="status-dot" title="Live Sync Active"></span>
+                    <span id="syncIndicator" class="status-dot" title="Synced"></span>
                 </div>
 
                 <div class="header-actions">
                     <!-- Search Icon Button (Triggers Expandable Top Bar Search) -->
-                    <button id="btnOpenSearch" class="btn-icon" title="Search Cold Storage" aria-label="Open Search">
+                    <button id="btnOpenSearch" class="btn-icon" title="Search Clips" aria-label="Search Clips">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                     </button>
                     <!-- Lock Button -->
@@ -138,10 +138,10 @@
 
         <!-- Main Scroll Area -->
         <div class="main-scroll">
-            <!-- Search Mode Notification Banner -->
+            <!-- Search Notification Banner -->
             <div id="searchBanner" class="search-banner hidden">
-                <span id="searchBannerText">Cold storage search results...</span>
-                <button id="btnResetSearchBanner" class="btn" style="padding: 2px 8px; font-size: 0.75rem; background: var(--bg-surface);">Back to Realtime Stream</button>
+                <span id="searchBannerText">Search results...</span>
+                <button id="btnResetSearchBanner" class="btn" style="padding: 2px 8px; font-size: 0.75rem; background: var(--bg-surface);">Show All Clips</button>
             </div>
 
             <!-- Clips Grid -->

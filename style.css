@@ -1,32 +1,35 @@
 :root {
-    /* Full English & Earth-Tone Single Theme Palette */
-    --bg-base: #1a1815;          /* Deep warm earth base */
-    --bg-surface: #24211d;       /* Dark warm surface */
-    --bg-card: #2d2924;          /* Warm earth card */
-    --bg-hover: #38332c;
+    /* Eye-Friendly Soft Light Theme with Earthy Accents */
+    --bg-base: #F7F5F0;          /* Warm soft cream-white background */
+    --bg-surface: #FFFFFF;       /* Clean white surface */
+    --bg-card: #FFFFFF;          /* Pure white card */
+    --bg-hover: #EFECE6;         /* Soft warm gray-beige hover */
     
-    --text-main: #EBE7E1;        /* Cream */
-    --text-muted: #C2B7A4;       /* Warm Beige */
-    --text: #EBE7E1;
+    --text-main: #2B2723;        /* Soft dark espresso/charcoal */
+    --text-muted: #7A7063;       /* Warm tan-gray for secondary text */
+    --text: #2B2723;
     
-    --primary: #AD9F85;          /* Sand accent */
-    --primary-hover: #998767;    /* Tan hover */
-    --primary-light: rgba(173, 159, 133, 0.18);
+    --primary: #998767;          /* Tan earthy primary accent */
+    --primary-hover: #807054;    /* Deeper Tan hover */
+    --primary-light: rgba(153, 135, 103, 0.12);
     
-    --danger: #ef4444;
-    --danger-hover: #dc2626;
-    --warning: #f59e0b;
-    --success: #AD9F85;
+    --accent-sand: #AD9F85;      /* Sand secondary accent */
+    --accent-beige: #C2B7A4;     /* Warm Beige border accent */
     
-    --border: #3d372e;
-    --border-color: #3d372e;
+    --danger: #e53e3e;
+    --danger-hover: #c53030;
+    --warning: #d69e2e;
+    --success: #38a169;
+    
+    --border: #E5E0D8;
+    --border-color: #E5E0D8;
     
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 18px;
-    --shadow-sm: 0 1px 3px 0 rgba(0,0,0,0.3);
-    --shadow-md: 0 4px 20px -2px rgba(0,0,0,0.5);
-    --shadow-lg: 0 10px 30px -3px rgba(0,0,0,0.7);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 16px -2px rgba(153, 135, 103, 0.12);
+    --shadow-lg: 0 10px 30px -3px rgba(0, 0, 0, 0.12);
     --glass-blur: blur(12px);
 }
 
@@ -113,7 +116,7 @@ body {
 
 .btn-primary {
     background: var(--primary) !important;
-    color: #1a1815 !important;
+    color: #FFFFFF !important;
     border: none !important;
     font-weight: 700 !important;
 }
@@ -226,7 +229,7 @@ header {
 
 .btn-search-trigger {
     background: var(--primary) !important;
-    color: #1a1815 !important;
+    color: #FFFFFF !important;
     border: none !important;
     padding: 6px 12px !important;
     border-radius: var(--radius-sm) !important;
@@ -236,7 +239,7 @@ header {
     justify-content: center !important;
 }
 
-/* Realtime Sync Status Indicator */
+/* Sync Status Indicator Dot */
 .status-dot {
     width: 9px;
     height: 9px;
@@ -297,19 +300,21 @@ header {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 12px 14px;
+    padding: 14px 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    transition: background 0.15s, border-color 0.15s;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
     user-select: none;
     -webkit-user-select: none;
     cursor: pointer;
+    box-shadow: var(--shadow-sm);
 }
 
 .clip-card:hover {
     border-color: var(--primary);
+    box-shadow: var(--shadow-md);
 }
 
 .clip-body {
@@ -321,7 +326,7 @@ header {
 .clip-text {
     font-size: 0.95rem;
     color: var(--text-main);
-    line-height: 1.4;
+    line-height: 1.45;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -335,7 +340,7 @@ header {
 .clip-meta {
     font-size: 0.75rem;
     color: var(--text-muted);
-    margin-top: 4px;
+    margin-top: 6px;
     user-select: none;
     -webkit-user-select: none;
 }
@@ -349,7 +354,7 @@ header {
 
 .btn-copy {
     background: var(--primary);
-    color: #1a1815;
+    color: #FFFFFF;
     border: none;
     padding: 8px 14px;
     border-radius: var(--radius-sm);
@@ -418,7 +423,7 @@ header {
     height: 54px;
     border-radius: 50%;
     border: none;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 4px 16px rgba(153, 135, 103, 0.35);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -428,31 +433,31 @@ header {
 
 .fab:hover {
     transform: scale(1.08);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 6px 20px rgba(153, 135, 103, 0.5);
 }
 
 .fab:active {
     transform: scale(0.92);
 }
 
-/* FAB Atas (Plus + for Fullpage Editor) */
+/* FAB Top (+ Plus for Fullpage Editor) */
 .fab-top {
     background: var(--primary);
-    color: #1a1815;
+    color: #FFFFFF;
 }
 
 .fab-top:hover {
     background: var(--primary-hover);
 }
 
-/* FAB Bawah (Paste Icon for Auto Paste & Save) */
+/* FAB Bottom (Paste Icon for Auto Paste & Save) */
 .fab-bottom {
-    background: #998767;
-    color: #EBE7E1;
+    background: var(--accent-sand);
+    color: #FFFFFF;
 }
 
 .fab-bottom:hover {
-    background: #807054;
+    background: var(--primary-hover);
 }
 
 /* Full Page Text Editor & Full Page Preview Modals */
@@ -515,20 +520,21 @@ header {
     transition: border-color 0.2s;
     user-select: text !important;
     -webkit-user-select: text !important;
+    box-shadow: var(--shadow-sm);
 }
 
 .fullpage-textarea:focus {
     border-color: var(--primary);
 }
 
-/* Toast */
+/* Toast Notification */
 #toast {
     position: fixed;
     bottom: 90px;
     left: 50%;
     transform: translateX(-50%) translateY(100px);
-    background: var(--bg-card);
-    color: var(--text-main);
+    background: var(--text-main);
+    color: var(--bg-surface);
     border: 1px solid var(--primary);
     padding: 10px 20px;
     border-radius: 20px;
@@ -553,7 +559,7 @@ header {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(43, 39, 35, 0.4);
     backdrop-filter: var(--glass-blur);
     display: flex;
     align-items: center;

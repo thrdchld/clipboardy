@@ -183,7 +183,7 @@ export function unlockApp() {
 }
 
 // ==========================================
-// 📡 FIRESTORE REALTIME STREAM & COLD STORAGE
+// 📡 SYNC & DATA MANAGEMENT
 // ==========================================
 
 function startClipsRealtimeSync() {
@@ -195,7 +195,7 @@ function startClipsRealtimeSync() {
     if (DOM.syncIndicator) {
         DOM.syncIndicator.classList.remove('disconnected');
         DOM.syncIndicator.classList.add('saving');
-        DOM.syncIndicator.title = "Connecting to live sync...";
+        DOM.syncIndicator.title = "Connecting...";
     }
     
     const q = query(notesRef, limit(50));
@@ -216,20 +216,20 @@ function startClipsRealtimeSync() {
         
         if (DOM.syncIndicator) {
             DOM.syncIndicator.classList.remove('saving', 'disconnected');
-            DOM.syncIndicator.title = "Live Sync Active";
+            DOM.syncIndicator.title = "Synced";
         }
         
         if (!isSearchMode) {
             renderClips(clipsArray);
         }
     }, (error) => {
-        console.error("Firestore realtime sync error:", error);
+        console.error("Firestore sync error:", error);
         if (DOM.syncIndicator) {
             DOM.syncIndicator.classList.remove('saving');
             DOM.syncIndicator.classList.add('disconnected');
-            DOM.syncIndicator.title = "Live Sync Disconnected";
+            DOM.syncIndicator.title = "Offline";
         }
-        showToast("Realtime sync error: " + (error.code || error.message));
+        showToast("Connection issue: " + (error.code || error.message));
     });
 }
 
@@ -249,7 +249,7 @@ async function createNewClip(text) {
             currentUser = cred.user;
         } catch (err) {
             console.error("Auth error during clip creation:", err);
-            showToast("Failed to authenticate room: " + err.message);
+            showToast("Unable to authenticate room: " + err.message);
             return;
         }
     }
@@ -300,8 +300,9 @@ async function deleteClip(clipId) {
     }
 }
 
-// ponytail: [cold storage search query limit 200] -> [integrate full-text search engine (e.g. Algolia/Elastic) if room exceeds 10,000 clips]
-async function performColdStorageSearch() {
+// Search across clips in history
+// ponytail: [search query limit 200] -> [integrate full-text search engine if room exceeds 10,000 clips]
+async function performSearch() {
     const term = (DOM.searchInput?.value || '').trim().toLowerCase();
     
     if (!term) {
@@ -310,7 +311,7 @@ async function performColdStorageSearch() {
     }
     
     isSearchMode = true;
-    showToast("Searching cold storage...");
+    showToast("Searching clips...");
     if (DOM.searchBanner) DOM.searchBanner.classList.remove('hidden');
     if (DOM.searchBannerText) DOM.searchBannerText.textContent = `Showing search results for "${term}"...`;
     
@@ -335,12 +336,12 @@ async function performColdStorageSearch() {
         matchedClips.sort((a, b) => getTimeMs(b.timestamp) - getTimeMs(a.timestamp));
         
         if (DOM.searchBannerText) {
-            DOM.searchBannerText.textContent = `Cold storage: ${matchedClips.length} clips found for "${term}"`;
+            DOM.searchBannerText.textContent = `Found ${matchedClips.length} clips for "${term}"`;
         }
         
         renderClips(matchedClips, true);
     } catch (err) {
-        console.error("Error searching cold storage:", err);
+        console.error("Error searching clips:", err);
         showToast("Search error: " + (err.message || err));
     }
 }
@@ -373,7 +374,7 @@ function renderClips(clipsList, isSearchResult = false) {
             const subText = DOM.emptyState.querySelector('p');
             if (subText) {
                 subText.textContent = isSearchResult 
-                    ? "No matching clips found in cold storage."
+                    ? "No matching clips found."
                     : "Use the (+) button at bottom right to write a new clip, or the Paste button to auto-save.";
             }
         }
@@ -406,6 +407,9 @@ function renderClips(clipsList, isSearchResult = false) {
         
         // Open Full Page Preview & Edit Modal on card click
         card.addEventListener('click', (e) => {
+            // Auto-close topbar search if active
+            closeSearchOverlay();
+            
             // Do not trigger if clicking copy or delete action buttons
             if (e.target.closest('.btn-copy') || e.target.closest('.btn-delete-clip')) {
                 return;
@@ -466,7 +470,7 @@ function closePreviewModal() {
 window.addEventListener('online', () => {
     if (DOM.syncIndicator) {
         DOM.syncIndicator.classList.remove('disconnected');
-        DOM.syncIndicator.title = "Live Sync Active";
+        DOM.syncIndicator.title = "Synced";
     }
     showToast("Internet reconnected");
     if (!isAppLocked && currentRoomHash) {
@@ -478,7 +482,7 @@ window.addEventListener('offline', () => {
     if (DOM.syncIndicator) {
         DOM.syncIndicator.classList.remove('saving');
         DOM.syncIndicator.classList.add('disconnected');
-        DOM.syncIndicator.title = "Connection Lost (Offline)";
+        DOM.syncIndicator.title = "Offline";
     }
     showToast("Connection lost (Offline)");
 });
@@ -598,15 +602,17 @@ if (DOM.btnSwitchAccount) {
 // Lock button
 if (DOM.btnLock) {
     DOM.btnLock.addEventListener('click', () => {
+        closeSearchOverlay();
         lockApp();
     });
 }
 
 // ==========================================
-// 🔍 EXPANDABLE TOP BAR SEARCH LISTENERS
+// 🔍 EXPANDABLE TOP BAR SEARCH LISTENERS & AUTO-CLOSE
 // ==========================================
 if (DOM.btnOpenSearch) {
-    DOM.btnOpenSearch.addEventListener('click', () => {
+    DOM.btnOpenSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (DOM.headerNormalView) DOM.headerNormalView.classList.add('hidden');
         if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.remove('hidden');
         if (DOM.searchInput) DOM.searchInput.focus();
@@ -614,14 +620,16 @@ if (DOM.btnOpenSearch) {
 }
 
 if (DOM.btnCloseSearch) {
-    DOM.btnCloseSearch.addEventListener('click', () => {
+    DOM.btnCloseSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
         closeSearchOverlay();
     });
 }
 
 if (DOM.btnSearch) {
-    DOM.btnSearch.addEventListener('click', () => {
-        performColdStorageSearch();
+    DOM.btnSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        performSearch();
     });
 }
 
@@ -629,7 +637,7 @@ if (DOM.searchInput) {
     DOM.searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            performColdStorageSearch();
+            performSearch();
         }
     });
 }
@@ -640,6 +648,17 @@ if (DOM.btnResetSearchBanner) {
     });
 }
 
+// Global click listener to auto-close topbar search when clicking outside
+document.addEventListener('click', (e) => {
+    if (DOM.headerSearchOverlay && !DOM.headerSearchOverlay.classList.contains('hidden')) {
+        const isClickInsideSearch = DOM.headerSearchOverlay.contains(e.target);
+        const isClickOpenSearchBtn = DOM.btnOpenSearch?.contains(e.target);
+        if (!isClickInsideSearch && !isClickOpenSearchBtn) {
+            closeSearchOverlay();
+        }
+    }
+});
+
 // ==========================================
 // 🔘 2 FABs MECHANISM LISTENERS
 // ==========================================
@@ -647,6 +666,7 @@ if (DOM.btnResetSearchBanner) {
 // FAB Top (+ Plus): Open Full Page Text Editor Modal
 if (DOM.btnFabEditor) {
     DOM.btnFabEditor.addEventListener('click', () => {
+        closeSearchOverlay();
         if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
         if (DOM.txtFullPageEditor) {
             DOM.txtFullPageEditor.value = '';
@@ -694,6 +714,7 @@ if (DOM.btnFullEditorSend) {
 // FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
+        closeSearchOverlay();
         try {
             const text = await navigator.clipboard.readText();
             if (text && text.trim()) {
