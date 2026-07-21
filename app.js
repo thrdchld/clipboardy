@@ -101,7 +101,7 @@ export function showToast(message) {
     DOM.toast.classList.add('show');
     setTimeout(() => {
         DOM.toast.classList.remove('show');
-    }, 2800);
+    }, 3000);
 }
 
 export function escapeHtml(str) {
@@ -176,7 +176,8 @@ function startClipsRealtimeSync() {
     if (!currentRoomHash) return;
     if (unsubscribeClips) unsubscribeClips();
     
-    const clipsRef = collection(db, 'clipboards', currentRoomHash, 'clips');
+    // Matched Firestore security rules subcollection: 'notes'
+    const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
     
     if (DOM.syncIndicator) {
         DOM.syncIndicator.classList.remove('disconnected');
@@ -185,7 +186,7 @@ function startClipsRealtimeSync() {
     }
     
     // Primary query capped at 50 documents
-    const q = query(clipsRef, limit(50));
+    const q = query(notesRef, limit(50));
     
     unsubscribeClips = onSnapshot(q, (snapshot) => {
         clipsArray = [];
@@ -244,9 +245,10 @@ async function createNewClip(text) {
     
     try {
         if (DOM.syncIndicator) DOM.syncIndicator.classList.add('saving');
-        const clipsRef = collection(db, 'clipboards', currentRoomHash, 'clips');
+        // Subcollection 'notes' matches Firestore security rules
+        const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
         
-        await addDoc(clipsRef, {
+        await addDoc(notesRef, {
             text: cleanText,
             timestamp: serverTimestamp(),
             userId: auth.currentUser ? auth.currentUser.uid : 'guest'
@@ -264,7 +266,7 @@ async function createNewClip(text) {
 
 async function deleteClip(clipId) {
     try {
-        const docRef = doc(db, 'clipboards', currentRoomHash, 'clips', clipId);
+        const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', clipId);
         await deleteDoc(docRef);
         showToast("Klip dihapus");
     } catch (err) {
@@ -290,8 +292,8 @@ async function performColdStorageSearch() {
     if (DOM.searchBannerText) DOM.searchBannerText.textContent = `Menampilkan hasil pencarian untuk "${term}"...`;
     
     try {
-        const clipsRef = collection(db, 'clipboards', currentRoomHash, 'clips');
-        const q = query(clipsRef, limit(200));
+        const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
+        const q = query(notesRef, limit(200));
         const snapshot = await getDocs(q);
         
         const matchedClips = [];
