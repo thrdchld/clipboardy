@@ -297,11 +297,13 @@ export async function readDocumentFile(file, maxKb = 128) {
     };
 }
 
+// Read system clipboard for Text or Browser-copied Image ONLY
 export async function readClipboardContent() {
     if (navigator.clipboard && navigator.clipboard.read) {
         try {
             const items = await navigator.clipboard.read();
             for (const item of items) {
+                // 1. Check for browser-copied image
                 const imageType = item.types.find(t => t.startsWith('image/'));
                 if (imageType) {
                     try {
@@ -309,26 +311,20 @@ export async function readClipboardContent() {
                         const file = new File([blob], "pasted-image.jpg", { type: imageType });
                         const compressedDataUrl = await compressImageToDataUrl(file, 128);
                         return { kind: 'image', data: compressedDataUrl };
-                    } catch (e) {}
+                    } catch (e) {
+                        console.warn("Failed to read image blob:", e);
+                    }
                 }
                 
-                for (const type of item.types) {
-                    if (type === 'text/plain') {
-                        try {
-                            const blob = await item.getType('text/plain');
-                            const text = await blob.text();
-                            if (text && text.trim()) {
-                                return { kind: 'text', text: text.trim() };
-                            }
-                        } catch (e) {}
-                    } else if (!type.includes('html')) {
-                        try {
-                            const blob = await item.getType(type);
-                            const file = new File([blob], `pasted-file`, { type: type });
-                            const fileObj = await readDocumentFile(file, 128);
-                            return { kind: 'file', ...fileObj };
-                        } catch (e) {}
-                    }
+                // 2. Check for text
+                if (item.types.includes('text/plain')) {
+                    try {
+                        const blob = await item.getType('text/plain');
+                        const text = await blob.text();
+                        if (text && text.trim()) {
+                            return { kind: 'text', text: text.trim() };
+                        }
+                    } catch (e) {}
                 }
             }
         } catch (err) {
@@ -336,6 +332,7 @@ export async function readClipboardContent() {
         }
     }
     
+    // Fallback to readText
     if (navigator.clipboard && navigator.clipboard.readText) {
         try {
             const text = await navigator.clipboard.readText();
@@ -667,7 +664,6 @@ async function handleGuestRoomLogin(rawCode) {
     } catch (err) {
         console.error("Guest room authorization error:", err);
         showToast("Guest Room Connection Error: " + (err.message || err));
-        // STOPS ENTIRELY ON ERROR! Never calls unlockApp() on error!
     }
 }
 
@@ -1210,6 +1206,14 @@ function closePreviewModal() {
     }
 }
 
+// Helper to open Add Clip Modal with specific tab
+function openAddClipModalWithTab(tabType = 'file') {
+    editorAttachment = null;
+    renderEditorAttachment();
+    if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
+    setEditorTab(tabType);
+}
+
 // ==========================================
 // 🚀 EVENT LISTENERS & INITIALIZATION
 // ==========================================
@@ -1544,14 +1548,7 @@ if (DOM.btnFabEditor) {
     DOM.btnFabEditor.addEventListener('click', () => {
         closeSearchOverlay();
         if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
-        editorAttachment = null;
-        renderEditorAttachment();
-        if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
-        setEditorTab('text');
-        if (DOM.txtFullPageEditor) {
-            DOM.txtFullPageEditor.value = '';
-            DOM.txtFullPageEditor.focus();
-        }
+        openAddClipModalWithTab('text');
     });
 }
 
@@ -1564,7 +1561,7 @@ if (DOM.btnCloseFullPageEditor) {
     });
 }
 
-// Full Page Editor: Paste Button
+// Full Page Editor: Paste Button (Paste Text or Browser Image, or fallback to File Tab)
 if (DOM.btnFullEditorPaste) {
     DOM.btnFullEditorPaste.addEventListener('click', async () => {
         try {
@@ -1575,12 +1572,7 @@ if (DOM.btnFullEditorPaste) {
                     editorAttachment = { kind: 'image', data: content.data };
                     renderEditorAttachment();
                     setEditorTab('image');
-                    showToast("Pasted image clip!");
-                } else if (kind === 'file') {
-                    editorAttachment = { kind: 'file', ...content };
-                    renderEditorAttachment();
-                    setEditorTab('file');
-                    showToast("Pasted file clip!");
+                    showToast("Pasted image!");
                 } else if (kind === 'text') {
                     editorAttachment = null;
                     renderEditorAttachment();
@@ -1588,14 +1580,15 @@ if (DOM.btnFullEditorPaste) {
                     if (DOM.txtFullPageEditor) {
                         DOM.txtFullPageEditor.value = content.text;
                     }
-                    showToast("Pasted text clip!");
+                    showToast("Pasted text!");
                 }
             } else {
-                showToast("Clipboard is empty or inaccessible!");
+                showToast("Empty/File clipboard detected. Switch to File tab...");
+                setEditorTab('file');
             }
         } catch (err) {
-            console.error("Failed to read clipboard:", err);
-            showToast("Allow clipboard access in browser");
+            showToast("Clipboard access issue. Opening File picker...");
+            setEditorTab('file');
         }
     });
 }
@@ -1613,31 +1606,36 @@ if (DOM.btnFullEditorSend) {
     });
 }
 
-// FAB Bottom (Paste Icon): 1-Tap Automatic Paste & Immediate Save
+// FAB Bottom (Paste Icon): 1-Tap Auto Paste Text or Browser Image. Mitigates Files/Empty by opening File Picker Modal!
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         closeSearchOverlay();
         if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+        
         try {
             const content = await readClipboardContent();
             if (content) {
                 const kind = content.kind || content.type;
                 if (kind === 'image') {
                     await createNewClip('', { kind: 'image', data: content.data });
-                    showToast("Pasted image saved to clipboard!");
-                } else if (kind === 'file') {
-                    await createNewClip('', { kind: 'file', ...content });
-                    showToast("Pasted file saved to clipboard!");
+                    showToast("Pasted image saved!");
+                    return;
                 } else if (kind === 'text') {
                     await createNewClip(content.text);
-                    showToast("Pasted text saved to clipboard!");
+                    showToast("Pasted text saved!");
+                    return;
                 }
-            } else {
-                showToast("Clipboard is empty or inaccessible!");
             }
+            
+            // SMART MITIGATION FALLBACK:
+            // Clipboard is empty, file from file-manager, or unreadable format
+            showToast("File/Empty clipboard detected. Opening File Picker...");
+            openAddClipModalWithTab('file');
+            
         } catch (err) {
-            console.error("Failed to read clipboard:", err);
-            showToast("Allow clipboard access in browser");
+            console.error("Paste error:", err);
+            showToast("Opening File Picker...");
+            openAddClipModalWithTab('file');
         }
     });
 }
