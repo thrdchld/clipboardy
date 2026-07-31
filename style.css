@@ -878,8 +878,8 @@ header {
    ========================================================================== */
 
 @media (min-width: 768px) {
-    /* 1. App Screen & Sidebar Layout */
-    #appScreen {
+    /* 1. App Screen & Sidebar Layout (ONLY WHEN UNLOCKED) */
+    #appScreen:not(.hidden) {
         max-width: 95%;
         height: calc(100vh - 32px);
         height: calc(100dvh - 32px);
@@ -887,8 +887,8 @@ header {
         border-radius: var(--radius-lg);
         border: 1px solid var(--border);
         box-shadow: var(--shadow-lg);
-        display: flex !important;
-        flex-direction: row !important;
+        display: flex;
+        flex-direction: row;
         overflow: hidden;
     }
 
@@ -901,19 +901,47 @@ header {
         position: relative;
     }
 
-    /* 2. Desktop Header Refinements (Hide FABs & Top Bar Lock Button, Search on Far Right) */
+    /* 2. Desktop Header Refinements (Search + Room/User Name on Far Right, Hide Top Bar Lock & FABs) */
     #fabContainer {
         display: none !important;
     }
 
-    header #btnLock {
+    #btnLock,
+    header #btnLock,
+    .header-actions #btnLock {
         display: none !important;
     }
 
+    .mobile-history-wrap {
+        display: none !important;
+    }
+
+    .header-normal-view {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+        width: 100%;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-left: auto;
+        order: 1;
+    }
+
     header .brand {
-        display: flex !important;
+        display: flex;
         align-items: center;
         gap: 8px;
+        order: 2;
+        background: var(--bg-hover);
+        padding: 5px 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        font-size: 0.85rem;
     }
 
     header .brand svg {
@@ -1092,7 +1120,7 @@ header {
 
 /* Wide Desktop Screens (min-width: 1024px) */
 @media (min-width: 1024px) {
-    #appScreen {
+    #appScreen:not(.hidden) {
         max-width: 1280px;
         height: calc(100vh - 48px);
         height: calc(100dvh - 48px);
