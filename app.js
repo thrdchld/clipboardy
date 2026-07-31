@@ -1,9 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp, collection, query, where, deleteDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, updateDoc, onSnapshot, serverTimestamp, collection, query, limit, addDoc, deleteDoc, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // ==========================================
-// 🔧 KONFIGURASI FIREBASE
+// 🔧 FIREBASE CONFIGURATION
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyAIkIoF6iT4LfUbt0C03053vfyDpm3YsuA",
@@ -21,2254 +21,252 @@ const db = getFirestore(app);
 // ==========================================
 // 💾 STATE MANAGEMENT
 // ==========================================
-let currentUser = null;
-let currentRoomHash = null;
-let appLockPasswordHash = null;
+export let currentUser = null;
+export let currentRoomHash = null;
+export let isGuestRoom = false;
 
-let folders = [{ id: 'default', name: 'General' }];
-let currentFolderId = 'default';
-let notesArray = []; 
-let editingFolderId = null;
-let isSelectingFolders = false;
-let selectedFoldersForDeletion = new Set();
+export let clipsArray = [];
+export let unsubscribeClips = null;
+export let isAppLocked = true;
+export let isSearchMode = false;
+export let activePreviewClipId = null;
 
-let unsubscribeNotes = null;
-let unsubscribeFolders = null;
+// Realtime Device Authorization State
+export let currentDeviceId = getOrCreateDeviceId();
+export let unsubscribeRoomRequests = null;
+export let unsubscribeMyRequest = null;
+export let activePendingRequestId = null;
+let heartbeatInterval = null;
 
-let isAppLocked = true;
-let viewMode = 'active'; // 'active' atau 'trash'
-let isPinnedCollapsed = localStorage.getItem('isPinnedCollapsed') === 'true';
-let searchQuery = '';
-let ignoreBlur = false;
+// Gboard-style Clip Creation Mode Tab State: 'text' | 'image' | 'file'
+export let currentEditorTab = 'text';
 
-let autoLockTimer = null;
-let strictLockEnabled = localStorage.getItem('strictLockEnabled') !== 'false';
-let idleLockEnabled = localStorage.getItem('idleLockEnabled') === 'true';
-let idleLockMinutes = parseInt(localStorage.getItem('idleLockMinutes')) || 5;
+// Attachments state
+export let editorAttachment = null;
+export let previewAttachment = null;
 
-// URL parameters parsing for resetLockPassword
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('mode') === 'resetLockPassword') {
-    localStorage.setItem('resetLockPasswordPending', 'true');
-    window.history.replaceState({}, document.title, window.location.pathname);
-}
-
-const saveTimeouts = new Map(); // Debounce map per note ID
+// Undo / Redo History Stack (Max 50 actions)
+export let undoStack = [];
+export let redoStack = [];
+const MAX_HISTORY = 50;
 
 // DOM Elements
 const DOM = {
     authScreen: document.getElementById('authScreen'),
     appScreen: document.getElementById('appScreen'),
-    passwordInput: document.getElementById('passwordInput'),
+    initialAuthContainer: document.getElementById('initialAuthContainer'),
+    
+    quickGoogleUserContainer: document.getElementById('quickGoogleUserContainer'),
+    quickUserAvatar: document.getElementById('quickUserAvatar'),
+    quickUserName: document.getElementById('quickUserName'),
+    quickUserEmail: document.getElementById('quickUserEmail'),
+    quickUserShortName: document.getElementById('quickUserShortName'),
+    btnQuickContinueGoogle: document.getElementById('btnQuickContinueGoogle'),
+    
+    roomNameInput: document.getElementById('roomNameInput'),
     loginBtn: document.getElementById('loginBtn'),
+    btnGoogleLogin: document.getElementById('btnGoogleLogin'),
+    btnGoogleLoginText: document.getElementById('btnGoogleLoginText'),
     
-    sidebar: document.querySelector('.sidebar'),
-    sidebarBackdrop: document.getElementById('sidebarBackdrop'),
-    btnMobileMenu: document.getElementById('btnMobileMenu'),
+    headerNormalView: document.getElementById('headerNormalView'),
+    headerSearchOverlay: document.getElementById('headerSearchOverlay'),
+    headerTitleText: document.getElementById('headerTitleText'),
+    syncIndicator: document.getElementById('syncIndicator'),
+    btnLock: document.getElementById('btnLock'),
     
-
-    strictLockToggle: document.getElementById('strictLockToggle'),
-    idleLockToggle: document.getElementById('idleLockToggle'),
-    btnIdleTimeout: document.getElementById('btnSettingsIdleTimeout'),
-    timeoutDropdown: document.getElementById('timeoutDropdown'),
-    btnOpenLockSettings: document.getElementById('btnOpenLockSettings'),
-    appLockSettingsModal: document.getElementById('appLockSettingsModal'),
-    btnCloseLockSettings: document.getElementById('btnCloseLockSettings'),
-
-    settingsIdleTimeoutText: document.getElementById('settingsIdleTimeoutText'),
+    btnOpenSearch: document.getElementById('btnOpenSearch'),
+    searchInput: document.getElementById('searchInput'),
+    btnSearch: document.getElementById('btnSearch'),
+    btnCloseSearch: document.getElementById('btnCloseSearch'),
+    searchBanner: document.getElementById('searchBanner'),
+    searchBannerText: document.getElementById('searchBannerText'),
+    btnResetSearchBanner: document.getElementById('btnResetSearchBanner'),
+    
+    btnToggleUndoRedo: document.getElementById('btnToggleUndoRedo'),
+    undoRedoPopup: document.getElementById('undoRedoPopup'),
+    btnDoUndo: document.getElementById('btnDoUndo'),
+    btnDoRedo: document.getElementById('btnDoRedo'),
+    undoSubtext: document.getElementById('undoSubtext'),
+    redoSubtext: document.getElementById('redoSubtext'),
+    
     clipGrid: document.getElementById('clipGrid'),
     emptyState: document.getElementById('emptyState'),
-    folderList: document.getElementById('folderList'),
-    btnAddFolder: document.getElementById('btnAddFolder'),
-    btnSelectFolders: document.getElementById('btnSelectFolders'),
     
-    btnAddNote: document.getElementById('btnAddNote'),
-    btnAddNoteMobile: document.getElementById('btnAddNoteMobile'),
-    btnAddNoteHeader: document.getElementById('btnAddNoteHeader'),
-    btnEmptyTrashMobile: document.getElementById('btnEmptyTrashMobile'),
-    btnGoogleLogin: document.getElementById('btnGoogleLogin'),
-    initialAuthContainer: document.getElementById('initialAuthContainer'),
-    googleLockedContainer: document.getElementById('googleLockedContainer'),
-    lockedUserAvatar: document.getElementById('lockedUserAvatar'),
-    lockedUserName: document.getElementById('lockedUserName'),
-    lockedUserEmail: document.getElementById('lockedUserEmail'),
-    lockPasswordInput: document.getElementById('lockPasswordInput'),
-    btnUnlockGoogle: document.getElementById('btnUnlockGoogle'),
-    btnSwitchAccount: document.getElementById('btnSwitchAccount'),
+    fabContainer: document.getElementById('fabContainer'),
+    btnFabEditor: document.getElementById('btnFabEditor'),
+    btnFabQuickPaste: document.getElementById('btnFabQuickPaste'),
     
-    setupLockPasswordModal: document.getElementById('setupLockPasswordModal'),
-    newLockPassword: document.getElementById('newLockPassword'),
-    confirmLockPassword: document.getElementById('confirmLockPassword'),
-    btnSaveLockPassword: document.getElementById('btnSaveLockPassword'),
+    fullPageEditorModal: document.getElementById('fullPageEditorModal'),
+    btnCloseFullPageEditor: document.getElementById('btnCloseFullPageEditor'),
     
-    btnThemeToggle: document.getElementById('btnThemeToggle'),
-    themeIconSun: document.getElementById('themeIconSun'),
-    themeIconMoon: document.getElementById('themeIconMoon'),
-    btnLock: document.getElementById('btnLock'),
-    btnOpenChangePassword: document.getElementById('btnOpenChangePassword'),
-    changeLockPasswordModal: document.getElementById('changeLockPasswordModal'),
-    btnCancelChangePassword: document.getElementById('btnCancelChangePassword'),
-    changeConfirmPassword: document.getElementById('changeConfirmPassword'),
-    sidebarGuestWarning: document.getElementById('sidebarGuestWarning'),
-    btnForgotPassword: document.getElementById('btnForgotPassword'),
-    btnChangeModalForgotPassword: document.getElementById('btnChangeModalForgotPassword'),
-    btnResetData: document.getElementById('btnResetData'),
-    changeOldPassword: document.getElementById('changeOldPassword'),
-    changeNewPassword: document.getElementById('changeNewPassword'),
-    btnSubmitChangePassword: document.getElementById('btnSubmitChangePassword'),
-
-    sidebarProfileCard: document.getElementById('sidebarProfileCard'),
-    sidebarAvatar: document.getElementById('sidebarAvatar'),
-    sidebarUserName: document.getElementById('sidebarUserName'),
-    sidebarUserEmail: document.getElementById('sidebarUserEmail'),
-    profileModal: document.getElementById('profileModal'),
-    profileModalAvatar: document.getElementById('profileModalAvatar'),
-    profileModalName: document.getElementById('profileModalName'),
-    profileModalEmail: document.getElementById('profileModalEmail'),
-    profileModalBadge: document.getElementById('profileModalBadge'),
-    profileModalRoomId: document.getElementById('profileModalRoomId'),
-    profileModalAuthType: document.getElementById('profileModalAuthType'),
-    btnSignOut: document.getElementById('btnSignOut'),
-    btnCloseProfile: document.getElementById('btnCloseProfile'),
-    btnToggleTrash: document.getElementById('btnToggleTrash'),
-    btnEmptyTrash: document.getElementById('btnEmptyTrash'),
-    btnToggleTrashText: document.getElementById('btnToggleTrashText'),
-    searchInput: document.getElementById('searchInput'),
-    btnClearSearch: document.getElementById('btnClearSearch'),
-    syncIndicator: document.getElementById('syncIndicator'),
+    tabTypeText: document.getElementById('tabTypeText'),
+    tabTypeImage: document.getElementById('tabTypeImage'),
+    tabTypeFile: document.getElementById('tabTypeFile'),
+    panelTypeText: document.getElementById('panelTypeText'),
+    inputEditorImage: document.getElementById('inputEditorImage'),
+    inputEditorFile: document.getElementById('inputEditorFile'),
+    editorAttachmentPreview: document.getElementById('editorAttachmentPreview'),
+    btnFullEditorPaste: document.getElementById('btnFullEditorPaste'),
+    btnFullEditorSend: document.getElementById('btnFullEditorSend'),
+    txtFullPageEditor: document.getElementById('txtFullPageEditor'),
+    
+    fullPagePreviewModal: document.getElementById('fullPagePreviewModal'),
+    btnClosePreviewModal: document.getElementById('btnClosePreviewModal'),
+    inputPreviewImage: document.getElementById('inputPreviewImage'),
+    inputPreviewFile: document.getElementById('inputPreviewFile'),
+    previewAttachmentDisplay: document.getElementById('previewAttachmentDisplay'),
+    btnPreviewCopy: document.getElementById('btnPreviewCopy'),
+    btnPreviewDelete: document.getElementById('btnPreviewDelete'),
+    btnPreviewSave: document.getElementById('btnPreviewSave'),
+    txtPreviewText: document.getElementById('txtPreviewText'),
+    
+    waitingApprovalModal: document.getElementById('waitingApprovalModal'),
+    waitingRoomName: document.getElementById('waitingRoomName'),
+    btnCancelWaitingRequest: document.getElementById('btnCancelWaitingRequest'),
+    
+    accessRequestModal: document.getElementById('accessRequestModal'),
+    requestingDeviceName: document.getElementById('requestingDeviceName'),
+    btnApproveAccessRequest: document.getElementById('btnApproveAccessRequest'),
+    btnDenyAccessRequest: document.getElementById('btnDenyAccessRequest'),
     
     toast: document.getElementById('toast'),
-    
-    folderModal: document.getElementById('folderModal'),
-    folderNameInput: document.getElementById('folderNameInput'),
-    btnCancelFolder: document.getElementById('btnCancelFolder'),
-    btnSaveFolder: document.getElementById('btnSaveFolder'),
-    
-    lightboxModal: document.getElementById('lightboxModal'),
-    lightboxImage: document.getElementById('lightboxImage'),
-    closeLightbox: document.getElementById('closeLightbox'),
-    btnDownloadLightbox: document.getElementById('btnDownloadLightbox')
+
+    // Sidebar & Desktop Navigation DOM Elements
+    appSidebar: document.getElementById('appSidebar'),
+    btnToggleSidebar: document.getElementById('btnToggleSidebar'),
+    navAllClips: document.getElementById('navAllClips'),
+    navAddClip: document.getElementById('navAddClip'),
+    navQuickPaste: document.getElementById('navQuickPaste'),
+    navLockApp: document.getElementById('navLockApp'),
+    btnDirectUndo: document.getElementById('btnDirectUndo'),
+    btnDirectRedo: document.getElementById('btnDirectRedo')
 };
 
-// Initialize settings state in DOM
-DOM.strictLockToggle.checked = strictLockEnabled;
-DOM.idleLockToggle.checked = idleLockEnabled;
-updateIdleTimeoutVisibility();
-
-// Initialize theme from localStorage on load
-const currentTheme = localStorage.getItem('theme') || 'dark';
-if (currentTheme === 'light') {
-    document.documentElement.classList.add('light');
-    if (DOM.themeIconSun) DOM.themeIconSun.classList.add('hidden');
-    if (DOM.themeIconMoon) DOM.themeIconMoon.classList.remove('hidden');
-} else {
-    document.documentElement.classList.remove('light');
-    if (DOM.themeIconSun) DOM.themeIconSun.classList.remove('hidden');
-    if (DOM.themeIconMoon) DOM.themeIconMoon.classList.add('hidden');
+function getOrCreateDeviceId() {
+    let id = localStorage.getItem('clipboardy_device_id');
+    if (!id) {
+        id = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        localStorage.setItem('clipboardy_device_id', id);
+    }
+    return id;
 }
 
-if (DOM.btnThemeToggle) {
-    DOM.btnThemeToggle.addEventListener('click', () => {
-        const isLight = document.documentElement.classList.toggle('light');
-        localStorage.setItem('theme', isLight ? 'light' : 'dark');
-        if (isLight) {
-            DOM.themeIconSun.classList.add('hidden');
-            DOM.themeIconMoon.classList.remove('hidden');
-        } else {
-            DOM.themeIconSun.classList.remove('hidden');
-            DOM.themeIconMoon.classList.add('hidden');
+function getDeviceName() {
+    const ua = navigator.userAgent;
+    if (/android/i.test(ua)) return "Android Device";
+    if (/iPhone|iPad/i.test(ua)) return "iOS Device";
+    if (/Macintosh/i.test(ua)) return "Mac Browser";
+    if (/Windows/i.test(ua)) return "Windows PC";
+    return "Web Browser";
+}
+
+function getStartOfTodayWibMs() {
+    const now = new Date();
+    const wibOffsetMs = 7 * 60 * 60 * 1000;
+    const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const wibDate = new Date(utcMs + wibOffsetMs);
+    wibDate.setHours(0, 0, 0, 0);
+    return wibDate.getTime() - wibOffsetMs;
+}
+
+function readBlobAsDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Failed to read blob"));
+        reader.readAsDataURL(blob);
+    });
+}
+
+// Mobile Virtual Keyboard Resizing Adapter using VisualViewport API
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+        const h = window.visualViewport.height;
+        const offsetTop = window.visualViewport.offsetTop;
+        if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+            DOM.fullPageEditorModal.style.height = `${h}px`;
+            DOM.fullPageEditorModal.style.top = `${offsetTop}px`;
+        }
+        if (DOM.fullPagePreviewModal && !DOM.fullPagePreviewModal.classList.contains('hidden')) {
+            DOM.fullPagePreviewModal.style.height = `${h}px`;
+            DOM.fullPagePreviewModal.style.top = `${offsetTop}px`;
         }
     });
 }
 
-function updateIdleTimeoutVisibility() {
-    if (DOM.settingsIdleTimeoutText) {
-        DOM.settingsIdleTimeoutText.textContent = idleLockMinutes >= 60 
-            ? Math.floor(idleLockMinutes / 60) + " Hour" 
-            : idleLockMinutes + " Min";
-    }
-    const durationSetting = document.getElementById('idleLockDurationSetting');
-    if (durationSetting) {
-        durationSetting.style.display = idleLockEnabled ? 'flex' : 'none';
-    }
-}
-
 // ==========================================
-// 🔒 AUTH & AUTO-LOCK
+// 🔐 UTILITIES & ATTACHMENT COMPRESSION
 // ==========================================
-let bypassLockChallenge = false;
-let isImportingFromGuest = false;
-let guestRoomHashToImport = null;
-
-// Import guest notes/folders to Google Room
-async function importGuestNotesToGoogle(googleUid) {
-    if (!guestRoomHashToImport) return;
-    
-    try {
-        const guestRoomHash = guestRoomHashToImport;
-        const googleRoomHash = "google_" + googleUid;
-        
-        // 1. Fetch guest folders
-        const guestRoomRef = doc(db, 'clipboards', guestRoomHash);
-        const guestSnap = await getDoc(guestRoomRef);
-        let guestFolders = [];
-        if (guestSnap.exists() && guestSnap.data().folders) {
-            guestFolders = guestSnap.data().folders;
-        }
-        
-        // 2. Fetch guest notes
-        const guestNotesRef = collection(db, 'clipboards', guestRoomHash, 'notes');
-        const guestNotesSnap = await getDocs(guestNotesRef);
-        
-        if (guestFolders.length <= 1 && guestNotesSnap.empty) {
-            guestRoomHashToImport = null;
-            isImportingFromGuest = false;
-            return;
-        }
-        
-        const confirmImport = await showCustomConfirm(
-            "Import Guest Notes",
-            "We found folders/notes in your guest room. Would you like to import and merge them into your Google Account?",
-            false
-        );
-        
-        if (confirmImport) {
-            showToast("Importing notes...");
-            
-            // 3. Merge folders
-            const googleRoomRef = doc(db, 'clipboards', googleRoomHash);
-            const googleSnap = await getDoc(googleRoomRef);
-            let googleFolders = [{ id: 'default', name: 'General' }];
-            if (googleSnap.exists() && googleSnap.data().folders) {
-                googleFolders = googleSnap.data().folders;
-            }
-            
-            guestFolders.forEach(guestFolder => {
-                if (guestFolder.id === 'default') return;
-                if (!googleFolders.find(f => f.name.toLowerCase() === guestFolder.name.toLowerCase())) {
-                    googleFolders.push({
-                        id: guestFolder.id,
-                        name: guestFolder.name,
-                        createdAt: guestFolder.createdAt || Date.now()
-                    });
-                }
-            });
-            
-            await setDoc(googleRoomRef, { folders: googleFolders }, { merge: true });
-            
-            // 4. Copy notes
-            for (const noteDoc of guestNotesSnap.docs) {
-                const noteData = noteDoc.data();
-                const newNoteRef = doc(db, 'clipboards', googleRoomHash, 'notes', noteDoc.id);
-                await setDoc(newNoteRef, noteData);
-            }
-            
-            showToast("Import successful! Notes transferred.");
-        }
-    } catch (err) {
-        console.error("Failed to import notes", err);
-        showToast("Import failed: " + err.message);
-    } finally {
-        guestRoomHashToImport = null;
-        isImportingFromGuest = false;
-    }
-}
-
-// Profile Update Logic
-function updateProfileUI(user) {
-    if (user && !user.isAnonymous) {
-        // Google User
-        if (DOM.sidebarProfileCard) DOM.sidebarProfileCard.style.display = 'flex';
-        if (DOM.sidebarGuestWarning) DOM.sidebarGuestWarning.style.display = 'none';
-        if (DOM.btnOpenChangePassword) DOM.btnOpenChangePassword.style.display = 'inline-flex';
-        if (DOM.btnResetData) DOM.btnResetData.style.display = 'inline-flex';
-
-        if (DOM.sidebarAvatar) DOM.sidebarAvatar.src = user.photoURL || 'https://via.placeholder.com/32';
-        if (DOM.sidebarUserName) DOM.sidebarUserName.textContent = user.displayName || 'Google User';
-        if (DOM.sidebarUserEmail) DOM.sidebarUserEmail.textContent = user.email || 'Connected';
-        
-        if (DOM.profileModalAvatar) DOM.profileModalAvatar.src = user.photoURL || 'https://via.placeholder.com/64';
-        if (DOM.profileModalName) DOM.profileModalName.textContent = user.displayName || 'Google User';
-        if (DOM.profileModalEmail) DOM.profileModalEmail.textContent = user.email || 'Connected';
-        if (DOM.profileModalBadge) {
-            DOM.profileModalBadge.textContent = "Google Account";
-            DOM.profileModalBadge.style.background = "var(--primary)";
-            DOM.profileModalBadge.style.color = "white";
-        }
-        if (DOM.profileModalRoomId) {
-            DOM.profileModalRoomId.textContent = user.uid.substring(0, 12) + "...";
-            DOM.profileModalRoomId.title = user.uid;
-        }
-        if (DOM.profileModalAuthType) DOM.profileModalAuthType.textContent = "Google Sign-In";
-    } else {
-        // Guest User / Anonymous
-        if (DOM.sidebarProfileCard) DOM.sidebarProfileCard.style.display = 'none';
-        if (DOM.btnOpenChangePassword) DOM.btnOpenChangePassword.style.display = 'none';
-        if (DOM.btnResetData) DOM.btnResetData.style.display = 'none';
-        
-        if (currentRoomHash && !isAppLocked) {
-            if (DOM.sidebarGuestWarning) DOM.sidebarGuestWarning.style.display = 'flex';
-        } else {
-            if (DOM.sidebarGuestWarning) DOM.sidebarGuestWarning.style.display = 'none';
-        }
-    }
-}
-
-// Sign in with Google
-async function loginWithGoogle() {
-    if (!currentUser) return showToast("Connecting to database...");
-    
-    DOM.btnGoogleLogin.disabled = true;
-    const originalText = DOM.btnGoogleLogin.innerHTML;
-    DOM.btnGoogleLogin.textContent = "Signing in...";
-    
-    const provider = new GoogleAuthProvider();
-    try {
-        bypassLockChallenge = true;
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        currentRoomHash = "google_" + user.uid;
-        
-        await ensureRoomMetadata();
-        
-        if (isImportingFromGuest) {
-            await importGuestNotesToGoogle(user.uid);
-        }
-        
-        if (!appLockPasswordHash) {
-            DOM.setupLockPasswordModal.classList.remove('hidden');
-        } else {
-            startFoldersSync();
-            startNotesSync();
-            
-            isAppLocked = false;
-            DOM.authScreen.classList.add('hidden');
-            DOM.appScreen.classList.remove('hidden');
-            
-            updateProfileUI(user);
-            resetAutoLockTimer();
-            showToast("Logged in as " + user.displayName);
-        }
-    } catch (err) {
-        console.error(err);
-        bypassLockChallenge = false;
-        showToast("Google login failed: " + err.message);
-    } finally {
-        DOM.btnGoogleLogin.disabled = false;
-        DOM.btnGoogleLogin.innerHTML = originalText;
-    }
-}
-
-// Log out and lock
-async function handleSignOut() {
-    if (currentUser && !currentUser.isAnonymous) {
-        try {
-            await signOut(auth);
-            currentRoomHash = null;
-            appLockPasswordHash = null;
-            lockApp();
-            updateProfileUI(null);
-        } catch (err) {
-            console.error(err);
-            showToast("Sign out failed: " + err.message);
-        }
-    } else {
-        currentRoomHash = null;
-        lockApp();
-        updateProfileUI(null);
-        showToast("Guest session closed & locked");
-    }
-}
-
-onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-        currentUser = null;
-        appLockPasswordHash = null;
-        signInAnonymously(auth).catch(err => console.error("Anonymous authentication failed", err));
-        updateProfileUI(null);
-        return;
-    }
-    
-    currentUser = user;
-    if (!user.isAnonymous) {
-        currentRoomHash = "google_" + user.uid;
-        try {
-            await ensureRoomMetadata();
-            
-            if (isImportingFromGuest) {
-                await importGuestNotesToGoogle(user.uid);
-            }
-            
-            if (bypassLockChallenge) {
-                bypassLockChallenge = false;
-                if (appLockPasswordHash) {
-                    isAppLocked = false;
-                    DOM.authScreen.classList.add('hidden');
-                    DOM.appScreen.classList.remove('hidden');
-                    startFoldersSync();
-                    startNotesSync();
-                    updateProfileUI(user);
-                    resetAutoLockTimer();
-                }
-            } else {
-                isAppLocked = true;
-                DOM.initialAuthContainer.classList.add('hidden');
-                DOM.googleLockedContainer.classList.remove('hidden');
-                
-                if (DOM.lockedUserAvatar) DOM.lockedUserAvatar.src = user.photoURL || 'https://via.placeholder.com/64';
-                if (DOM.lockedUserName) DOM.lockedUserName.textContent = user.displayName || 'Google User';
-                if (DOM.lockedUserEmail) DOM.lockedUserEmail.textContent = user.email || '';
-                
-                DOM.authScreen.classList.remove('hidden');
-                DOM.appScreen.classList.add('hidden');
-                updateProfileUI(user);
-                
-                if (!appLockPasswordHash) {
-                    DOM.setupLockPasswordModal.classList.remove('hidden');
-                } else {
-                    DOM.lockPasswordInput.focus();
-                }
-            }
-        } catch (err) {
-            console.error(err);
-            showToast("Failed to load user space: " + err.message);
-        }
-
-    } else {
-        updateProfileUI(null);
-        if (isAppLocked || !currentRoomHash) {
-            DOM.initialAuthContainer.classList.remove('hidden');
-            DOM.googleLockedContainer.classList.add('hidden');
-            DOM.authScreen.classList.remove('hidden');
-            DOM.appScreen.classList.add('hidden');
-        }
-    }
-});
-
-async function hashPassword(password) {
-    const msgUint8 = new TextEncoder().encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+export async function hashPassword(str) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Activity based auto-lock
-function resetAutoLockTimer() {
-    if (isAppLocked) return;
-    clearTimeout(autoLockTimer);
-    if (!idleLockEnabled) return;
-    const timeoutMs = idleLockMinutes * 60 * 1000;
-    autoLockTimer = setTimeout(lockApp, timeoutMs);
-}
-
-['mousemove', 'keydown', 'scroll', 'click'].forEach(evt => {
-    window.addEventListener(evt, resetAutoLockTimer);
-});
-
-// Instant strict lock
-function checkStrictLock() {
-    if (ignoreBlur) return;
-    if (!isAppLocked && strictLockEnabled) {
-        lockApp();
-    }
-}
-
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden) checkStrictLock();
-});
-window.addEventListener("pagehide", checkStrictLock);
-
-// Helper safe confirm dialog to avoid blur auto-lock
-function safeConfirm(message) {
-    ignoreBlur = true;
-    const result = confirm(message);
-    setTimeout(() => {
-        ignoreBlur = false;
-    }, 300);
-    return result;
-}
-
-function showCustomConfirm(title, message, isDangerous = false) {
-    ignoreBlur = true;
-    return new Promise((resolve) => {
-        const modal = document.getElementById('confirmModal');
-        const titleEl = document.getElementById('confirmTitle');
-        const msgEl = document.getElementById('confirmMessage');
-        const cancelBtn = document.getElementById('confirmCancelBtn');
-        const confirmBtn = document.getElementById('confirmConfirmBtn');
-        const iconEl = document.getElementById('confirmIcon');
-        
-        titleEl.textContent = title;
-        msgEl.textContent = message;
-        
-        if (isDangerous) {
-            confirmBtn.className = 'btn btn-primary btn-danger-confirm';
-            iconEl.style.color = 'var(--danger)';
-        } else {
-            confirmBtn.className = 'btn btn-primary';
-            iconEl.style.color = 'var(--primary)';
-        }
-        
-        const cleanUp = () => {
-            modal.classList.add('hidden');
-            cancelBtn.removeEventListener('click', onCancel);
-            confirmBtn.removeEventListener('click', onConfirm);
-            document.removeEventListener('keydown', onKeyDown);
-            setTimeout(() => { ignoreBlur = false; }, 300);
-        };
-        const onCancel = () => { cleanUp(); resolve(false); };
-        const onConfirm = () => { cleanUp(); resolve(true); };
-        const onKeyDown = (e) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                onCancel();
-            }
-        };
-        
-        cancelBtn.addEventListener('click', onCancel);
-        confirmBtn.addEventListener('click', onConfirm);
-        document.addEventListener('keydown', onKeyDown);
-        modal.classList.remove('hidden');
-    });
-}
-
-// Reset ignoreBlur when window gains focus back
-window.addEventListener("focus", () => {
-    if (ignoreBlur) {
-        setTimeout(() => {
-            ignoreBlur = false;
-        }, 300);
-    }
-});
-
-function lockApp() {
-    if (isAppLocked) return;
-    isAppLocked = true;
-    clearTimeout(autoLockTimer);
-    
-    DOM.appScreen.classList.add('app-blur');
-    
-    notesArray = [];
-    folders = [{ id: 'default', name: 'General' }];
-    currentFolderId = 'default';
-    
-    if (unsubscribeNotes) { unsubscribeNotes(); unsubscribeNotes = null; }
-    if (unsubscribeFolders) { unsubscribeFolders(); unsubscribeFolders = null; }
-    
-    DOM.clipGrid.innerHTML = ''; 
-    DOM.lightboxModal.classList.add('hidden');
-    DOM.lightboxImage.src = '';
-    
-    setTimeout(() => {
-        DOM.appScreen.classList.add('hidden');
-        DOM.appScreen.classList.remove('app-blur');
-        
-        if (currentUser && !currentUser.isAnonymous) {
-            DOM.initialAuthContainer.classList.add('hidden');
-            DOM.googleLockedContainer.classList.remove('hidden');
-            
-            if (DOM.lockedUserAvatar) DOM.lockedUserAvatar.src = currentUser.photoURL || 'https://via.placeholder.com/64';
-            if (DOM.lockedUserName) DOM.lockedUserName.textContent = currentUser.displayName || 'Google User';
-            if (DOM.lockedUserEmail) DOM.lockedUserEmail.textContent = currentUser.email || '';
-            
-            DOM.lockPasswordInput.value = '';
-        } else {
-            currentRoomHash = null;
-            DOM.initialAuthContainer.classList.remove('hidden');
-            DOM.googleLockedContainer.classList.add('hidden');
-            DOM.passwordInput.value = '';
-        }
-        
-        DOM.authScreen.classList.remove('hidden');
-        updateProfileUI(currentUser);
-    }, 100);
-    
-    showToast("Application locked");
-    closeMobileSidebar();
-}
-
-async function login() {
-    const pwd = DOM.passwordInput.value.trim();
-    if (!pwd) return;
-    if (!currentUser) return showToast("Waiting for server connection...");
-
-    DOM.loginBtn.textContent = "Joining...";
-    DOM.loginBtn.disabled = true;
-
-    try {
-        currentRoomHash = await hashPassword(pwd);
-        
-        await ensureRoomMetadata();
-        
-        startFoldersSync();
-        startNotesSync();
-        
-        isAppLocked = false;
-        DOM.authScreen.classList.add('hidden');
-        DOM.appScreen.classList.remove('hidden');
-        DOM.passwordInput.value = ''; 
-        
-        updateProfileUI(currentUser);
-        resetAutoLockTimer();
-        showToast("Joined guest room");
-    } catch (err) {
-        console.error(err);
-        showToast("Error: " + err.message);
-    } finally {
-        DOM.loginBtn.textContent = "Join Room";
-        DOM.loginBtn.disabled = false;
-    }
-}
-
-// ==========================================
-// 📱 SIDEBAR LOGIC (MOBILE & DESKTOP)
-// ==========================================
-function toggleSidebar() {
-    if (window.innerWidth <= 768) {
-        DOM.sidebar.classList.add('open');
-        DOM.sidebarBackdrop.classList.remove('hidden');
-    } else {
-        DOM.sidebar.classList.remove('collapsed');
-    }
-}
-
-function closeMobileSidebar() {
-    if (window.innerWidth <= 768) {
-        DOM.sidebar.classList.remove('open');
-        DOM.sidebarBackdrop.classList.add('hidden');
-    }
-}
-
-DOM.btnMobileMenu.addEventListener('click', toggleSidebar);
-DOM.sidebarBackdrop.addEventListener('click', closeMobileSidebar);
-document.getElementById('btnSidebarCollapse').addEventListener('click', () => {
-    if (window.innerWidth <= 768) {
-        closeMobileSidebar();
-    } else {
-        DOM.sidebar.classList.add('collapsed');
-    }
-});
-
-window.addEventListener('resize', () => {
-    if (window.innerWidth > 768) {
-        DOM.sidebar.classList.remove('open');
-        DOM.sidebarBackdrop.classList.add('hidden');
-    }
-});
-
-// ==========================================
-// 📡 DATABASE SYNC
-// ==========================================
-
-async function ensureRoomMetadata() {
-    const roomRef = doc(db, 'clipboards', currentRoomHash);
-    
-    // Handle pending lock password reset
-    if (localStorage.getItem('resetLockPasswordPending') === 'true') {
-        try {
-            await setDoc(roomRef, { lockPasswordHash: null }, { merge: true });
-            localStorage.removeItem('resetLockPasswordPending');
-            showToast("Lock password reset triggered");
-        } catch (err) {
-            console.error("Failed to reset lock password in Firestore:", err);
-        }
-    }
-    
-    const snap = await getDoc(roomRef);
-    if (!snap.exists()) {
-        const initialData = {
-            folders: [{ id: 'default', name: 'General' }],
-            createdAt: serverTimestamp()
-        };
-        await setDoc(roomRef, initialData);
-        appLockPasswordHash = null;
-    } else {
-        const data = snap.data();
-        appLockPasswordHash = data.lockPasswordHash || null;
-    }
-}
-
-async function cleanupExpiredFolders() {
-    const isGuest = !currentUser || currentUser.isAnonymous;
-    const expirationPeriod = isGuest ? 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
-    const cutoffTime = Date.now() - expirationPeriod;
-    
-    let updatedFolders = [...folders];
-    let changed = false;
-    updatedFolders = updatedFolders.filter(f => {
-        if (f.deleted && f.deletedAt && f.deletedAt < cutoffTime) {
-            changed = true;
-            return false;
-        }
-        return true;
-    });
-    if (changed) {
-        folders = updatedFolders;
-        try {
-            const roomRef = doc(db, 'clipboards', currentRoomHash);
-            await setDoc(roomRef, { folders }, { merge: true });
-        } catch (err) {
-            console.error("Failed to clean up expired folders", err);
-        }
-    }
-}
-
-async function cleanupExpiredNotes() {
-    const isGuest = !currentUser || currentUser.isAnonymous;
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-
-    let expiredNotes = [];
-    if (isGuest) {
-        expiredNotes = notesArray.filter(n => n.updatedAt < oneDayAgo);
-    } else {
-        expiredNotes = notesArray.filter(n => n.deleted && n.deletedAt && n.deletedAt < thirtyDaysAgo);
-    }
-
-    for (const note of expiredNotes) {
-        const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
-        try {
-            await deleteDoc(noteRef);
-        } catch (err) {
-            console.error("Failed to delete expired note", note.id, err);
-        }
-    }
-}
-
-function startFoldersSync() {
-    const roomRef = doc(db, 'clipboards', currentRoomHash);
-    unsubscribeFolders = onSnapshot(roomRef, (docSnap) => {
-        if (docSnap.exists() && docSnap.data().folders) {
-            folders = docSnap.data().folders;
-            cleanupExpiredFolders();
-            
-            const activeFolders = folders.filter(f => !f.deleted);
-            if (!activeFolders.find(f => f.id === currentFolderId)) {
-                currentFolderId = activeFolders[0] ? activeFolders[0].id : 'default';
-            }
-            updateViewArchiveUI();
-        }
-    });
-}
-
-
-function startNotesSync() {
-    if (unsubscribeNotes) unsubscribeNotes();
-    
-    const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
-    const q = viewMode === 'trash'
-        ? query(notesRef)
-        : query(notesRef, where('folderId', '==', currentFolderId));
-    
-    unsubscribeNotes = onSnapshot(q, (snapshot) => {
-        notesArray = [];
-        snapshot.forEach(docSnap => {
-            notesArray.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        
-        cleanupExpiredNotes();
-        DOM.syncIndicator.classList.remove('saving');
-        renderGrid();
-    }, (error) => {
-        console.error("Sync Error", error);
-        showToast("Disconnected from note sync");
-    });
-}
-
-function updateViewArchiveUI() {
-    if (DOM.btnToggleTrash) DOM.btnToggleTrash.classList.remove('active');
-    
-    // Update dynamic header title
-    const headerTitleEl = document.getElementById('headerTitleText');
-    if (headerTitleEl) {
-        if (viewMode === 'trash') {
-            headerTitleEl.textContent = "Trash";
-        } else {
-            const currentFolder = folders.find(f => f.id === currentFolderId);
-            headerTitleEl.textContent = currentFolder ? currentFolder.name : "Notes";
-        }
-    }
-    
-    if (viewMode === 'trash') {
-        if (DOM.btnToggleTrash) {
-            DOM.btnToggleTrashText.textContent = "Back to Last Folder";
-            DOM.btnToggleTrash.classList.add('active');
-        }
-    } else {
-        if (DOM.btnToggleTrash) {
-            DOM.btnToggleTrashText.textContent = "Trash";
-        }
-    }
-
-    if (DOM.btnEmptyTrash) {
-        if (viewMode === 'trash') {
-            DOM.btnEmptyTrash.classList.remove('hidden');
-            DOM.btnEmptyTrash.style.display = 'inline-flex';
-            if (DOM.btnAddNoteHeader) DOM.btnAddNoteHeader.style.display = 'none';
-            if (DOM.btnAddNoteMobile) DOM.btnAddNoteMobile.style.display = 'none';
-            if (DOM.btnEmptyTrashMobile) {
-                DOM.btnEmptyTrashMobile.classList.remove('hidden');
-                DOM.btnEmptyTrashMobile.style.display = '';
-            }
-        } else {
-            DOM.btnEmptyTrash.classList.add('hidden');
-            DOM.btnEmptyTrash.style.display = 'none';
-            if (DOM.btnAddNoteHeader) DOM.btnAddNoteHeader.style.display = '';
-            if (DOM.btnAddNoteMobile) DOM.btnAddNoteMobile.style.display = '';
-            if (DOM.btnEmptyTrashMobile) {
-                DOM.btnEmptyTrashMobile.classList.add('hidden');
-                DOM.btnEmptyTrashMobile.style.display = 'none';
-            }
-        }
-    }
-
-    renderFolders();
-}
-
-function switchFolder(folderId) {
-    currentFolderId = folderId;
-    viewMode = 'active';
-    updateViewArchiveUI();
-    startNotesSync();
-    closeMobileSidebar(); // Auto-close on mobile when folder selected
-}
-
-async function forceSaveNoteToServer(note) {
-    if (isAppLocked || !currentRoomHash) return;
-    DOM.syncIndicator.classList.add('saving');
-    
-    const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
-    try {
-        await setDoc(noteRef, {
-            ...note,
-            updatedAt: Date.now()
-        }, { merge: true });
-    } catch (err) {
-        console.error(err);
-        showToast("Failed to save note");
-    }
-}
-
-function triggerNoteAutoSave(note) {
-    DOM.syncIndicator.classList.add('saving');
-    if (saveTimeouts.has(note.id)) {
-        clearTimeout(saveTimeouts.get(note.id));
-    }
-    const timeout = setTimeout(() => {
-        forceSaveNoteToServer(note);
-    }, 1000);
-    saveTimeouts.set(note.id, timeout);
-}
-
-// ==========================================
-// 🎨 UI RENDERING - FOLDERS
-// ==========================================
-function renderFolders() {
-    const activeFolders = folders.filter(f => !f.deleted);
-    if (activeFolders.length <= 1) {
-        isSelectingFolders = false;
-        if (DOM.btnSelectFolders) {
-            DOM.btnSelectFolders.style.color = 'var(--text-muted)';
-            DOM.btnSelectFolders.style.display = 'none';
-        }
-        if (DOM.btnAddFolder) {
-            DOM.btnAddFolder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
-            DOM.btnAddFolder.style.color = '';
-            DOM.btnAddFolder.setAttribute('title', 'Add New Folder');
-        }
-    } else {
-        if (DOM.btnSelectFolders) {
-            DOM.btnSelectFolders.style.display = 'inline-flex';
-        }
-    }
-
-    DOM.folderList.innerHTML = '';
-    folders.forEach(f => {
-        if (f.deleted) return;
-        
-        const li = document.createElement('li');
-        li.className = `folder-item ${f.id === currentFolderId && viewMode === 'active' ? 'active' : ''}`;
-        li.setAttribute('tabindex', '0');
-        li.setAttribute('role', 'button');
-        li.setAttribute('aria-label', `Folder ${f.name}`);
-        
-        const folderNameWrapper = document.createElement('div');
-        folderNameWrapper.style.display = 'flex';
-        folderNameWrapper.style.alignItems = 'center';
-        folderNameWrapper.style.gap = '8px';
-        
-        const folderIcon = document.createElement('span');
-        folderIcon.className = 'folder-icon-wrapper';
-        folderIcon.style.display = 'inline-flex';
-        folderIcon.style.alignItems = 'center';
-        folderIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
-        folderNameWrapper.appendChild(folderIcon);
-        
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = f.name;
-        folderNameWrapper.appendChild(nameSpan);
-        li.appendChild(folderNameWrapper);
-        
-        if (isSelectingFolders && f.id !== 'default') {
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = selectedFoldersForDeletion.has(f.id);
-            checkbox.style.pointerEvents = 'none'; // let the li handle click
-            checkbox.style.marginRight = '8px';
-            folderNameWrapper.prepend(checkbox);
-            folderIcon.style.display = 'none';
-        }
-
-        if (f.id !== 'default' && !isSelectingFolders) {
-            const actions = document.createElement('div');
-            actions.className = 'folder-actions';
-            
-            const btnOptions = document.createElement('button');
-            btnOptions.className = 'btn-folder-options';
-            btnOptions.setAttribute('title', 'Folder Options');
-            btnOptions.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`;
-            
-            const dropdown = document.createElement('div');
-            dropdown.className = 'folder-dropdown';
-            
-            const btnEdit = document.createElement('button');
-            btnEdit.className = 'folder-dropdown-item';
-            btnEdit.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Rename`;
-            btnEdit.onclick = (e) => {
-                e.stopPropagation();
-                dropdown.classList.remove('show');
-                actions.classList.remove('open');
-                editFolder(f.id, f.name);
-            };
-            
-            const btnDel = document.createElement('button');
-            btnDel.className = 'folder-dropdown-item danger';
-            btnDel.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete`;
-            btnDel.onclick = (e) => {
-                e.stopPropagation();
-                dropdown.classList.remove('show');
-                actions.classList.remove('open');
-                deleteFolder(f.id);
-            };
-            
-            dropdown.appendChild(btnEdit);
-            dropdown.appendChild(btnDel);
-            
-            btnOptions.onclick = (e) => {
-                e.stopPropagation();
-                document.querySelectorAll('.folder-dropdown.show').forEach(d => {
-                    if (d !== dropdown) {
-                        d.classList.remove('show');
-                        if (d.parentElement) d.parentElement.classList.remove('open');
-                    }
-                });
-                const isShowing = dropdown.classList.toggle('show');
-                actions.classList.toggle('open', isShowing);
-            };
-            
-            actions.appendChild(btnOptions);
-            actions.appendChild(dropdown);
-            li.appendChild(actions);
-
-            // Touch-and-hold (long press) logic
-            let pressTimer;
-            const clearTimer = () => clearTimeout(pressTimer);
-            li.addEventListener('touchstart', (e) => {
-                pressTimer = setTimeout(() => {
-                    if (isMobile()) {
-                        if (navigator.vibrate) navigator.vibrate(15);
-                        closeMobileSidebar();
-                        setTimeout(() => {
-                            openMobileFolderActions(f);
-                        }, 250);
-                    } else {
-                        document.querySelectorAll('.folder-dropdown.show').forEach(d => {
-                            d.classList.remove('show');
-                            if (d.parentElement) d.parentElement.classList.remove('open');
-                        });
-                        dropdown.classList.add('show');
-                        actions.classList.add('open');
-                    }
-                }, 550); // 550ms long press
-            });
-            li.addEventListener('touchend', clearTimer);
-            li.addEventListener('touchmove', clearTimer);
-            li.addEventListener('touchcancel', clearTimer);
-        }
-        
-        if (f.id === 'default' && !isSelectingFolders) {
-            let pressTimer;
-            const clearTimer = () => clearTimeout(pressTimer);
-            li.addEventListener('touchstart', (e) => {
-                pressTimer = setTimeout(() => {
-                    showToast("General folder cannot be renamed or deleted");
-                }, 500);
-            });
-            li.addEventListener('touchend', clearTimer);
-            li.addEventListener('touchmove', clearTimer);
-            li.addEventListener('touchcancel', clearTimer);
-        }
-        
-        if (isSelectingFolders && f.id !== 'default') {
-            li.onclick = (e) => {
-                e.preventDefault();
-                if (selectedFoldersForDeletion.has(f.id)) selectedFoldersForDeletion.delete(f.id);
-                else selectedFoldersForDeletion.add(f.id);
-                renderFolders();
-            };
-        } else {
-            li.onclick = () => switchFolder(f.id);
-        }
-        
-        li.onkeydown = (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                switchFolder(f.id);
-            }
-        };
-        DOM.folderList.appendChild(li);
-    });
-}
-
-function editFolder(folderId, currentName) {
-    editingFolderId = folderId;
-    DOM.folderModal.querySelector('h3').textContent = "Edit Folder";
-    DOM.folderModal.classList.remove('hidden');
-    DOM.folderNameInput.value = currentName;
-    DOM.folderNameInput.focus();
-}
-
-async function saveNewFolder() {
-    const name = DOM.folderNameInput.value.trim();
-    if (!name) return;
-    
-    if (editingFolderId) {
-        folders = folders.map(f => f.id === editingFolderId ? { ...f, name } : f);
-        DOM.folderModal.classList.add('hidden');
-        DOM.folderNameInput.value = '';
-        
-        try {
-            const roomRef = doc(db, 'clipboards', currentRoomHash);
-            await setDoc(roomRef, { folders }, { merge: true });
-            if (currentFolderId === editingFolderId) updateViewArchiveUI();
-            else renderFolders();
-        } catch(err) {
-            showToast("Failed to edit folder");
-        }
-        editingFolderId = null;
-    } else {
-        const newFolder = {
-            id: 'f_' + Date.now().toString(36),
-            name: name
-        };
-        
-        folders.push(newFolder);
-        DOM.folderModal.classList.add('hidden');
-        DOM.folderNameInput.value = '';
-        
-        try {
-            const roomRef = doc(db, 'clipboards', currentRoomHash);
-            await setDoc(roomRef, { folders }, { merge: true });
-            switchFolder(newFolder.id);
-        } catch(err) {
-            showToast("Failed to create folder");
-        }
-    }
-}
-
-async function deleteFolder(folderId) {
-    if (!await showCustomConfirm("Move Folder to Trash", "Move this folder and its notes to Trash?", true)) return;
-    
-    folders = folders.map(f => f.id === folderId ? { ...f, deleted: true, deletedAt: Date.now() } : f);
-    try {
-        const roomRef = doc(db, 'clipboards', currentRoomHash);
-        await setDoc(roomRef, { folders }, { merge: true });
-        
-        // Also soft-delete all notes in this folder
-        const notesInFolder = notesArray.filter(n => n.folderId === folderId);
-        for (const note of notesInFolder) {
-            const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
-            await setDoc(noteRef, {
-                deleted: true,
-                deletedAt: Date.now()
-            }, { merge: true });
-        }
-        
-        if (currentFolderId === folderId) switchFolder('default');
-        showToast("Folder moved to Trash");
-    } catch(err) {
-        showToast("Failed to delete folder");
-    }
-}
-
-// ==========================================
-// 🎨 UI RENDERING - GRID & CARDS
-// ==========================================
-function countWordsAndChars(text) {
+export function countWordsAndChars(text) {
+    if (!text || typeof text !== 'string') return '0 words | 0 chars';
+    const trimmed = text.trim();
+    const words = trimmed ? trimmed.split(/\s+/).length : 0;
     const chars = text.length;
-    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     return `${words} words | ${chars} chars`;
 }
 
-function resizeTextarea(textarea) {
-    if (!textarea) return;
-    textarea.style.height = '100%';
-    textarea.style.overflowY = 'auto';
-}
-
-function renderGrid() {
-    if (isAppLocked) return;
-    
-    // Save active note textarea focus & caret state
-    let activeNoteId = null;
-    let caretStart = 0;
-    let caretEnd = 0;
-    if (document.activeElement && 
-        document.activeElement.classList.contains('card-body') && 
-        document.activeElement.dataset.noteId) {
-        activeNoteId = document.activeElement.dataset.noteId;
-        caretStart = document.activeElement.selectionStart;
-        caretEnd = document.activeElement.selectionEnd;
-    }
-    
-    DOM.clipGrid.innerHTML = "";
-    
-    if (viewMode === 'trash') {
-        const trashFolders = folders.filter(f => f.deleted && f.name.toLowerCase().includes(searchQuery));
-        const trashNotes = notesArray.filter(n => n.deleted && n.text.toLowerCase().includes(searchQuery));
-        
-        if (trashFolders.length === 0 && trashNotes.length === 0) {
-            DOM.emptyState.classList.remove('hidden');
-            DOM.emptyState.querySelector('h3').textContent = "Trash is empty";
-            DOM.emptyState.querySelector('p').textContent = "Deleted notes and folders will appear here for 30 days.";
-            DOM.clipGrid.innerHTML = "";
-            return;
-        } else {
-            DOM.emptyState.classList.add('hidden');
-        }
-        
-        DOM.clipGrid.innerHTML = `<div id="trashGrid" class="grid"></div>`;
-        const trashGrid = DOM.clipGrid.querySelector('#trashGrid');
-        
-        trashFolders.forEach(f => {
-            const card = document.createElement('div');
-            card.className = 'card trash-card';
-            
-            const msRemaining = (f.deletedAt + 30 * 24 * 60 * 60 * 1000) - Date.now();
-            const daysRemaining = Math.max(1, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
-            
-            card.innerHTML = `
-                <div class="card-header">
-                    <div class="card-badges">
-                        <span class="badge" style="background: var(--danger); color: white; display: inline-flex; align-items: center; gap: 4px;">
-                            Folder
-                        </span>
-                        <span class="badge" style="display: inline-flex; align-items: center; gap: 4px;">
-                            ${daysRemaining} days left
-                        </span>
-                    </div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px; margin: 15px 0;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                    <span style="font-weight: 700; font-size: 1.1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.name}</span>
-                </div>
-                <div class="card-footer">
-                    <div class="card-actions" style="justify-content: space-between; width: 100%;">
-                        <button class="action-btn restore-folder-btn" style="display:inline-flex; align-items:center; gap:4px; font-weight: 600;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                            Restore
-                        </button>
-                        <button class="action-btn del delete-folder-perm-btn" style="display:inline-flex; align-items:center; gap:4px;">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            card.querySelector('.restore-folder-btn').onclick = () => restoreFolder(f.id);
-            card.querySelector('.delete-folder-perm-btn').onclick = () => deleteFolderPermanently(f.id);
-            trashGrid.appendChild(card);
-        });
-        
-        trashNotes.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'card trash-card';
-            
-            const msRemaining = (item.deletedAt + 30 * 24 * 60 * 60 * 1000) - Date.now();
-            const daysRemaining = Math.max(1, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
-            
-            const imageHtml = item.image ? `
-                <div class="card-image-wrapper">
-                    <img src="${item.image}" class="card-image" alt="Note Image">
-                </div>
-            ` : '';
-            
-            const documentHtml = item.document ? `
-                <div class="card-document-wrapper" style="margin-top: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-base); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.85em; font-weight: 500;">
-                    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); flex-shrink: 0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                        <span class="document-name" style="overflow: hidden; text-overflow: ellipsis; opacity: 0.8;" title="${item.documentName}">${item.documentName || 'Document'}</span>
-                    </div>
-                </div>
-            ` : '';
-            
-            card.innerHTML = `
-                <div class="card-header">
-                    <div class="card-badges">
-                        <span class="badge" style="background: var(--warning); color: white; display: inline-flex; align-items: center; gap: 4px;">
-                            Note
-                        </span>
-                        <span class="badge" style="display: inline-flex; align-items: center; gap: 4px;">
-                            ${daysRemaining} days left
-                        </span>
-                    </div>
-                </div>
-                ${imageHtml}
-                ${documentHtml}
-                <textarea class="card-body" readonly aria-label="Note Content" style="opacity: 0.8; cursor: not-allowed;">${item.text}</textarea>
-                <div class="card-footer">
-                    <div class="card-actions" style="justify-content: space-between; width: 100%;">
-                        <button class="action-btn restore-note-btn" style="display:inline-flex; align-items:center; gap:4px; font-weight: 600;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                            Restore
-                        </button>
-                        <button class="action-btn del delete-note-perm-btn" style="display:inline-flex; align-items:center; gap:4px;">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            const textInput = card.querySelector('.card-body');
-            setTimeout(() => resizeTextarea(textInput), 0);
-            
-            card.querySelector('.restore-note-btn').onclick = () => restoreNote(item.id);
-            card.querySelector('.delete-note-perm-btn').onclick = () => deleteNotePermanently(item.id);
-            trashGrid.appendChild(card);
-        });
-        
-        return;
-    }
-    
-    DOM.emptyState.querySelector('h3').textContent = "No notes yet";
-    DOM.emptyState.querySelector('p').textContent = 'Click "+ New Note" to start writing in this folder.';
-    
-    // Filter active notes
-    let filtered = notesArray.filter(n => {
-        const matchesFolder = n.folderId === currentFolderId;
-        const matchesView = !n.deleted;
-        const matchesSearch = n.text.toLowerCase().includes(searchQuery);
-        return matchesFolder && matchesView && matchesSearch;
-    });
-
-    filtered.sort((a, b) => {
-        if (a.pinned === b.pinned) return (b.updatedAt || 0) - (a.updatedAt || 0);
-        return a.pinned ? -1 : 1;
-    });
-
-    if (filtered.length === 0) {
-        DOM.emptyState.classList.remove('hidden');
-        DOM.clipGrid.innerHTML = "";
-        return;
-    } else {
-        DOM.emptyState.classList.add('hidden');
-    }
-
-    const pinnedNotes = filtered.filter(n => n.pinned);
-    const otherNotes = filtered.filter(n => !n.pinned);
-
-    let pinnedGrid, othersGrid;
-
-    if (pinnedNotes.length > 0) {
-        DOM.clipGrid.innerHTML = `
-            <div class="section-container" style="width: 100%; margin-bottom: 24px;">
-                <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px;">
-                    <span style="font-size: 0.8rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted);">PINNED</span>
-                    <button class="btn-accordion-toggle" style="background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 600; padding: 4px 8px; border-radius: var(--radius-sm); transition: background 0.2s;">
-                        <span>${isPinnedCollapsed ? 'Show' : 'Hide'}</span>
-                        <svg class="toggle-icon" style="transition: transform 0.2s; ${isPinnedCollapsed ? 'transform: rotate(-90deg);' : ''}" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    </button>
-                </div>
-                <div id="pinnedGrid" class="grid ${isPinnedCollapsed ? 'hidden' : ''}"></div>
-            </div>
-            <div class="section-container" style="width: 100%;">
-                <div class="section-header" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px;">
-                    <span style="font-size: 0.8rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted);">OTHERS</span>
-                </div>
-                <div id="othersGrid" class="grid"></div>
-            </div>
-        `;
-        pinnedGrid = DOM.clipGrid.querySelector('#pinnedGrid');
-        othersGrid = DOM.clipGrid.querySelector('#othersGrid');
-
-        const toggleBtn = DOM.clipGrid.querySelector('.btn-accordion-toggle');
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                isPinnedCollapsed = !isPinnedCollapsed;
-                localStorage.setItem('isPinnedCollapsed', isPinnedCollapsed);
-                renderGrid();
-            });
-        }
-    } else {
-        DOM.clipGrid.innerHTML = `
-            <div id="othersGrid" class="grid" style="width: 100%;"></div>
-        `;
-        othersGrid = DOM.clipGrid.querySelector('#othersGrid');
-    }
-
-    filtered.forEach(item => {
-        const card = document.createElement('div');
-        card.className = `card ${item.pinned ? 'pinned' : ''}`;
-        
-        const dateStr = item.updatedAt ? new Date(item.updatedAt).toLocaleString('en-US', {day:'numeric', month:'short', hour: '2-digit', minute:'2-digit'}) : 'New';
-
-        const imageHtml = item.image ? `
-            <div class="card-image-wrapper">
-                <img src="${item.image}" class="card-image" alt="Note Image">
-                <button class="btn-download-image" title="Download Image" aria-label="Download Image">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                </button>
-                <button class="btn-remove-image" title="Delete Image" aria-label="Delete Image">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-            </div>
-        ` : '';
-
-        const documentHtml = item.document ? `
-            <div class="card-document-wrapper" style="margin-top: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-base); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.85em; font-weight: 500;">
-                <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex-grow: 1;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary); flex-shrink: 0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                    <span class="document-name" style="overflow: hidden; text-overflow: ellipsis;" title="${item.documentName}">${item.documentName || 'Document'}</span>
-                </div>
-                <div style="display: flex; gap: 8px; flex-shrink: 0;">
-                    <button class="btn-download-document" title="Download Document" aria-label="Download Document" style="background: none; border: none; cursor: pointer; color: var(--text-muted); display: inline-flex; align-items: center;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    </button>
-                    <button class="btn-remove-document" title="Delete Document" aria-label="Delete Document" style="background: none; border: none; cursor: pointer; color: var(--danger); display: inline-flex; align-items: center;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    </button>
-                </div>
-            </div>
-        ` : '';
-
-        const hasAttachment = item.image || item.document;
-        const attachmentBtnHtml = hasAttachment ? '' : `
-            <div class="attachment-btn-container" style="position: relative; display: inline-block;">
-                <button class="action-btn attachment-btn" title="Add Attachment" aria-label="Add Attachment" style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px; gap: 6px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                    Attachment
-                </button>
-                <div class="attachment-dropdown hidden" style="position: absolute; bottom: 100%; right: 0; margin-bottom: 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 100; min-width: 140px; display: flex; flex-direction: column; overflow: hidden; padding: 4px 0;">
-                    <button class="dropdown-item opt-add-image" style="background: none; border: none; padding: 8px 12px; font-size: 0.85em; font-weight: 500; text-align: left; cursor: pointer; color: var(--text-main); display: flex; align-items: center; gap: 8px; width: 100%;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                        Media/Image
-                    </button>
-                    <button class="dropdown-item opt-add-document" style="background: none; border: none; padding: 8px 12px; font-size: 0.85em; font-weight: 500; text-align: left; cursor: pointer; color: var(--text-main); display: flex; align-items: center; gap: 8px; width: 100%;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                        Document
-                    </button>
-                </div>
-            </div>
-            <input type="file" class="card-image-input" accept="image/*" style="display: none;" aria-label="Upload Image">
-            <input type="file" class="card-document-input" accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv" style="display: none;" aria-label="Upload Document">
-        `;
-
-        const moveDropdownItems = folders.filter(f => f.id !== currentFolderId).map(f => `
-            <button class="dropdown-item opt-move-note" data-folder-id="${f.id}" style="background: none; border: none; padding: 8px 12px; font-size: 0.85em; font-weight: 500; text-align: left; cursor: pointer; color: var(--text-main); width: 100%; transition: background 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                ${f.name}
-            </button>
-        `).join('');
-
-        const moveSelectHtml = folders.length > 1 ? `
-            <div class="move-dropdown-container" style="position: relative; display: inline-block;">
-                <span class="badge move-btn" role="button" tabindex="0" aria-label="Move Note" style="display:inline-flex; align-items:center; gap:4px;">
-                    Move...
-                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                </span>
-                <div class="move-dropdown hidden" style="position: absolute; top: 100%; left: 0; margin-top: 6px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 110; min-width: 140px; display: flex; flex-direction: column; overflow: hidden; padding: 4px 0;">
-                    <div style="padding: 6px 12px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); border-bottom: 1px solid var(--border); margin-bottom: 4px; letter-spacing: 0.5px; text-transform: uppercase;">Move to...</div>
-                    ${moveDropdownItems}
-                </div>
-            </div>
-        ` : '';
-
-        card.innerHTML = `
-            <div class="card-header">
-                <div class="card-badges">
-                    <span class="badge pin-btn ${item.pinned ? 'active-pin' : ''}" role="button" tabindex="0" aria-label="${item.pinned ? 'Unpin Note' : 'Pin Note'}" style="display:inline-flex; align-items:center; gap:4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A.5.5 0 0 0 6.36 14h11.28a.5.5 0 0 0 .25-.56l-1.78-.89a2 2 0 0 1-1.11-1.79V4H9v6.76zM8 4h8M10 2h4"/></svg>
-                        ${item.pinned ? 'Pinned' : 'Pin'}
-                    </span>
-                    ${moveSelectHtml}
-                </div>
-            </div>
-            ${imageHtml}
-            ${documentHtml}
-            <textarea class="card-body" data-note-id="${item.id}" placeholder="Type something..." aria-label="Note Content">${item.text}</textarea>
-            <div class="card-footer">
-                <div class="card-stats">
-                    <span class="card-date">${dateStr}</span>
-                    <span class="word-count">${countWordsAndChars(item.text)}</span>
-                </div>
-                <div class="card-actions">
-                    ${attachmentBtnHtml}
-                    <button class="action-btn copy-btn" title="Copy Note" aria-label="Copy Note" style="display:inline-flex; align-items:center; gap:4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                        Copy
-                    </button>
-                    <button class="action-btn del del-btn" title="Delete Note" aria-label="Delete Note" style="display:inline-flex; align-items:center; gap:4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        Delete
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        const textInput = card.querySelector('.card-body');
-        const wordCountDisplay = card.querySelector('.word-count');
-        
-        if (isMobile()) {
-            textInput.setAttribute('readonly', 'true');
-            textInput.style.cursor = 'pointer';
-        }
-        
-        // Auto-resize on initial render
-        setTimeout(() => resizeTextarea(textInput), 0);
-
-        textInput.addEventListener('input', (e) => {
-            item.text = e.target.value;
-            item.updatedAt = Date.now();
-            wordCountDisplay.textContent = countWordsAndChars(item.text);
-            resizeTextarea(textInput);
-            triggerNoteAutoSave(item);
-        });
-
-        textInput.addEventListener('paste', async (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image') !== -1) {
-                    e.preventDefault();
-                    const file = items[i].getAsFile();
-                    if (!file) continue;
-
-                    showToast("Compressing image from clipboard...");
-                    
-                    try {
-                        const compressedBase64 = await compressImage(file, 256);
-                        item.image = compressedBase64;
-                        item.updatedAt = Date.now();
-                        await forceSaveNoteToServer(item);
-                        renderGrid();
-                        showToast("Image from clipboard uploaded successfully!");
-                    } catch (err) {
-                        console.error(err);
-                        showToast(err.message || "Failed to compress image from clipboard.");
-                    }
-                    break;
-                }
-            }
-        });
-
-        const pinBtn = card.querySelector('.pin-btn');
-        const togglePin = () => {
-            item.pinned = !item.pinned;
-            item.updatedAt = Date.now();
-            forceSaveNoteToServer(item);
-            renderGrid();
-        };
-        pinBtn.addEventListener('click', togglePin);
-        pinBtn.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                togglePin();
-            }
-        });
-
-        const copyBtn = card.querySelector('.copy-btn');
-        copyBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(textInput.value).then(() => {
-                // Micro-animation
-                const originalContent = copyBtn.innerHTML;
-                copyBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                    Copied!
-                `;
-                copyBtn.classList.add('copied');
-                setTimeout(() => {
-                    copyBtn.innerHTML = originalContent;
-                    copyBtn.classList.remove('copied');
-                }, 2000);
-            });
-        });
-
-        card.querySelector('.del-btn').addEventListener('click', async () => {
-            if (await showCustomConfirm("Move to Trash", "Move this note to Trash? It will be automatically deleted after 30 days.", false)) {
-                const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', item.id);
-                try {
-                    await setDoc(noteRef, {
-                        deleted: true,
-                        deletedAt: Date.now()
-                    }, { merge: true });
-                    showToast("Note moved to Trash");
-                } catch(err) {
-                    showToast("Failed to move note to Trash");
-                }
-            }
-        });
-
-        if (folders.length > 1) {
-            const moveBtn = card.querySelector('.move-btn');
-            const moveDropdown = card.querySelector('.move-dropdown');
-            
-            moveBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // Close all other dropdowns
-                document.querySelectorAll('.move-dropdown, .attachment-dropdown').forEach(d => {
-                    if (d !== moveDropdown) d.classList.add('hidden');
-                });
-                moveDropdown.classList.toggle('hidden');
-            });
-
-            card.querySelectorAll('.opt-move-note').forEach(opt => {
-                opt.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const targetFolderId = opt.getAttribute('data-folder-id');
-                    if (targetFolderId) {
-                        item.folderId = targetFolderId;
-                        item.updatedAt = Date.now();
-                        await forceSaveNoteToServer(item);
-                        renderGrid();
-                        showToast("Note moved!");
-                    }
-                });
-            });
-        }
-
-        if (item.image) {
-            // Lightbox viewer
-            card.querySelector('.card-image').addEventListener('click', () => {
-                DOM.lightboxImage.src = item.image;
-                DOM.lightboxModal.classList.remove('hidden');
-            });
-
-            // Remove image
-            card.querySelector('.btn-remove-image').addEventListener('click', async (e) => {
-                e.stopPropagation();
-                if (await showCustomConfirm("Delete Image", "Remove this image from the note permanently?", true)) {
-                    item.image = null;
-                    item.updatedAt = Date.now();
-                    forceSaveNoteToServer(item);
-                    renderGrid();
-                }
-            });
-
-            // Download image overlay
-            card.querySelector('.btn-download-image').addEventListener('click', (e) => {
-                e.stopPropagation();
-                downloadImage(item.image, `image-${item.id}`);
-            });
-        }
-        
-        if (item.document) {
-            // Download document handler
-            card.querySelector('.btn-download-document').addEventListener('click', (e) => {
-                e.stopPropagation();
-                downloadFile(item.document, item.documentName);
-            });
-
-            // Remove document
-            card.querySelector('.btn-remove-document').addEventListener('click', async (e) => {
-                e.stopPropagation();
-                if (await showCustomConfirm("Delete Document", "Remove this document from the note permanently?", true)) {
-                    item.document = null;
-                    item.documentName = null;
-                    item.documentType = null;
-                    item.updatedAt = Date.now();
-                    forceSaveNoteToServer(item);
-                    renderGrid();
-                }
-            });
-        }
-
-        if (!hasAttachment) {
-            // Attachment dropdown toggle
-            const attachmentBtn = card.querySelector('.attachment-btn');
-            const attachmentDropdown = card.querySelector('.attachment-dropdown');
-            const fileImageInput = card.querySelector('.card-image-input');
-            const fileDocInput = card.querySelector('.card-document-input');
-            const optAddImage = card.querySelector('.opt-add-image');
-            const optAddDoc = card.querySelector('.opt-add-document');
-
-            attachmentBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.querySelectorAll('.attachment-dropdown').forEach(d => {
-                    if (d !== attachmentDropdown) d.classList.add('hidden');
-                });
-                attachmentDropdown.classList.toggle('hidden');
-            });
-
-            // Upload Image choice
-            optAddImage.addEventListener('click', () => {
-                attachmentDropdown.classList.add('hidden');
-                ignoreBlur = true;
-                fileImageInput.click();
-            });
-
-            fileImageInput.addEventListener('cancel', () => {
-                setTimeout(() => { ignoreBlur = false; }, 300);
-            });
-
-            fileImageInput.addEventListener('change', async (e) => {
-                setTimeout(() => { ignoreBlur = false; }, 300);
-                const file = e.target.files[0];
-                if (!file) return;
-
-                attachmentBtn.innerHTML = `Loading...`;
-                attachmentBtn.disabled = true;
-
-                try {
-                    const compressedBase64 = await compressImage(file, 256);
-                    item.image = compressedBase64;
-                    item.updatedAt = Date.now();
-                    await forceSaveNoteToServer(item);
-                    renderGrid();
-                    showToast("Image uploaded successfully!");
-                } catch (err) {
-                    console.error(err);
-                    showToast(err.message || "Failed to compress image.");
-                    renderGrid();
-                }
-            });
-
-            // Upload Document choice
-            optAddDoc.addEventListener('click', () => {
-                attachmentDropdown.classList.add('hidden');
-                ignoreBlur = true;
-                fileDocInput.click();
-            });
-
-            fileDocInput.addEventListener('cancel', () => {
-                setTimeout(() => { ignoreBlur = false; }, 300);
-            });
-
-            fileDocInput.addEventListener('change', async (e) => {
-                setTimeout(() => { ignoreBlur = false; }, 300);
-                const file = e.target.files[0];
-                if (!file) return;
-
-                attachmentBtn.innerHTML = `Loading...`;
-                attachmentBtn.disabled = true;
-
-                try {
-                    if (file.size > 2 * 1024 * 1024) {
-                        throw new Error("File size cannot exceed 2MB.");
-                    }
-
-                    const reader = new FileReader();
-                    reader.onload = async (event) => {
-                        try {
-                            item.document = event.target.result;
-                            item.documentName = file.name;
-                            item.documentType = file.type;
-                            item.updatedAt = Date.now();
-                            await forceSaveNoteToServer(item);
-                            renderGrid();
-                            showToast("Document uploaded successfully!");
-                        } catch (err) {
-                            showToast(err.message || "Failed to save document.");
-                            renderGrid();
-                        }
-                    };
-                    reader.onerror = () => {
-                        showToast("Failed to read document file.");
-                        renderGrid();
-                    };
-                    reader.readAsDataURL(file);
-                } catch (err) {
-                    console.error(err);
-                    showToast(err.message || "Failed to process document.");
-                    renderGrid();
-                }
-            });
-        }
-
-        if (isMobile()) {
-            bindMobileCardEvents(card, item);
-        }
-
-        if (item.pinned && pinnedNotes.length > 0) {
-            pinnedGrid.appendChild(card);
-        } else {
-            othersGrid.appendChild(card);
-        }
-    });
-
-    // Restore active note textarea focus & caret state
-    if (activeNoteId) {
-        const textInput = DOM.clipGrid.querySelector(`textarea[data-note-id="${activeNoteId}"]`);
-        if (textInput) {
-            textInput.focus();
-            textInput.setSelectionRange(caretStart, caretEnd);
-        }
-    }
-}
-
-// ==========================================
-// 🎮 GLOBAL EVENTS
-// ==========================================
-async function unlockGoogleRoom() {
-    const pwd = DOM.lockPasswordInput.value.trim();
-    if (!pwd) return;
-    
-    const hash = await hashPassword(pwd);
-    if (hash === appLockPasswordHash) {
-        startFoldersSync();
-        startNotesSync();
-        
-        isAppLocked = false;
-        DOM.authScreen.classList.add('hidden');
-        DOM.appScreen.classList.remove('hidden');
-        DOM.lockPasswordInput.value = '';
-        
-        resetAutoLockTimer();
-        updateProfileUI(currentUser);
-        showToast("Welcome back!");
-    } else {
-        showToast("Incorrect Lock Password");
-        DOM.lockPasswordInput.value = '';
-        DOM.lockPasswordInput.focus();
-    }
-}
-
-async function saveLockPassword() {
-    const pwd = DOM.newLockPassword.value.trim();
-    const conf = DOM.confirmLockPassword.value.trim();
-    if (!pwd) return showToast("Password cannot be empty");
-    if (pwd !== conf) return showToast("Passwords do not match");
-    
-    try {
-        const hash = await hashPassword(pwd);
-        
-        const roomRef = doc(db, 'clipboards', currentRoomHash);
-        await setDoc(roomRef, { lockPasswordHash: hash }, { merge: true });
-        
-        appLockPasswordHash = hash;
-        DOM.setupLockPasswordModal.classList.add('hidden');
-        DOM.newLockPassword.value = '';
-        DOM.confirmLockPassword.value = '';
-        
-        startFoldersSync();
-        startNotesSync();
-        
-        isAppLocked = false;
-        DOM.authScreen.classList.add('hidden');
-        DOM.appScreen.classList.remove('hidden');
-        
-        resetAutoLockTimer();
-        updateProfileUI(currentUser);
-        showToast("Lock password set successfully!");
-    } catch (err) {
-        console.error(err);
-        showToast("Failed to save password: " + err.message);
-    }
-}
-
-
-
-async function submitChangePassword() {
-    const oldPwd = DOM.changeOldPassword.value.trim();
-    const newPwd = DOM.changeNewPassword.value.trim();
-    const confPwd = DOM.changeConfirmPassword.value.trim();
-    
-    if (!oldPwd || !newPwd || !confPwd) return showToast("Fields cannot be empty");
-    if (newPwd !== confPwd) return showToast("New passwords do not match");
-    
-    const oldHash = await hashPassword(oldPwd);
-    if (oldHash !== appLockPasswordHash) {
-        return showToast("Current password incorrect");
-    }
-    try {
-        const newHash = await hashPassword(newPwd);
-        const roomRef = doc(db, 'clipboards', currentRoomHash);
-        await setDoc(roomRef, { lockPasswordHash: newHash }, { merge: true });
-        
-        appLockPasswordHash = newHash;
-        DOM.changeOldPassword.value = '';
-        DOM.changeNewPassword.value = '';
-        DOM.changeConfirmPassword.value = '';
-        DOM.changeLockPasswordModal.classList.add('hidden');
-        DOM.profileModal.classList.remove('hidden'); // Return to profile modal
-        showToast("Password updated successfully!");
-    } catch (err) {
-        console.error(err);
-        showToast("Failed to update password: " + err.message);
-    }
-}
-
-async function handleForgotPassword() {
-    if (!currentUser || currentUser.isAnonymous) return;
-    
-    const isChangePwdOpen = !DOM.changeLockPasswordModal.classList.contains('hidden');
-    if (isChangePwdOpen) {
-        DOM.changeLockPasswordModal.classList.add('hidden');
-    }
-    
-    const confirmReset = await showCustomConfirm(
-        "Reset Lock Password",
-        "Forgot your lock password? We will send a verification email to " + currentUser.email + " to help you reset it.",
-        false
-    );
-    
-    if (confirmReset) {
-        try {
-            await sendPasswordResetEmail(auth, currentUser.email);
-            
-            // Show successful email confirmation modal before logout
-            await showCustomConfirm(
-                "Email Sent",
-                "A recovery link has been sent to " + currentUser.email + ". Please click the link inside the email to confirm, then return here to log in and set your new code.",
-                false
-            );
-            
-            await handleSignOut();
-        } catch (err) {
-            console.error("Failed to send reset email:", err);
-            showToast("Failed to send email: " + err.message);
-            if (isChangePwdOpen) {
-                DOM.changeLockPasswordModal.classList.remove('hidden');
-            }
-        }
-    } else {
-        if (isChangePwdOpen) {
-            DOM.changeLockPasswordModal.classList.remove('hidden');
-        }
-    }
-}
-
-async function resetRoomData() {
-    const confirmDelete = await showCustomConfirm(
-        "Reset Room Data", 
-        "Are you sure you want to delete all notes and folders? This cannot be undone.", 
-        true
-    );
-    if (!confirmDelete) return;
-    
-    try {
-        for (const note of notesArray) {
-            const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
-            await deleteDoc(noteRef);
-        }
-        
-        const roomRef = doc(db, 'clipboards', currentRoomHash);
-        await setDoc(roomRef, { 
-            folders: [{ id: 'default', name: 'General' }] 
-        }, { merge: true });
-        
-        DOM.profileModal.classList.add('hidden');
-        showToast("Workspace database reset successfully");
-    } catch (err) {
-        console.error(err);
-        showToast("Failed to reset workspace: " + err.message);
-    }
-}
-
-
-DOM.loginBtn.addEventListener('click', login);
-DOM.passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
-if (DOM.btnGoogleLogin) {
-    DOM.btnGoogleLogin.addEventListener('click', loginWithGoogle);
-}
-if (DOM.btnUnlockGoogle) {
-    DOM.btnUnlockGoogle.addEventListener('click', unlockGoogleRoom);
-}
-if (DOM.lockPasswordInput) {
-    DOM.lockPasswordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') unlockGoogleRoom(); });
-}
-if (DOM.btnSwitchAccount) {
-    DOM.btnSwitchAccount.addEventListener('click', handleSignOut);
-}
-if (DOM.btnSaveLockPassword) {
-    DOM.btnSaveLockPassword.addEventListener('click', saveLockPassword);
-}
-if (DOM.btnLock) {
-    DOM.btnLock.addEventListener('click', lockApp);
-}
-if (DOM.btnOpenChangePassword) {
-    DOM.btnOpenChangePassword.addEventListener('click', () => {
-        DOM.changeOldPassword.value = '';
-        DOM.changeNewPassword.value = '';
-        DOM.changeConfirmPassword.value = '';
-        DOM.profileModal.classList.add('hidden');
-        DOM.changeLockPasswordModal.classList.remove('hidden');
-    });
-}
-if (DOM.btnCancelChangePassword) {
-    DOM.btnCancelChangePassword.addEventListener('click', () => {
-        DOM.changeLockPasswordModal.classList.add('hidden');
-        DOM.profileModal.classList.remove('hidden');
-    });
-}
-if (DOM.changeLockPasswordModal) {
-    DOM.changeLockPasswordModal.addEventListener('click', (e) => {
-        if (e.target === DOM.changeLockPasswordModal) {
-            DOM.changeLockPasswordModal.classList.add('hidden');
-        }
-    });
-}
-if (DOM.btnSubmitChangePassword) {
-    DOM.btnSubmitChangePassword.addEventListener('click', submitChangePassword);
-}
-if (DOM.btnResetData) {
-    DOM.btnResetData.addEventListener('click', resetRoomData);
-}
-if (DOM.btnForgotPassword) {
-    DOM.btnForgotPassword.addEventListener('click', handleForgotPassword);
-}
-if (DOM.btnChangeModalForgotPassword) {
-    DOM.btnChangeModalForgotPassword.addEventListener('click', handleForgotPassword);
-}
-if (DOM.sidebarGuestWarning) {
-    DOM.sidebarGuestWarning.addEventListener('click', () => {
-        if (currentRoomHash && !currentRoomHash.startsWith('google_')) {
-            guestRoomHashToImport = currentRoomHash;
-            isImportingFromGuest = true;
-        }
-        loginWithGoogle();
-    });
-}
-
-if (DOM.sidebarProfileCard) {
-    DOM.sidebarProfileCard.addEventListener('click', () => {
-        DOM.profileModal.classList.remove('hidden');
-    });
-}
-if (DOM.btnCloseProfile) {
-    DOM.btnCloseProfile.addEventListener('click', () => {
-        DOM.profileModal.classList.add('hidden');
-    });
-}
-
-if (DOM.profileModal) {
-    DOM.profileModal.addEventListener('click', (e) => {
-        if (e.target === DOM.profileModal) {
-            DOM.profileModal.classList.add('hidden');
-        }
-    });
-}
-if (DOM.btnSignOut) {
-    DOM.btnSignOut.addEventListener('click', () => {
-        DOM.profileModal.classList.add('hidden');
-        handleSignOut();
-    });
-}
-
-const handleAddNote = async () => {
-    if (viewMode === 'trash') {
-        viewMode = 'active';
-        updateViewArchiveUI();
-        startNotesSync();
-    }
-    
-    const newNoteId = 'n_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-    const newNote = {
-        id: newNoteId,
-        text: "",
-        folderId: currentFolderId,
-        pinned: false,
-        updatedAt: Date.now()
-    };
-    
-    await forceSaveNoteToServer(newNote);
-    
-    if (isMobile()) {
-        openMobileEditor(newNote);
-    } else {
-        setTimeout(() => {
-            const firstInput = DOM.clipGrid.querySelector('.card-body');
-            if (firstInput) {
-                firstInput.focus();
-                resizeTextarea(firstInput);
-            }
-        }, 100);
-    }
-};
-
-DOM.btnAddNote.addEventListener('click', handleAddNote);
-if (DOM.btnAddNoteMobile) {
-    DOM.btnAddNoteMobile.addEventListener('click', handleAddNote);
-}
-if (DOM.btnAddNoteHeader) {
-    DOM.btnAddNoteHeader.addEventListener('click', handleAddNote);
-}
-
-
-if (DOM.btnToggleTrash) {
-    DOM.btnToggleTrash.addEventListener('click', () => {
-        viewMode = viewMode === 'trash' ? 'active' : 'trash';
-        updateViewArchiveUI();
-        startNotesSync();
-        closeMobileSidebar();
-    });
-}
-
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.attachment-btn-container') && !e.target.closest('.move-dropdown-container')) {
-        document.querySelectorAll('.attachment-dropdown, .move-dropdown').forEach(d => d.classList.add('hidden'));
-    }
-});
-
-// Search and Clear Search
-DOM.searchInput.addEventListener('input', (e) => {
-    searchQuery = e.target.value.toLowerCase();
-    if (searchQuery.length > 0) {
-        DOM.btnClearSearch.classList.remove('hidden');
-    } else {
-        DOM.btnClearSearch.classList.add('hidden');
-    }
-    renderGrid();
-});
-
-DOM.btnClearSearch.addEventListener('click', () => {
-    DOM.searchInput.value = '';
-    searchQuery = '';
-    DOM.btnClearSearch.classList.add('hidden');
-    renderGrid();
-});
-
-// Settings Event Handlers
-DOM.strictLockToggle.addEventListener('change', () => {
-    strictLockEnabled = DOM.strictLockToggle.checked;
-    localStorage.setItem('strictLockEnabled', strictLockEnabled);
-});
-
-DOM.idleLockToggle.addEventListener('change', () => {
-    idleLockEnabled = DOM.idleLockToggle.checked;
-    localStorage.setItem('idleLockEnabled', idleLockEnabled);
-    updateIdleTimeoutVisibility();
-    resetAutoLockTimer();
-});
-
-// App Lock Settings Modal Event Handlers
-if (DOM.btnOpenLockSettings) {
-    DOM.btnOpenLockSettings.addEventListener('click', () => {
-        DOM.strictLockToggle.checked = strictLockEnabled;
-        DOM.idleLockToggle.checked = idleLockEnabled;
-        updateIdleTimeoutVisibility();
-        DOM.appLockSettingsModal.classList.remove('hidden');
-    });
-}
-if (DOM.btnCloseLockSettings) {
-    DOM.btnCloseLockSettings.addEventListener('click', () => {
-        DOM.appLockSettingsModal.classList.add('hidden');
-    });
-}
-if (DOM.appLockSettingsModal) {
-    DOM.appLockSettingsModal.addEventListener('click', (e) => {
-        if (e.target === DOM.appLockSettingsModal) {
-            DOM.appLockSettingsModal.classList.add('hidden');
-        }
-    });
-}
-
-DOM.btnIdleTimeout.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isOpen = DOM.timeoutDropdown.classList.contains('show');
-    
-    // Close other dropdowns
-    document.querySelectorAll('.dropdown-menu.show, .folder-dropdown.show').forEach(d => {
-        if (d !== DOM.timeoutDropdown) d.classList.remove('show');
-    });
-    
-    if (isOpen) {
-        DOM.timeoutDropdown.classList.remove('show');
-    } else {
-        DOM.timeoutDropdown.querySelectorAll('.dropdown-item').forEach(item => {
-            const val = parseInt(item.getAttribute('data-value'));
-            if (val === idleLockMinutes) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
-        DOM.timeoutDropdown.classList.add('show');
-    }
-});
-
-DOM.timeoutDropdown.querySelectorAll('.dropdown-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        idleLockMinutes = parseInt(item.getAttribute('data-value')) || 5;
-        localStorage.setItem('idleLockMinutes', idleLockMinutes);
-        resetAutoLockTimer();
-        updateIdleTimeoutVisibility();
-        DOM.timeoutDropdown.classList.remove('show');
-        showToast(`Auto-lock set to ${idleLockMinutes} min`);
-    });
-});
-
-// Close dropdowns on outside click
-document.addEventListener('click', () => {
-    document.querySelectorAll('.folder-dropdown.show').forEach(d => {
-        d.classList.remove('show');
-        if (d.parentElement) d.parentElement.classList.remove('open');
-    });
-    if (DOM.timeoutDropdown) {
-        DOM.timeoutDropdown.classList.remove('show');
-    }
-});
-
-// Modal Events
-DOM.btnSelectFolders.addEventListener('click', () => {
-    isSelectingFolders = !isSelectingFolders;
-    selectedFoldersForDeletion.clear();
-    
-    if (isSelectingFolders) {
-        DOM.btnSelectFolders.style.color = 'var(--primary)';
-        DOM.btnAddFolder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
-        DOM.btnAddFolder.style.color = 'var(--danger)';
-        DOM.btnAddFolder.setAttribute('title', 'Delete Selected Folders');
-    } else {
-        DOM.btnSelectFolders.style.color = 'var(--text-muted)';
-        DOM.btnAddFolder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
-        DOM.btnAddFolder.style.color = '';
-        DOM.btnAddFolder.setAttribute('title', 'Add New Folder');
-    }
-    renderFolders();
-});
-
-DOM.btnAddFolder.addEventListener('click', async () => {
-    if (isSelectingFolders) {
-        if (selectedFoldersForDeletion.size === 0) return;
-        if (!await showCustomConfirm("Delete Selected Folders", `Move ${selectedFoldersForDeletion.size} folder(s) and their notes to Trash?`, true)) return;
-        
-        let foldersChanged = false;
-        for (const folderId of selectedFoldersForDeletion) {
-            folders = folders.map(f => f.id === folderId ? { ...f, deleted: true, deletedAt: Date.now() } : f);
-            
-            const notesInFolder = notesArray.filter(n => n.folderId === folderId);
-            for (const note of notesInFolder) {
-                const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
-                await setDoc(noteRef, { deleted: true, deletedAt: Date.now() }, { merge: true });
-            }
-            foldersChanged = true;
-        }
-        if (foldersChanged) {
-            const roomRef = doc(db, 'clipboards', currentRoomHash);
-            await setDoc(roomRef, { folders }, { merge: true });
-        }
-        
-        if (selectedFoldersForDeletion.has(currentFolderId)) {
-            switchFolder('default');
-        } else {
-            renderFolders();
-        }
-        
-        // Reset selection mode after deletion
-        isSelectingFolders = false;
-        selectedFoldersForDeletion.clear();
-        DOM.btnSelectFolders.style.color = 'var(--text-muted)';
-        DOM.btnAddFolder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
-        DOM.btnAddFolder.style.color = '';
-        DOM.btnAddFolder.setAttribute('title', 'Add New Folder');
-        renderFolders();
-    } else {
-        editingFolderId = null;
-        DOM.folderModal.querySelector('h3').textContent = "Create New Folder";
-        DOM.folderModal.classList.remove('hidden');
-        DOM.folderNameInput.focus();
-    }
-});
-DOM.btnCancelFolder.addEventListener('click', () => {
-    editingFolderId = null;
-    DOM.folderModal.classList.add('hidden');
-    DOM.folderNameInput.value = '';
-});
-DOM.btnSaveFolder.addEventListener('click', saveNewFolder);
-DOM.folderNameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') saveNewFolder(); });
-
-// Lightbox Close Events
-DOM.closeLightbox.addEventListener('click', () => {
-    DOM.lightboxModal.classList.add('hidden');
-    DOM.lightboxImage.src = '';
-});
-DOM.lightboxModal.addEventListener('click', (e) => {
-    if (e.target === DOM.lightboxModal) {
-        DOM.lightboxModal.classList.add('hidden');
-        DOM.lightboxImage.src = '';
-    }
-});
-
-// Lightbox Download Event
-DOM.btnDownloadLightbox.addEventListener('click', () => {
-    if (DOM.lightboxImage.src) {
-        downloadImage(DOM.lightboxImage.src, `download-${Date.now()}`);
-    }
-});
-
-// Utility
-function downloadImage(base64Data, baseFilename = 'image') {
-    ignoreBlur = true;
-    const link = document.createElement('a');
-    link.href = base64Data;
-    
-    // Deduce file extension
-    let ext = 'jpg';
-    const match = base64Data.match(/^data:image\/(\w+);base64,/);
-    if (match && match[1]) {
-        ext = match[1];
-    }
-    
-    link.download = `${baseFilename}.${ext}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    setTimeout(() => {
-        ignoreBlur = false;
-    }, 1000);
-}
-
-function downloadFile(base64Data, filename) {
-    ignoreBlur = true;
-    const link = document.createElement('a');
-    link.href = base64Data;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => {
-        ignoreBlur = false;
-    }, 1000);
-}
-
-function showToast(msg) {
-    DOM.toast.textContent = msg;
+export function showToast(message) {
+    if (!DOM.toast) return;
+    DOM.toast.textContent = message;
     DOM.toast.classList.add('show');
-    setTimeout(() => DOM.toast.classList.remove('show'), 3000);
+    setTimeout(() => {
+        DOM.toast.classList.remove('show');
+    }, 2800);
 }
 
-// Image Compression Algorithm
-function compressImage(file, maxSizeKB = 256) {
-    return new Promise((resolve, reject) => {
-        // Validate it's an image file
-        if (!file.type.startsWith('image/')) {
-            reject(new Error("The selected file is not an image."));
-            return;
-        }
+export function escapeHtml(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
+function getTimeMs(ts) {
+    if (!ts) return 0;
+    if (typeof ts === 'number') return ts;
+    if (ts.toMillis) return ts.toMillis();
+    if (ts.seconds) return ts.seconds * 1000;
+    return 0;
+}
+
+function formatTime(timestamp) {
+    if (!timestamp) return 'Just now';
+    const ms = getTimeMs(timestamp);
+    if (!ms) return 'Just now';
+    const date = new Date(ms);
+    
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (isToday) {
+        return timeStr;
+    }
+    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${timeStr}`;
+}
+
+export async function compressImageToDataUrl(file, maxKb = 128) {
+    return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
+        reader.onload = (e) => {
             const img = new Image();
-            img.src = event.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 let width = img.width;
                 let height = img.height;
-
-                // Max dimensions to avoid large memory footprints
-                const maxDim = 1200;
+                
+                const maxDim = 1000;
                 if (width > maxDim || height > maxDim) {
                     if (width > height) {
                         height = Math.round((height * maxDim) / width);
@@ -2278,822 +276,1549 @@ function compressImage(file, maxSizeKB = 256) {
                         height = maxDim;
                     }
                 }
-
+                
                 canvas.width = width;
                 canvas.height = height;
-
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
-
-                // Initial high quality JPEG export
-                let quality = 0.9;
-                let base64 = canvas.toDataURL('image/jpeg', quality);
                 
-                // Calculate size in KB
-                const getKBSize = (b64Str) => (b64Str.length * 0.75) / 1024;
-
-                // Iterative quality reduction loop
-                while (getKBSize(base64) > maxSizeKB && quality > 0.1) {
+                let quality = 0.8;
+                let dataUrl = canvas.toDataURL('image/jpeg', quality);
+                
+                while (dataUrl.length > maxKb * 1024 * 1.33 && quality > 0.15) {
                     quality -= 0.1;
-                    base64 = canvas.toDataURL('image/jpeg', quality);
+                    dataUrl = canvas.toDataURL('image/jpeg', quality);
                 }
-
-                // If quality reduction isn't enough, iteratively scale down the canvas resolution
-                if (getKBSize(base64) > maxSizeKB) {
-                    let scale = 0.75;
-                    while (getKBSize(base64) > maxSizeKB && scale > 0.15) {
-                        const newWidth = Math.round(width * scale);
-                        const newHeight = Math.round(height * scale);
-                        
-                        canvas.width = newWidth;
-                        canvas.height = newHeight;
-                        ctx.drawImage(img, 0, 0, newWidth, newHeight);
-                        
-                        base64 = canvas.toDataURL('image/jpeg', 0.5); // Use a low quality setting for scaled dimensions
-                        scale -= 0.15;
-                    }
-                }
-
-                if (getKBSize(base64) > maxSizeKB) {
-                    reject(new Error(`Image is too large. Maximum compression only succeeded in reducing size to ${Math.round(getKBSize(base64))} KB.`));
-                } else {
-                    resolve(base64);
-                }
-            };
-            img.onerror = (err) => reject(new Error("Failed to load image for compression."));
-        };
-        reader.onerror = (err) => reject(new Error("Failed to read image file."));
-    });
-}
-
-async function restoreFolder(folderId) {
-    folders = folders.map(f => f.id === folderId ? { ...f, deleted: false, deletedAt: null } : f);
-    try {
-        const roomRef = doc(db, 'clipboards', currentRoomHash);
-        await setDoc(roomRef, { folders }, { merge: true });
-        
-        // Also restore notes in this folder that are deleted
-        const notesInFolder = notesArray.filter(n => n.folderId === folderId && n.deleted);
-        for (const note of notesInFolder) {
-            const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
-            await setDoc(noteRef, {
-                deleted: false,
-                deletedAt: null,
-                updatedAt: Date.now()
-            }, { merge: true });
-        }
-        
-        showToast("Folder restored");
-        renderGrid();
-    } catch(err) {
-        showToast("Failed to restore folder");
-    }
-}
-
-async function deleteFolderPermanently(folderId) {
-    if (!await showCustomConfirm("Delete Permanently", "Delete this folder and its notes forever? This action cannot be undone.", true)) return;
-    
-    folders = folders.filter(f => f.id !== folderId);
-    try {
-        const roomRef = doc(db, 'clipboards', currentRoomHash);
-        await setDoc(roomRef, { folders }, { merge: true });
-        
-        const notesInFolder = notesArray.filter(n => n.folderId === folderId);
-        for (const note of notesInFolder) {
-            const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
-            await deleteDoc(noteRef);
-        }
-        
-        showToast("Folder and notes permanently deleted");
-        renderGrid();
-    } catch(err) {
-        showToast("Failed to delete folder permanently");
-    }
-}
-
-async function restoreNote(noteId) {
-    const note = notesArray.find(n => n.id === noteId);
-    if (!note) return;
-    
-    const parentFolder = folders.find(f => f.id === note.folderId);
-    let targetFolderId = note.folderId;
-    if (parentFolder && parentFolder.deleted) {
-        targetFolderId = 'default';
-        showToast("Note's original folder is deleted. Note restored to General folder.");
-    }
-    
-    const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', noteId);
-    try {
-        await setDoc(noteRef, {
-            deleted: false,
-            deletedAt: null,
-            folderId: targetFolderId,
-            updatedAt: Date.now()
-        }, { merge: true });
-        showToast("Note restored");
-    } catch(err) {
-        showToast("Failed to restore note");
-    }
-}
-
-async function deleteNotePermanently(noteId) {
-    if (!await showCustomConfirm("Delete Permanently", "Delete this note forever? This action cannot be undone.", true)) return;
-    
-    const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', noteId);
-    try {
-        await deleteDoc(noteRef);
-        showToast("Note permanently deleted");
-    } catch(err) {
-        showToast("Failed to delete note");
-    }
-}
-
-async function emptyTrash() {
-    if (!await showCustomConfirm("Empty Trash", "Delete all items in trash permanently? This action cannot be undone.", true)) return;
-    
-    try {
-        const trashFolders = folders.filter(f => f.deleted);
-        const trashNotes = notesArray.filter(n => n.deleted);
-        
-        // Delete all notes
-        for (const note of trashNotes) {
-            const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
-            await deleteDoc(noteRef);
-        }
-        
-        // Delete all folders
-        if (trashFolders.length > 0) {
-            const newFolders = folders.filter(f => !f.deleted);
-            const roomRef = doc(db, 'clipboards', currentRoomHash);
-            await setDoc(roomRef, { folders: newFolders }, { merge: true });
-            folders = newFolders;
-        }
-        
-        showToast("Trash emptied successfully");
-    } catch(err) {
-        showToast("Failed to empty trash");
-    }
-}
-
-if (DOM.btnEmptyTrash) {
-    DOM.btnEmptyTrash.addEventListener('click', emptyTrash);
-}
-if (DOM.btnEmptyTrashMobile) {
-    DOM.btnEmptyTrashMobile.addEventListener('click', emptyTrash);
-}
-
-// ==========================================
-// 📱 MOBILE INTERACTION & GESTURE SYSTEM (Juli 2026)
-// ==========================================
-
-function isMobile() {
-    return window.innerWidth <= 768;
-}
-
-let currentEditingMobileNote = null;
-let currentContextMobileNote = null;
-let currentPickerMobileNote = null;
-
-// Opens the mobile bottom sheet note editor
-function openMobileEditor(note) {
-    currentEditingMobileNote = note;
-    
-    const backdrop = document.getElementById('mobileNoteEditorBackdrop');
-    const sheet = document.getElementById('mobileNoteEditorSheet');
-    const textarea = document.getElementById('mobileEditorTextarea');
-    const stats = document.getElementById('mobileEditorStats');
-    
-    textarea.value = note.text;
-    stats.textContent = countWordsAndChars(note.text);
-    
-    // Set attachments state
-    const imgWrapper = document.getElementById('mobileEditorImageWrapper');
-    const img = document.getElementById('mobileEditorImage');
-    if (note.image) {
-        img.src = note.image;
-        imgWrapper.style.display = 'block';
-    } else {
-        img.src = '';
-        imgWrapper.style.display = 'none';
-    }
-    
-    const docWrapper = document.getElementById('mobileEditorDocumentWrapper');
-    const docName = document.getElementById('mobileEditorDocumentName');
-    if (note.document) {
-        docName.textContent = note.documentName || 'Document';
-        docWrapper.style.display = 'flex';
-    } else {
-        docWrapper.style.display = 'none';
-    }
-    
-    backdrop.classList.add('active');
-    sheet.classList.add('active');
-    
-    setTimeout(() => {
-        textarea.focus();
-    }, 150);
-}
-
-function closeMobileEditor() {
-    const backdrop = document.getElementById('mobileNoteEditorBackdrop');
-    const sheet = document.getElementById('mobileNoteEditorSheet');
-    
-    backdrop.classList.remove('active');
-    sheet.classList.remove('active');
-    sheet.style.bottom = '';
-    
-    if (currentEditingMobileNote) {
-        triggerNoteAutoSave(currentEditingMobileNote);
-    }
-    currentEditingMobileNote = null;
-}
-
-// Opens the context action menu (from hold / long-press)
-function openMobileContextMenu(note) {
-    currentContextMobileNote = note;
-    
-    const backdrop = document.getElementById('mobileContextMenuBackdrop');
-    const sheet = document.getElementById('mobileContextMenuSheet');
-    const preview = document.getElementById('mobileMenuNotePreview');
-    const pinText = document.getElementById('mobileMenuPinText');
-    
-    preview.textContent = note.text.trim() || "(Empty note)";
-    pinText.textContent = note.pinned ? "Unpin Note" : "Pin Note";
-    
-    backdrop.classList.add('active');
-    sheet.classList.add('active');
-}
-
-function closeMobileContextMenu() {
-    const backdrop = document.getElementById('mobileContextMenuBackdrop');
-    const sheet = document.getElementById('mobileContextMenuSheet');
-    backdrop.classList.remove('active');
-    sheet.classList.remove('active');
-    currentContextMobileNote = null;
-}
-
-// Opens the folder picker sheet
-function openMobileFolderPicker(note) {
-    currentPickerMobileNote = note;
-    
-    const backdrop = document.getElementById('mobileFolderPickerBackdrop');
-    const sheet = document.getElementById('mobileFolderPickerSheet');
-    const folderList = document.getElementById('mobileFolderList');
-    
-    folderList.innerHTML = '';
-    
-    folders.forEach(f => {
-        if (f.id === currentFolderId || f.deleted) return;
-        
-        const btn = document.createElement('button');
-        btn.className = 'mobile-menu-item';
-        btn.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-            ${f.name}
-        `;
-        
-        btn.onclick = async () => {
-            note.folderId = f.id;
-            note.updatedAt = Date.now();
-            await forceSaveNoteToServer(note);
-            showToast(`Moved to ${f.name}`);
-            closeMobileFolderPicker();
-            renderGrid();
-        };
-        
-        folderList.appendChild(btn);
-    });
-    
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'mobile-menu-item';
-    cancelBtn.style.color = 'var(--text-muted)';
-    cancelBtn.innerHTML = `Cancel`;
-    cancelBtn.onclick = () => closeMobileFolderPicker();
-    folderList.appendChild(cancelBtn);
-    
-    backdrop.classList.add('active');
-    sheet.classList.add('active');
-}
-
-function closeMobileFolderPicker() {
-    const backdrop = document.getElementById('mobileFolderPickerBackdrop');
-    const sheet = document.getElementById('mobileFolderPickerSheet');
-    backdrop.classList.remove('active');
-    sheet.classList.remove('active');
-    currentPickerMobileNote = null;
-}
-
-// Helpers for swipe/context actions
-async function toggleNotePin(note) {
-    note.pinned = !note.pinned;
-    note.updatedAt = Date.now();
-    await forceSaveNoteToServer(note);
-    renderGrid();
-}
-
-async function deleteNoteToTrash(note) {
-    if (await showCustomConfirm("Move to Trash", "Move this note to Trash? It will be automatically deleted after 30 days.", false)) {
-        const noteRef = doc(db, 'clipboards', currentRoomHash, 'notes', note.id);
-        try {
-            await setDoc(noteRef, {
-                deleted: true,
-                deletedAt: Date.now()
-            }, { merge: true });
-            showToast("Note moved to Trash");
-            renderGrid();
-        } catch(err) {
-            showToast("Failed to move note to Trash");
-        }
-    }
-}
-
-// Bind swipe gestures and tap/long-press events
-function bindMobileCardEvents(card, item) {
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchMoveX = 0;
-    let touchMoveY = 0;
-    let longPressTimer = null;
-    let isLongPressTriggered = false;
-    let isSwiping = false;
-
-    card.addEventListener('touchstart', (e) => {
-        if (e.touches.length !== 1) return;
-        const touch = e.touches[0];
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
-        touchMoveX = touchStartX;
-        touchMoveY = touchStartY;
-        isLongPressTriggered = false;
-        isSwiping = false;
-
-        longPressTimer = setTimeout(() => {
-            isLongPressTriggered = true;
-            if (navigator.vibrate) navigator.vibrate(15);
-            openMobileContextMenu(item);
-        }, 550);
-    }, { passive: true });
-
-    card.addEventListener('touchmove', (e) => {
-        if (e.touches.length !== 1) return;
-        const touch = e.touches[0];
-        touchMoveX = touch.clientX;
-        touchMoveY = touch.clientY;
-
-        const diffX = touchMoveX - touchStartX;
-        const diffY = touchMoveY - touchStartY;
-
-        if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
-        }
-
-        if (Math.abs(diffX) > Math.abs(diffY) * 1.5 && Math.abs(diffX) > 15) {
-            isSwiping = true;
-            card.style.transform = `translateX(${diffX}px) scale(0.98)`;
-            
-            if (diffX > 0) {
-                card.className = `card swipe-action-pin ${item.pinned ? 'pinned' : ''}`;
-            } else {
-                card.className = `card swipe-action-delete ${item.pinned ? 'pinned' : ''}`;
-            }
-        }
-    }, { passive: true });
-
-    card.addEventListener('touchend', (e) => {
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-        }
-
-        if (isLongPressTriggered) return;
-
-        const diffX = touchMoveX - touchStartX;
-        const diffY = touchMoveY - touchStartY;
-
-        if (isSwiping) {
-            card.style.transform = '';
-            card.className = `card ${item.pinned ? 'pinned' : ''}`;
-            
-            const threshold = window.innerWidth * 0.35;
-            if (diffX > threshold) {
-                if (navigator.vibrate) navigator.vibrate([10, 20]);
-                toggleNotePin(item);
-            } else if (diffX < -threshold) {
-                if (navigator.vibrate) navigator.vibrate([20, 50]);
-                deleteNoteToTrash(item);
-            }
-        } else {
-            if (Math.abs(diffX) < 8 && Math.abs(diffY) < 8) {
-                openMobileEditor(item);
-            }
-        }
-    });
-
-    card.addEventListener('click', (e) => {
-        if (isMobile()) {
-            e.preventDefault();
-            e.stopPropagation();
-            openMobileEditor(item);
-        }
-    });
-}
-
-// Wire up the mobile sheet control elements
-function initializeMobileSheets() {
-    const btnDone = document.getElementById('btnDoneMobileEditor');
-    const editorBackdrop = document.getElementById('mobileNoteEditorBackdrop');
-    const contextBackdrop = document.getElementById('mobileContextMenuBackdrop');
-    const folderBackdrop = document.getElementById('mobileFolderPickerBackdrop');
-    
-    if (btnDone) btnDone.onclick = () => { closeMobileEditor(); renderGrid(); };
-    if (editorBackdrop) editorBackdrop.onclick = () => { closeMobileEditor(); renderGrid(); };
-    if (contextBackdrop) contextBackdrop.onclick = () => closeMobileContextMenu();
-    if (folderBackdrop) folderBackdrop.onclick = () => closeMobileFolderPicker();
-    
-    // Mobile editor text input handler
-    const mobileTextarea = document.getElementById('mobileEditorTextarea');
-    if (mobileTextarea) {
-        mobileTextarea.addEventListener('input', (e) => {
-            if (currentEditingMobileNote) {
-                currentEditingMobileNote.text = e.target.value;
-                currentEditingMobileNote.updatedAt = Date.now();
-                document.getElementById('mobileEditorStats').textContent = countWordsAndChars(e.target.value);
-                triggerNoteAutoSave(currentEditingMobileNote);
-            }
-        });
-    }
-
-    // Context menu items
-    const btnCopy = document.getElementById('btnMobileMenuCopy');
-    const btnPin = document.getElementById('btnMobileMenuPin');
-    const btnMove = document.getElementById('btnMobileMenuMove');
-    const btnDelete = document.getElementById('btnMobileMenuDelete');
-
-    if (btnCopy) btnCopy.onclick = () => {
-        if (currentContextMobileNote) {
-            navigator.clipboard.writeText(currentContextMobileNote.text).then(() => {
-                showToast("Copied to clipboard");
-            });
-            closeMobileContextMenu();
-        }
-    };
-
-    if (btnPin) btnPin.onclick = () => {
-        if (currentContextMobileNote) {
-            toggleNotePin(currentContextMobileNote);
-            closeMobileContextMenu();
-        }
-    };
-
-    if (btnDelete) btnDelete.onclick = () => {
-        if (currentContextMobileNote) {
-            deleteNoteToTrash(currentContextMobileNote);
-            closeMobileContextMenu();
-        }
-    };
-
-    if (btnMove) btnMove.onclick = () => {
-        if (currentContextMobileNote) {
-            const note = currentContextMobileNote;
-            closeMobileContextMenu();
-            setTimeout(() => openMobileFolderPicker(note), 200);
-        }
-    };
-
-    // Attachments flow inside mobile sheet
-    const btnMobileAttach = document.getElementById('btnMobileAttach');
-    const mobileAttachDropdown = document.getElementById('mobileAttachDropdown');
-    const mobileImageInput = document.getElementById('mobileEditorImageInput');
-    const mobileDocInput = document.getElementById('mobileEditorDocumentInput');
-    const optAddImage = document.getElementById('optMobileAddImage');
-    const optAddDoc = document.getElementById('optMobileAddDocument');
-
-    if (btnMobileAttach && mobileAttachDropdown) {
-        btnMobileAttach.onclick = (e) => {
-            e.stopPropagation();
-            mobileAttachDropdown.style.display = mobileAttachDropdown.style.display === 'flex' ? 'none' : 'flex';
-        };
-        document.addEventListener('click', () => {
-            mobileAttachDropdown.style.display = 'none';
-        });
-    }
-
-    if (optAddImage) optAddImage.onclick = () => { ignoreBlur = true; mobileImageInput.click(); };
-    if (optAddDoc) optAddDoc.onclick = () => { ignoreBlur = true; mobileDocInput.click(); };
-
-    if (mobileImageInput) {
-        mobileImageInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file || !currentEditingMobileNote) return;
-            showToast("Uploading image...");
-            try {
-                const compressedBase64 = await compressImage(file, 256);
-                currentEditingMobileNote.image = compressedBase64;
-                currentEditingMobileNote.updatedAt = Date.now();
-                await forceSaveNoteToServer(currentEditingMobileNote);
                 
-                document.getElementById('mobileEditorImage').src = compressedBase64;
-                document.getElementById('mobileEditorImageWrapper').style.display = 'block';
-                showToast("Image uploaded successfully!");
-            } catch (err) {
-                console.error(err);
-                showToast(err.message || "Failed to compress image.");
-            }
-        });
-    }
+                if (dataUrl.length > maxKb * 1024 * 1.33) {
+                    canvas.width = Math.round(width * 0.6);
+                    canvas.height = Math.round(height * 0.6);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+                }
+                
+                resolve(dataUrl);
+            };
+            img.onerror = () => reject(new Error("Failed to load image"));
+            img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+    });
+}
 
-    if (mobileDocInput) {
-        mobileDocInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file || !currentEditingMobileNote) return;
-            try {
-                if (file.size > 2 * 1024 * 1024) throw new Error("File size cannot exceed 2MB.");
-                showToast("Uploading document...");
-                const reader = new FileReader();
-                reader.onload = async (event) => {
+export async function readDocumentFile(file, maxKb = 128) {
+    const maxBytes = maxKb * 1024;
+    if (file.size > maxBytes) {
+        const kbSize = Math.round(file.size / 1024);
+        throw new Error(`File size (${kbSize} KB) exceeds limit of ${maxKb} KB!`);
+    }
+    
+    const dataUrl = await readBlobAsDataUrl(file);
+    return {
+        fileName: file.name || 'document',
+        fileSize: file.size || dataUrl.length,
+        mimeType: file.type || 'application/octet-stream',
+        data: dataUrl
+    };
+}
+
+// Read system clipboard for Text or Browser-copied Image ONLY
+export async function readClipboardContent() {
+    if (navigator.clipboard && navigator.clipboard.read) {
+        try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+                // 1. Check for browser-copied image
+                const imageType = item.types.find(t => t.startsWith('image/'));
+                if (imageType) {
                     try {
-                        currentEditingMobileNote.document = event.target.result;
-                        currentEditingMobileNote.documentName = file.name;
-                        currentEditingMobileNote.documentType = file.type;
-                        currentEditingMobileNote.updatedAt = Date.now();
-                        await forceSaveNoteToServer(currentEditingMobileNote);
-                        
-                        document.getElementById('mobileEditorDocumentName').textContent = file.name;
-                        document.getElementById('mobileEditorDocumentWrapper').style.display = 'flex';
-                        showToast("Document uploaded successfully!");
-                    } catch (err) {
-                        showToast(err.message || "Failed to save document.");
+                        const blob = await item.getType(imageType);
+                        const file = new File([blob], "pasted-image.jpg", { type: imageType });
+                        const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                        return { kind: 'image', data: compressedDataUrl };
+                    } catch (e) {
+                        console.warn("Failed to read image blob:", e);
                     }
-                };
-                reader.readAsDataURL(file);
-            } catch (err) {
-                console.error(err);
-                showToast(err.message || "Failed to process document.");
+                }
+                
+                // 2. Check for text
+                if (item.types.includes('text/plain')) {
+                    try {
+                        const blob = await item.getType('text/plain');
+                        const text = await blob.text();
+                        if (text && text.trim()) {
+                            return { kind: 'text', text: text.trim() };
+                        }
+                    } catch (e) {}
+                }
+            }
+        } catch (err) {
+            console.warn("navigator.clipboard.read fallback:", err);
+        }
+    }
+    
+    // Fallback to readText
+    if (navigator.clipboard && navigator.clipboard.readText) {
+        try {
+            const text = await navigator.clipboard.readText();
+            if (text && text.trim()) {
+                return { kind: 'text', text: text.trim() };
+            }
+        } catch (err) {
+            console.warn("navigator.clipboard.readText fallback:", err);
+        }
+    }
+    
+    return null;
+}
+
+// ==========================================
+// ↺ UNDO & REDO HISTORY SYSTEM (Max 50 Actions)
+// ==========================================
+export function pushHistoryAction(action) {
+    undoStack.push(action);
+    if (undoStack.length > MAX_HISTORY) {
+        undoStack.shift();
+    }
+    redoStack = [];
+    updateUndoRedoUI();
+}
+
+export function updateUndoRedoUI() {
+    const isUndoDisabled = undoStack.length === 0;
+    const isRedoDisabled = redoStack.length === 0;
+
+    if (DOM.btnDoUndo) DOM.btnDoUndo.disabled = isUndoDisabled;
+    if (DOM.btnDirectUndo) DOM.btnDirectUndo.disabled = isUndoDisabled;
+
+    if (DOM.undoSubtext) {
+        if (undoStack.length > 0) {
+            const last = undoStack[undoStack.length - 1];
+            DOM.undoSubtext.textContent = `${last.title} (${undoStack.length}/${MAX_HISTORY})`;
+        } else {
+            DOM.undoSubtext.textContent = "No actions";
+        }
+    }
+    
+    if (DOM.btnDoRedo) DOM.btnDoRedo.disabled = isRedoDisabled;
+    if (DOM.btnDirectRedo) DOM.btnDirectRedo.disabled = isRedoDisabled;
+
+    if (DOM.redoSubtext) {
+        if (redoStack.length > 0) {
+            const last = redoStack[redoStack.length - 1];
+            DOM.redoSubtext.textContent = `${last.title} (${redoStack.length})`;
+        } else {
+            DOM.redoSubtext.textContent = "No actions";
+        }
+    }
+}
+
+export function closeUndoRedoPopup() {
+    if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.add('hidden');
+    if (DOM.btnToggleUndoRedo) DOM.btnToggleUndoRedo.classList.remove('active');
+}
+
+export function openUndoRedoPopup() {
+    if (DOM.undoRedoPopup) DOM.undoRedoPopup.classList.remove('hidden');
+    if (DOM.btnToggleUndoRedo) DOM.btnToggleUndoRedo.classList.add('active');
+    updateUndoRedoUI();
+}
+
+export async function performUndo() {
+    if (undoStack.length === 0) {
+        showToast("Nothing to undo");
+        return;
+    }
+    
+    const action = undoStack.pop();
+    redoStack.push(action);
+    updateUndoRedoUI();
+    
+    try {
+        if (action.type === 'ADD') {
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await deleteDoc(docRef);
+            showToast("Undone: Created clip removed");
+        } else if (action.type === 'DELETE') {
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await setDoc(docRef, {
+                text: action.beforeState.text || '',
+                timestamp: serverTimestamp(),
+                userId: action.beforeState.userId || 'guest',
+                imageData: action.beforeState.imageData || null,
+                fileData: action.beforeState.fileData || null
+            });
+            showToast("Undone: Clip restored");
+        } else if (action.type === 'UPDATE') {
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await updateDoc(docRef, {
+                text: action.beforeState.text || '',
+                timestamp: serverTimestamp(),
+                imageData: action.beforeState.imageData || null,
+                fileData: action.beforeState.fileData || null
+            });
+            showToast("Undone: Clip changes reverted");
+        }
+    } catch (err) {
+        console.error("Undo error:", err);
+        showToast("Undo failed: " + (err.message || err));
+    }
+}
+
+export async function performRedo() {
+    if (redoStack.length === 0) {
+        showToast("Nothing to redo");
+        return;
+    }
+    
+    const action = redoStack.pop();
+    undoStack.push(action);
+    updateUndoRedoUI();
+    
+    try {
+        if (action.type === 'ADD') {
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await setDoc(docRef, {
+                text: action.afterState.text || '',
+                timestamp: serverTimestamp(),
+                userId: action.afterState.userId || 'guest',
+                imageData: action.afterState.imageData || null,
+                fileData: action.afterState.fileData || null
+            });
+            showToast("Redone: Clip re-added");
+        } else if (action.type === 'DELETE') {
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await deleteDoc(docRef);
+            showToast("Redone: Clip deleted again");
+        } else if (action.type === 'UPDATE') {
+            const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', action.clipId);
+            await updateDoc(docRef, {
+                text: action.afterState.text || '',
+                timestamp: serverTimestamp(),
+                imageData: action.afterState.imageData || null,
+                fileData: action.afterState.fileData || null
+            });
+            showToast("Redone: Clip updated");
+        }
+    } catch (err) {
+        console.error("Redo error:", err);
+        showToast("Redo failed: " + (err.message || err));
+    }
+}
+
+// Global Keyboard Shortcut Listener for Desktop & Web
+document.addEventListener('keydown', (e) => {
+    if (isAppLocked) return;
+
+    const activeElem = document.activeElement;
+    const isTypingInInput = activeElem && (activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'INPUT');
+    const key = e.key.toLowerCase();
+
+    // Escape to close modals or exit search mode
+    if (e.key === 'Escape') {
+        if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+            DOM.btnCloseFullPageEditor.click();
+        } else if (DOM.fullPagePreviewModal && !DOM.fullPagePreviewModal.classList.contains('hidden')) {
+            DOM.btnClosePreviewModal.click();
+        } else if (isSearchMode) {
+            DOM.btnCloseSearch.click();
+        }
+        return;
+    }
+
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    if (!isCtrlOrCmd) return;
+
+    if (key === 'n' && e.shiftKey && !isTypingInInput) {
+        e.preventDefault();
+        if (DOM.btnFabEditor) DOM.btnFabEditor.click();
+    } else if (key === 'v' && e.shiftKey) {
+        e.preventDefault();
+        if (DOM.btnFabQuickPaste) DOM.btnFabQuickPaste.click();
+    } else if (key === 'f' && !isTypingInInput) {
+        e.preventDefault();
+        if (DOM.btnOpenSearch) {
+            DOM.btnOpenSearch.click();
+            if (DOM.searchInput) DOM.searchInput.focus();
+        }
+    } else if ((key === 'z' && e.shiftKey) || key === 'y') {
+        if (!isTypingInInput) {
+            e.preventDefault();
+            performRedo();
+        }
+    } else if (key === 'z' && !e.shiftKey) {
+        if (!isTypingInInput) {
+            e.preventDefault();
+            performUndo();
+        }
+    }
+});
+
+// ==========================================
+// 🔒 LOCK & SCREEN MANAGEMENT
+// ==========================================
+export function lockApp() {
+    isAppLocked = true;
+    
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    }
+    if (unsubscribeClips) {
+        unsubscribeClips();
+        unsubscribeClips = null;
+    }
+    if (unsubscribeRoomRequests) {
+        unsubscribeRoomRequests();
+        unsubscribeRoomRequests = null;
+    }
+    if (unsubscribeMyRequest) {
+        unsubscribeMyRequest();
+        unsubscribeMyRequest = null;
+    }
+    
+    if (DOM.appScreen) DOM.appScreen.classList.add('hidden');
+    if (DOM.authScreen) DOM.authScreen.classList.remove('hidden');
+    
+    renderSavedGoogleUser();
+}
+
+export function unlockApp() {
+    isAppLocked = false;
+    if (DOM.authScreen) DOM.authScreen.classList.add('hidden');
+    if (DOM.appScreen) DOM.appScreen.classList.remove('hidden');
+    
+    startClipsRealtimeSync();
+    if (isGuestRoom) {
+        listenForIncomingAccessRequests();
+        startDeviceHeartbeat();
+    }
+}
+
+function renderSavedGoogleUser() {
+    const savedStr = localStorage.getItem('last_google_user');
+    if (savedStr) {
+        try {
+            const savedUser = JSON.parse(savedStr);
+            if (DOM.quickGoogleUserContainer) DOM.quickGoogleUserContainer.classList.remove('hidden');
+            if (DOM.quickUserAvatar) DOM.quickUserAvatar.src = savedUser.photoURL || 'https://via.placeholder.com/40';
+            if (DOM.quickUserName) DOM.quickUserName.textContent = savedUser.displayName || 'Google User';
+            if (DOM.quickUserEmail) DOM.quickUserEmail.textContent = savedUser.email || '';
+            if (DOM.quickUserShortName) DOM.quickUserShortName.textContent = (savedUser.displayName || 'User').split(' ')[0];
+            if (DOM.btnGoogleLoginText) DOM.btnGoogleLoginText.textContent = "Sign in with Another Google Account";
+        } catch (e) {
+            console.error("Error parsing saved Google user:", e);
+        }
+    } else {
+        if (DOM.quickGoogleUserContainer) DOM.quickGoogleUserContainer.classList.add('hidden');
+        if (DOM.btnGoogleLoginText) DOM.btnGoogleLoginText.textContent = "Sign in with Google";
+    }
+}
+
+// Device Heartbeat for Guest Room active status (stored inside notes collection to guarantee permissions)
+function startDeviceHeartbeat() {
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(async () => {
+        if (!isAppLocked && isGuestRoom && currentRoomHash) {
+            try {
+                const deviceAuthRef = doc(db, 'clipboards', currentRoomHash, 'notes', '_meta_deviceAuth');
+                await setDoc(deviceAuthRef, {
+                    activeDeviceId: currentDeviceId,
+                    activeDeviceName: getDeviceName(),
+                    lastActiveTime: serverTimestamp()
+                }, { merge: true });
+            } catch (e) {}
+        }
+    }, 30 * 1000);
+}
+
+// ==========================================
+// 🤝 GUEST ROOM REALTIME MULTI-DEVICE AUTHORIZATION
+// ==========================================
+
+async function handleGuestRoomLogin(rawCode) {
+    const roomCode = (rawCode || '').trim();
+    if (!roomCode) {
+        showToast("Please enter a Room Code!");
+        return;
+    }
+    
+    isGuestRoom = true;
+    currentRoomHash = await hashPassword('guest_room_' + roomCode.toLowerCase());
+    
+    if (DOM.headerTitleText) DOM.headerTitleText.textContent = `Room: ${roomCode}`;
+    
+    if (!auth.currentUser) {
+        try {
+            const cred = await signInAnonymously(auth);
+            currentUser = cred.user;
+        } catch (err) {
+            console.error("Anonymous auth error:", err);
+            showToast("Failed to authenticate: " + err.message);
+            return;
+        }
+    }
+    
+    // Store metadata strictly inside notes collection to match Firestore Security Rules!
+    const deviceAuthRef = doc(db, 'clipboards', currentRoomHash, 'notes', '_meta_deviceAuth');
+    
+    try {
+        const docSnap = await getDoc(deviceAuthRef);
+        let needsApproval = false;
+        
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const activeId = data.activeDeviceId;
+            
+            // STRICT RULE: If activeDeviceId is set AND is DIFFERENT from currentDeviceId -> ALWAYS REQUIRE APPROVAL!
+            if (activeId && activeId !== currentDeviceId) {
+                needsApproval = true;
+            }
+        }
+        
+        if (!needsApproval) {
+            // First device in room OR this device IS the active device -> Unlock immediately!
+            await setDoc(deviceAuthRef, {
+                roomCode: roomCode,
+                activeDeviceId: currentDeviceId,
+                activeDeviceName: getDeviceName(),
+                lastActiveTime: serverTimestamp()
+            }, { merge: true });
+            unlockApp();
+            return;
+        }
+        
+        // Device B MUST request authorization from Device A!
+        const requestRef = doc(db, 'clipboards', currentRoomHash, 'notes', '_req_' + currentDeviceId);
+        await setDoc(requestRef, {
+            deviceId: currentDeviceId,
+            deviceName: getDeviceName(),
+            status: 'pending',
+            timestamp: serverTimestamp()
+        });
+        
+        if (DOM.waitingRoomName) DOM.waitingRoomName.textContent = roomCode;
+        if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.remove('hidden');
+        
+        if (unsubscribeMyRequest) unsubscribeMyRequest();
+        unsubscribeMyRequest = onSnapshot(requestRef, async (requestSnap) => {
+            if (!requestSnap.exists()) return;
+            const data = requestSnap.data();
+            
+            if (data.status === 'approved') {
+                if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.add('hidden');
+                if (unsubscribeMyRequest) unsubscribeMyRequest();
+                
+                await setDoc(deviceAuthRef, {
+                    roomCode: roomCode,
+                    activeDeviceId: currentDeviceId,
+                    activeDeviceName: getDeviceName(),
+                    lastActiveTime: serverTimestamp()
+                }, { merge: true });
+                
+                showToast("Access granted by active device!");
+                unlockApp();
+            } else if (data.status === 'denied') {
+                if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.add('hidden');
+                if (unsubscribeMyRequest) unsubscribeMyRequest();
+                showToast("Access denied by active device.");
             }
         });
+        
+    } catch (err) {
+        console.error("Guest room authorization error:", err);
+        showToast("Guest Room Connection Error: " + (err.message || err));
     }
+}
 
-    const btnRemoveImage = document.getElementById('btnMobileRemoveImage');
-    if (btnRemoveImage) {
-        btnRemoveImage.onclick = async (e) => {
-            e.stopPropagation();
-            if (!currentEditingMobileNote) return;
-            if (await showCustomConfirm("Delete Image", "Remove this image from the note permanently?", true)) {
-                currentEditingMobileNote.image = null;
-                currentEditingMobileNote.updatedAt = Date.now();
-                await forceSaveNoteToServer(currentEditingMobileNote);
-                document.getElementById('mobileEditorImageWrapper').style.display = 'none';
-                showToast("Image deleted");
+function listenForIncomingAccessRequests() {
+    if (!currentRoomHash || !isGuestRoom) return;
+    
+    const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
+    if (unsubscribeRoomRequests) unsubscribeRoomRequests();
+    
+    unsubscribeRoomRequests = onSnapshot(notesRef, (snapshot) => {
+        snapshot.docChanges().forEach(change => {
+            if (change.doc.id.startsWith('_req_')) {
+                if (change.type === 'added' || change.type === 'modified') {
+                    const data = change.doc.data();
+                    if (data.status === 'pending' && data.deviceId !== currentDeviceId) {
+                        activePendingRequestId = change.doc.id;
+                        if (DOM.requestingDeviceName) DOM.requestingDeviceName.textContent = data.deviceName || 'Device';
+                        if (DOM.accessRequestModal) DOM.accessRequestModal.classList.remove('hidden');
+                    }
+                }
             }
-        };
-    }
+        });
+    });
+}
 
-    const btnRemoveDoc = document.getElementById('btnMobileRemoveDocument');
-    if (btnRemoveDoc) {
-        btnRemoveDoc.onclick = async (e) => {
-            e.stopPropagation();
-            if (!currentEditingMobileNote) return;
-            if (await showCustomConfirm("Delete Document", "Remove this document from the note permanently?", true)) {
-                currentEditingMobileNote.document = null;
-                currentEditingMobileNote.documentName = null;
-                currentEditingMobileNote.documentType = null;
-                currentEditingMobileNote.updatedAt = Date.now();
-                await forceSaveNoteToServer(currentEditingMobileNote);
-                document.getElementById('mobileEditorDocumentWrapper').style.display = 'none';
-                showToast("Document deleted");
+// ==========================================
+// 📡 SYNC & DATA MANAGEMENT
+// ==========================================
+
+function startClipsRealtimeSync() {
+    if (!currentRoomHash) return;
+    if (unsubscribeClips) unsubscribeClips();
+    
+    const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
+    
+    if (DOM.syncIndicator) {
+        DOM.syncIndicator.classList.remove('disconnected');
+        DOM.syncIndicator.classList.add('saving');
+        DOM.syncIndicator.title = "Connecting...";
+    }
+    
+    const q = query(notesRef, limit(50));
+    
+    unsubscribeClips = onSnapshot(q, (snapshot) => {
+        clipsArray = [];
+        const nowMs = Date.now();
+        const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+        const cutoff24hMs = nowMs - TWENTY_FOUR_HOURS_MS;
+        
+        snapshot.forEach(docSnap => {
+            // Filter out system metadata and request documents
+            if (docSnap.id.startsWith('_')) {
+                return;
             }
-        };
-    }
+            
+            const data = docSnap.data();
+            const clipTs = getTimeMs(data.timestamp);
+            
+            // STRICT 24-HOUR EXPIRATION & AUTO-CLEANUP FOR GUEST ROOMS:
+            if (isGuestRoom && clipTs > 0) {
+                if (clipTs < cutoff24hMs) {
+                    // Delete expired clip from Firestore database asynchronously
+                    deleteDoc(docSnap.ref).catch(() => {});
+                    return;
+                }
+            }
+            
+            clipsArray.push({
+                id: docSnap.id,
+                text: data.text || data.content || '',
+                timestamp: data.timestamp,
+                imageData: data.imageData || null,
+                fileData: data.fileData || null,
+                userId: data.userId || 'guest'
+            });
+        });
+        
+        clipsArray.sort((a, b) => getTimeMs(b.timestamp) - getTimeMs(a.timestamp));
+        
+        if (DOM.syncIndicator) {
+            DOM.syncIndicator.classList.remove('saving', 'disconnected');
+            DOM.syncIndicator.title = "Synced";
+        }
+        
+        if (!isSearchMode) {
+            renderClips(clipsArray);
+        }
+    }, (error) => {
+        console.error("Firestore sync error:", error);
+        if (DOM.syncIndicator) {
+            DOM.syncIndicator.classList.remove('saving');
+            DOM.syncIndicator.classList.add('disconnected');
+            DOM.syncIndicator.title = "Offline";
+        }
+        showToast("Connection issue: " + (error.code || error.message));
+    });
+}
 
-    const btnShare = document.getElementById('btnMobileShare');
-    if (btnShare) {
-        btnShare.onclick = () => {
-            if (!currentEditingMobileNote) return;
-            if (navigator.share) {
-                navigator.share({
-                    title: 'Clipboardy Note',
-                    text: currentEditingMobileNote.text
-                }).catch(err => console.log('Share failed', err));
-            } else {
-                navigator.clipboard.writeText(currentEditingMobileNote.text).then(() => {
-                    showToast("Copied to clipboard (Share not supported)");
+// GBOARD-STYLE DISCRETE CLIP CREATION:
+// Each clip is strictly ONE item type: Text OR Image OR File.
+async function createNewClip(text, attachment = null, trackHistory = true) {
+    if (!currentRoomHash) {
+        showToast("Room is required!");
+        return;
+    }
+    
+    const payload = {
+        timestamp: serverTimestamp(),
+        userId: auth.currentUser ? auth.currentUser.uid : 'guest',
+        text: '',
+        imageData: null,
+        fileData: null
+    };
+
+    if (attachment && (attachment.kind === 'image' || attachment.type === 'image')) {
+        payload.imageData = attachment.data;
+    } else if (attachment && (attachment.kind === 'file' || attachment.type === 'file')) {
+        payload.fileData = {
+            name: attachment.fileName || attachment.name || 'file',
+            size: attachment.fileSize || attachment.size || 0,
+            type: attachment.mimeType || attachment.type || 'application/octet-stream',
+            data: attachment.data
+        };
+    } else if (text && text.trim()) {
+        payload.text = text.trim();
+    } else {
+        showToast("Write text or select a file first!");
+        return;
+    }
+    
+    if (!auth.currentUser) {
+        try {
+            const cred = await signInAnonymously(auth);
+            currentUser = cred.user;
+        } catch (err) {
+            console.error("Auth error during clip creation:", err);
+            showToast("Unable to authenticate room: " + err.message);
+            return;
+        }
+    }
+    
+    try {
+        if (DOM.syncIndicator) DOM.syncIndicator.classList.add('saving');
+        const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
+        
+        const newDocRef = await addDoc(notesRef, payload);
+        
+        if (trackHistory) {
+            pushHistoryAction({
+                type: 'ADD',
+                clipId: newDocRef.id,
+                afterState: payload,
+                title: payload.imageData ? 'Image Clip' : (payload.fileData ? 'File Clip' : 'Text Clip')
+            });
+        }
+        
+        if (DOM.txtFullPageEditor) {
+            DOM.txtFullPageEditor.value = '';
+        }
+        editorAttachment = null;
+        renderEditorAttachment();
+        
+        showToast(payload.imageData ? "Image clip saved!" : (payload.fileData ? "File clip saved!" : "Text clip saved!"));
+    } catch (err) {
+        console.error("Failed to save clip:", err);
+        showToast("Failed to save clip: " + (err.message || err));
+    } finally {
+        if (DOM.syncIndicator) DOM.syncIndicator.classList.remove('saving');
+    }
+}
+
+async function updateClip(clipId, newText, attachment = null, trackHistory = true) {
+    if (!clipId) return;
+    try {
+        const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', clipId);
+        
+        const payload = {
+            timestamp: serverTimestamp(),
+            text: '',
+            imageData: null,
+            fileData: null
+        };
+        
+        if (attachment === 'DELETE') {
+            payload.text = (newText || '').trim();
+        } else if (attachment && (attachment.kind === 'image' || attachment.type === 'image')) {
+            payload.imageData = attachment.data;
+        } else if (attachment && (attachment.kind === 'file' || attachment.type === 'file')) {
+            payload.fileData = {
+                name: attachment.fileName || attachment.name || 'file',
+                size: attachment.fileSize || attachment.size || 0,
+                type: attachment.mimeType || attachment.type || 'application/octet-stream',
+                data: attachment.data
+            };
+        } else if (newText && newText.trim()) {
+            payload.text = newText.trim();
+        }
+        
+        if (trackHistory) {
+            const existingClip = clipsArray.find(c => c.id === clipId);
+            if (existingClip) {
+                pushHistoryAction({
+                    type: 'UPDATE',
+                    clipId: clipId,
+                    beforeState: {
+                        text: existingClip.text,
+                        imageData: existingClip.imageData,
+                        fileData: existingClip.fileData
+                    },
+                    afterState: payload,
+                    title: 'Edit Clip'
                 });
             }
-        };
+        }
+        
+        await updateDoc(docRef, payload);
+        showToast("Clip updated!");
+    } catch (err) {
+        console.error("Failed to update clip:", err);
+        showToast("Failed to update clip: " + (err.message || err));
     }
+}
 
-    // Pull-to-refresh implementation
-    const mainScroll = document.querySelector('.main-scroll');
-    const ptr = document.getElementById('pullToRefreshSpinner');
-    if (mainScroll && ptr) {
-        let ptrStartY = 0;
-        let ptrDiffY = 0;
-        let isPtrActive = false;
-
-        mainScroll.addEventListener('touchstart', (e) => {
-            if (mainScroll.scrollTop === 0 && e.touches.length === 1) {
-                ptrStartY = e.touches[0].clientY;
-                isPtrActive = true;
+async function deleteClip(clipId, trackHistory = true) {
+    try {
+        if (trackHistory) {
+            const targetClip = clipsArray.find(c => c.id === clipId);
+            if (targetClip) {
+                pushHistoryAction({
+                    type: 'DELETE',
+                    clipId: clipId,
+                    beforeState: {
+                        text: targetClip.text,
+                        imageData: targetClip.imageData,
+                        fileData: targetClip.fileData,
+                        userId: targetClip.userId
+                    },
+                    title: 'Delete Clip'
+                });
             }
-        }, { passive: true });
-
-        mainScroll.addEventListener('touchmove', (e) => {
-            if (!isPtrActive || e.touches.length !== 1) return;
-            const currentY = e.touches[0].clientY;
-            ptrDiffY = currentY - ptrStartY;
-
-            if (ptrDiffY > 0) {
-                if (e.cancelable) e.preventDefault();
-                
-                const pullHeight = Math.min(60, ptrDiffY * 0.4);
-                ptr.style.display = 'flex';
-                ptr.style.height = `${pullHeight}px`;
-                ptr.style.opacity = `${pullHeight / 60}`;
-            } else {
-                isPtrActive = false;
-            }
-        }, { passive: false });
-
-        mainScroll.addEventListener('touchend', async () => {
-            if (!isPtrActive) return;
-            isPtrActive = false;
-
-            if (ptrDiffY > 80) {
-                ptr.classList.add('visible');
-                ptr.style.height = '';
-                ptr.style.opacity = '';
-                
-                if (navigator.vibrate) navigator.vibrate(20);
-                showToast("Syncing database...");
-                
-                try {
-                    await startFoldersSync();
-                    await startNotesSync();
-                    showToast("Database up to date");
-                } catch (err) {
-                    console.error("Sync failed", err);
-                } finally {
-                    ptr.classList.remove('visible');
-                    ptr.style.display = 'none';
-                }
-            } else {
-                ptr.style.transition = 'height 0.2s, opacity 0.2s';
-                ptr.style.height = '0px';
-                ptr.style.opacity = '0';
-                setTimeout(() => {
-                    ptr.style.transition = '';
-                    ptr.style.display = 'none';
-                }, 200);
-            }
-            ptrDiffY = 0;
-        });
+        }
+        
+        const docRef = doc(db, 'clipboards', currentRoomHash, 'notes', clipId);
+        await deleteDoc(docRef);
+        showToast("Clip deleted");
+    } catch (err) {
+        console.error("Failed to delete clip:", err);
+        showToast("Failed to delete clip: " + (err.message || err));
     }
+}
 
-    // Left edge swipe-to-open and swipe-to-close sidebar drawer
-    let sidebarStartX = 0;
-    let sidebarStartY = 0;
-    let sidebarIsPulling = false;
-    const sidebar = DOM.sidebar;
-    const sidebarBackdrop = DOM.sidebarBackdrop;
-
-    if (sidebar && sidebarBackdrop) {
-        document.addEventListener('touchstart', (e) => {
-            if (!isMobile()) return;
-            const touch = e.touches[0];
-            
-            if (!sidebar.classList.contains('open') && touch.clientX < 30) {
-                sidebarStartX = touch.clientX;
-                sidebarStartY = touch.clientY;
-                sidebarIsPulling = true;
-                sidebar.style.transition = 'none';
-                sidebarBackdrop.style.transition = 'none';
-            }
-            else if (sidebar.classList.contains('open')) {
-                sidebarStartX = touch.clientX;
-                sidebarIsPulling = true;
-                sidebar.style.transition = 'none';
-            }
-        }, { passive: true });
-
-        document.addEventListener('touchmove', (e) => {
-            if (!sidebarIsPulling || e.touches.length !== 1) return;
-            const touch = e.touches[0];
-            const diffX = touch.clientX - sidebarStartX;
-            
-            if (!sidebar.classList.contains('open')) {
-                if (diffX > 0) {
-                    if (e.cancelable) e.preventDefault();
-                    const translateAmt = Math.min(0, -260 + diffX);
-                    sidebar.style.transform = `translateX(${translateAmt}px)`;
-                    sidebarBackdrop.classList.remove('hidden');
-                    sidebarBackdrop.style.opacity = `${Math.min(1, diffX / 260)}`;
-                }
-            } else {
-                if (diffX < 0) {
-                    if (e.cancelable) e.preventDefault();
-                    const translateAmt = Math.max(-260, diffX);
-                    sidebar.style.transform = `translateX(${translateAmt}px)`;
-                    sidebarBackdrop.style.opacity = `${Math.max(0, 1 + (diffX / 260))}`;
-                }
-            }
-        }, { passive: false });
-
-        document.addEventListener('touchend', (e) => {
-            if (!sidebarIsPulling) return;
-            sidebarIsPulling = false;
-            
-            sidebar.style.transition = '';
-            sidebarBackdrop.style.transition = '';
-            sidebarBackdrop.style.opacity = '';
-            
-            const touch = e.changedTouches[0];
-            const diffX = touch.clientX - sidebarStartX;
-            
-            if (!sidebar.classList.contains('open')) {
-                if (diffX > 80) {
-                    toggleSidebar();
-                } else {
-                    closeMobileSidebar();
-                    sidebar.style.transform = '';
-                }
-            } else {
-                if (diffX < -80) {
-                    closeMobileSidebar();
-                    sidebar.style.transform = '';
-                } else {
-                    sidebar.style.transform = 'translateX(0)';
-                }
-            }
-        });
-    }
-
-    // Folder Actions Context Menu handlers
-    const folderActionsBackdrop = document.getElementById('mobileFolderActionsBackdrop');
-    if (folderActionsBackdrop) {
-        folderActionsBackdrop.onclick = () => closeMobileFolderActions();
+// Search across clips in history
+async function performSearch() {
+    const term = (DOM.searchInput?.value || '').trim().toLowerCase();
+    
+    if (!term) {
+        resetSearchMode();
+        return;
     }
     
-    const btnRenameFolder = document.getElementById('btnMobileFolderRename');
-    if (btnRenameFolder) {
-        btnRenameFolder.onclick = () => {
-            if (currentFolderMobileAction) {
-                const folder = currentFolderMobileAction;
-                closeMobileFolderActions();
-                setTimeout(() => editFolder(folder.id, folder.name), 200);
+    isSearchMode = true;
+    showToast("Searching clips...");
+    if (DOM.searchBanner) DOM.searchBanner.classList.remove('hidden');
+    if (DOM.searchBannerText) DOM.searchBannerText.textContent = `Showing search results for "${term}"...`;
+    
+    try {
+        const notesRef = collection(db, 'clipboards', currentRoomHash, 'notes');
+        const q = query(notesRef, limit(200));
+        const snapshot = await getDocs(q);
+        
+        const matchedClips = [];
+        snapshot.forEach(docSnap => {
+            if (docSnap.id.startsWith('_')) return; // Filter out system docs
+            
+            const data = docSnap.data();
+            const text = data.text || data.content || '';
+            const fileName = data.fileData?.name || '';
+            if (text.toLowerCase().includes(term) || fileName.toLowerCase().includes(term)) {
+                matchedClips.push({
+                    id: docSnap.id,
+                    text: text,
+                    timestamp: data.timestamp,
+                    imageData: data.imageData || null,
+                    fileData: data.fileData || null,
+                    userId: data.userId || 'guest'
+                });
             }
-        };
-    }
-
-    const btnDeleteFolder = document.getElementById('btnMobileFolderDelete');
-    if (btnDeleteFolder) {
-        btnDeleteFolder.onclick = () => {
-            if (currentFolderMobileAction) {
-                const folder = currentFolderMobileAction;
-                closeMobileFolderActions();
-                setTimeout(() => deleteFolder(folder.id), 200);
-            }
-        };
-    }
-
-    // Visual Viewport Keyboard pinning
-    if (window.visualViewport) {
-        const adjustSheetHeight = () => {
-            const editorSheet = document.getElementById('mobileNoteEditorSheet');
-            if (editorSheet && editorSheet.classList.contains('active')) {
-                const offsetBottom = window.innerHeight - window.visualViewport.height;
-                editorSheet.style.bottom = `${offsetBottom}px`;
-            }
-        };
-        window.visualViewport.addEventListener('resize', adjustSheetHeight);
-        window.visualViewport.addEventListener('scroll', adjustSheetHeight);
+        });
+        
+        matchedClips.sort((a, b) => getTimeMs(b.timestamp) - getTimeMs(a.timestamp));
+        
+        if (DOM.searchBannerText) {
+            DOM.searchBannerText.textContent = `Found ${matchedClips.length} clips for "${term}"`;
+        }
+        
+        renderClips(matchedClips, true);
+    } catch (err) {
+        console.error("Error searching clips:", err);
+        showToast("Search error: " + (err.message || err));
     }
 }
 
-let currentFolderMobileAction = null;
-
-function openMobileFolderActions(folder) {
-    currentFolderMobileAction = folder;
-    const backdrop = document.getElementById('mobileFolderActionsBackdrop');
-    const sheet = document.getElementById('mobileFolderActionsSheet');
-    const title = document.getElementById('mobileFolderActionsTitle');
-    title.textContent = `Folder Options: ${folder.name}`;
-    backdrop.classList.add('active');
-    sheet.classList.add('active');
+function resetSearchMode() {
+    isSearchMode = false;
+    if (DOM.searchInput) DOM.searchInput.value = '';
+    if (DOM.searchBanner) DOM.searchBanner.classList.add('hidden');
+    renderClips(clipsArray);
 }
 
-function closeMobileFolderActions() {
-    const backdrop = document.getElementById('mobileFolderActionsBackdrop');
-    const sheet = document.getElementById('mobileFolderActionsSheet');
-    backdrop.classList.remove('active');
-    sheet.classList.remove('active');
-    currentFolderMobileAction = null;
+function closeSearchOverlay() {
+    if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.add('hidden');
+    if (DOM.headerNormalView) DOM.headerNormalView.classList.remove('hidden');
+    if (DOM.fabContainer) DOM.fabContainer.classList.remove('hidden');
+    resetSearchMode();
 }
 
-// Run mobile sheets initializer
-initializeMobileSheets();
+// ==========================================
+// 🎨 FRONTEND UI RENDERING
+// ==========================================
 
-// Exports for unit testing
-export { hashPassword, countWordsAndChars, login, lockApp, isAppLocked, currentUser, currentRoomHash, ignoreBlur, safeConfirm };
+function renderClips(clipsList, isSearchResult = false) {
+    if (!DOM.clipGrid) return;
+    DOM.clipGrid.innerHTML = '';
+    
+    if (!clipsList || clipsList.length === 0) {
+        if (DOM.emptyState) {
+            DOM.emptyState.classList.remove('hidden');
+            const subText = DOM.emptyState.querySelector('p');
+            if (subText) {
+                subText.textContent = isSearchResult 
+                    ? "No matching clips found."
+                    : "Use the (+) button at bottom right to add a text/image/file clip, or tap the Paste button to save directly from system clipboard.";
+            }
+        }
+        return;
+    }
+    
+    if (DOM.emptyState) DOM.emptyState.classList.add('hidden');
+    
+    clipsList.forEach(clip => {
+        const card = document.createElement('div');
+        card.className = 'clip-card';
+        
+        const timeStr = formatTime(clip.timestamp);
+        
+        let contentHtml = '';
+        if (clip.imageData) {
+            contentHtml = `<img src="${clip.imageData}" class="clip-card-attachment-thumb" alt="Image Clip">`;
+        } else if (clip.fileData) {
+            const kbSize = Math.round((clip.fileData.size || 0) / 1024);
+            contentHtml = `
+                <div class="clip-card-attachment-file">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                    <span>${escapeHtml(clip.fileData.name)} (${kbSize} KB)</span>
+                </div>
+            `;
+        } else {
+            contentHtml = `<div class="clip-text">${escapeHtml(clip.text || '(Empty Clip)')}</div>`;
+        }
+        
+        card.innerHTML = `
+            <div class="clip-body" title="Click to view full clip">
+                ${contentHtml}
+                <div class="clip-meta">${timeStr}</div>
+            </div>
+            <div class="clip-actions">
+                <button class="btn-copy" aria-label="Copy clip content">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    Copy
+                </button>
+                <button class="btn-delete-clip" title="Delete clip" aria-label="Delete clip">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+        `;
+        
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-copy') || e.target.closest('.btn-delete-clip')) {
+                return;
+            }
+            openPreviewModal(clip);
+        });
+        
+        const copyBtn = card.querySelector('.btn-copy');
+        copyBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                let textToCopy = clip.text;
+                if (clip.imageData) textToCopy = clip.imageData;
+                else if (clip.fileData) textToCopy = clip.fileData.data || clip.fileData.name;
+                
+                await navigator.clipboard.writeText(textToCopy);
+                showToast("Clip copied to clipboard!");
+                copyBtn.innerHTML = `✓ Copied`;
+                setTimeout(() => {
+                    copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`;
+                }, 1500);
+            } catch (err) {
+                console.error("Failed to copy:", err);
+                showToast("Failed to copy text");
+            }
+        });
+        
+        const delBtn = card.querySelector('.btn-delete-clip');
+        delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteClip(clip.id);
+        });
+        
+        DOM.clipGrid.appendChild(card);
+    });
+}
+
+// Gboard Tab Switcher Handler (Text vs Image vs File)
+function setEditorTab(tabType) {
+    currentEditorTab = tabType;
+    
+    if (DOM.tabTypeText) DOM.tabTypeText.classList.toggle('active', tabType === 'text');
+    if (DOM.tabTypeImage) DOM.tabTypeImage.classList.toggle('active', tabType === 'image');
+    if (DOM.tabTypeFile) DOM.tabTypeFile.classList.toggle('active', tabType === 'file');
+    
+    if (tabType === 'text') {
+        if (DOM.panelTypeText) DOM.panelTypeText.classList.remove('hidden');
+        if (DOM.editorAttachmentPreview) DOM.editorAttachmentPreview.classList.add('hidden');
+        editorAttachment = null;
+        if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.focus();
+    } else if (tabType === 'image') {
+        if (DOM.panelTypeText) DOM.panelTypeText.classList.add('hidden');
+        if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
+        if (!editorAttachment || (editorAttachment.kind !== 'image' && editorAttachment.type !== 'image')) {
+            DOM.inputEditorImage?.click();
+        }
+    } else if (tabType === 'file') {
+        if (DOM.panelTypeText) DOM.panelTypeText.classList.add('hidden');
+        if (DOM.txtFullPageEditor) DOM.txtFullPageEditor.value = '';
+        if (!editorAttachment || (editorAttachment.kind !== 'file' && editorAttachment.type !== 'file')) {
+            DOM.inputEditorFile?.click();
+        }
+    }
+}
+
+// Render Attachment Preview inside Editor Modal
+function renderEditorAttachment() {
+    if (!DOM.editorAttachmentPreview) return;
+    
+    if (!editorAttachment) {
+        DOM.editorAttachmentPreview.classList.add('hidden');
+        DOM.editorAttachmentPreview.innerHTML = '';
+        return;
+    }
+    
+    DOM.editorAttachmentPreview.classList.remove('hidden');
+    if (DOM.panelTypeText) DOM.panelTypeText.classList.add('hidden');
+    
+    const attKind = editorAttachment.kind || editorAttachment.type;
+    
+    if (attKind === 'image') {
+        DOM.editorAttachmentPreview.innerHTML = `
+            <img src="${editorAttachment.data}" class="attachment-image-display" alt="Attached Image">
+            <button id="btnRemoveEditorAttachment" class="btn-detach" title="Remove attachment">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                Remove Image
+            </button>
+        `;
+    } else if (attKind === 'file') {
+        const name = editorAttachment.fileName || editorAttachment.name || 'document';
+        const size = editorAttachment.fileSize || editorAttachment.size || 0;
+        const kbSize = Math.round(size / 1024);
+        DOM.editorAttachmentPreview.innerHTML = `
+            <div class="attachment-file-info">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                <span class="attachment-file-name">${escapeHtml(name)} (${kbSize} KB)</span>
+            </div>
+            <button id="btnRemoveEditorAttachment" class="btn-detach" title="Remove attachment">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                Remove File
+            </button>
+        `;
+    }
+    
+    const removeBtn = document.getElementById('btnRemoveEditorAttachment');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+            editorAttachment = null;
+            renderEditorAttachment();
+            setEditorTab('text');
+        });
+    }
+}
+
+// Render Attachment Preview inside Preview Modal
+function renderPreviewAttachment() {
+    if (!DOM.previewAttachmentDisplay) return;
+    
+    if (!previewAttachment || previewAttachment === 'DELETE') {
+        DOM.previewAttachmentDisplay.classList.add('hidden');
+        DOM.previewAttachmentDisplay.innerHTML = '';
+        if (DOM.txtPreviewText) DOM.txtPreviewText.classList.remove('hidden');
+        return;
+    }
+    
+    DOM.previewAttachmentDisplay.classList.remove('hidden');
+    if (DOM.txtPreviewText) DOM.txtPreviewText.classList.add('hidden');
+    
+    const attKind = previewAttachment.kind || previewAttachment.type;
+    
+    if (attKind === 'image') {
+        DOM.previewAttachmentDisplay.innerHTML = `
+            <img src="${previewAttachment.data}" class="attachment-image-display" alt="Attached Image">
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <a href="${previewAttachment.data}" download="image-clip.jpg" class="btn" style="padding: 6px 12px; font-size: 0.82rem;" title="Download image">Download Image</a>
+            </div>
+        `;
+    } else if (attKind === 'file') {
+        const name = previewAttachment.fileName || previewAttachment.name || 'file';
+        const size = previewAttachment.fileSize || previewAttachment.size || 0;
+        const kbSize = Math.round(size / 1024);
+        DOM.previewAttachmentDisplay.innerHTML = `
+            <div class="attachment-file-info">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                <span class="attachment-file-name">${escapeHtml(name)} (${kbSize} KB)</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <a href="${previewAttachment.data}" download="${escapeHtml(name)}" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" title="Download file">Download File</a>
+            </div>
+        `;
+    }
+}
+
+function openPreviewModal(clip) {
+    activePreviewClipId = clip.id;
+    
+    if (clip.imageData) {
+        previewAttachment = { kind: 'image', data: clip.imageData };
+    } else if (clip.fileData) {
+        previewAttachment = { kind: 'file', fileName: clip.fileData.name, fileSize: clip.fileData.size, mimeType: clip.fileData.type, data: clip.fileData.data };
+    } else {
+        previewAttachment = null;
+        if (DOM.txtPreviewText) {
+            DOM.txtPreviewText.value = clip.text || '';
+        }
+    }
+    
+    renderPreviewAttachment();
+    
+    if (DOM.fullPagePreviewModal) {
+        DOM.fullPagePreviewModal.classList.remove('hidden');
+    }
+}
+
+function closePreviewModal() {
+    activePreviewClipId = null;
+    previewAttachment = null;
+    if (DOM.fullPagePreviewModal) {
+        DOM.fullPagePreviewModal.classList.add('hidden');
+    }
+}
+
+// Helper to open Add Clip Modal with specific tab
+function openAddClipModalWithTab(tabType = 'file') {
+    editorAttachment = null;
+    renderEditorAttachment();
+    if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.remove('hidden');
+    setEditorTab(tabType);
+}
+
+// ==========================================
+// 🚀 EVENT LISTENERS & INITIALIZATION
+// ==========================================
+
+// Gboard Style Clip Type Tab Listeners
+if (DOM.tabTypeText) DOM.tabTypeText.addEventListener('click', () => setEditorTab('text'));
+if (DOM.tabTypeImage) DOM.tabTypeImage.addEventListener('click', () => setEditorTab('image'));
+if (DOM.tabTypeFile) DOM.tabTypeFile.addEventListener('click', () => setEditorTab('file'));
+
+// Image & File Input change handlers
+if (DOM.inputEditorImage) {
+    DOM.inputEditorImage.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                showToast("Compressing image...");
+                const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                editorAttachment = { kind: 'image', data: compressedDataUrl };
+                renderEditorAttachment();
+                showToast("Image clip selected (<128KB)");
+            } catch (err) {
+                console.error("Image error:", err);
+                showToast("Failed to process image");
+                setEditorTab('text');
+            }
+        }
+        e.target.value = '';
+    });
+}
+
+if (DOM.inputEditorFile) {
+    DOM.inputEditorFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const fileObj = await readDocumentFile(file, 128);
+                editorAttachment = { kind: 'file', ...fileObj };
+                renderEditorAttachment();
+                showToast("File clip selected (" + Math.round((fileObj.fileSize || file.size) / 1024) + " KB)");
+            } catch (err) {
+                console.error("File error:", err);
+                showToast(err.message || "File size exceeds 128KB limit!");
+                setEditorTab('text');
+            }
+        }
+        e.target.value = '';
+    });
+}
+
+// Global Paste Event Listener
+document.addEventListener('paste', async (e) => {
+    if (isAppLocked) return;
+    
+    const items = e.clipboardData?.items || [];
+    let imageItem = null;
+    let fileItem = null;
+    
+    for (const item of items) {
+        if (item.type.startsWith('image/')) {
+            imageItem = item;
+            break;
+        } else if (item.kind === 'file') {
+            fileItem = item;
+        }
+    }
+    
+    if (imageItem) {
+        e.preventDefault();
+        const file = imageItem.getAsFile();
+        if (file) {
+            try {
+                showToast("Compressing pasted image...");
+                const compressedDataUrl = await compressImageToDataUrl(file, 128);
+                
+                if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+                    editorAttachment = { kind: 'image', data: compressedDataUrl };
+                    renderEditorAttachment();
+                    if (DOM.tabTypeImage) setEditorTab('image');
+                    showToast("Pasted image clip");
+                } else {
+                    await createNewClip('', { kind: 'image', data: compressedDataUrl });
+                    showToast("Pasted image saved to clipboard!");
+                }
+            } catch (err) {
+                console.error("Paste image error:", err);
+                showToast("Failed to process pasted image");
+            }
+        }
+    } else if (fileItem) {
+        e.preventDefault();
+        const file = fileItem.getAsFile();
+        if (file) {
+            try {
+                const fileObj = await readDocumentFile(file, 128);
+                
+                if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+                    editorAttachment = { kind: 'file', ...fileObj };
+                    renderEditorAttachment();
+                    if (DOM.tabTypeFile) setEditorTab('file');
+                    showToast("Pasted file clip");
+                } else {
+                    await createNewClip('', { kind: 'file', ...fileObj });
+                    showToast("Pasted file saved to clipboard!");
+                }
+            } catch (err) {
+                console.error("Paste file error:", err);
+                showToast(err.message || "File size exceeds 128KB limit!");
+            }
+        }
+    }
+});
+
+// Network connection listeners
+window.addEventListener('online', () => {
+    if (DOM.syncIndicator) {
+        DOM.syncIndicator.classList.remove('disconnected');
+        DOM.syncIndicator.title = "Synced";
+    }
+    showToast("Internet reconnected");
+    if (!isAppLocked && currentRoomHash) {
+        startClipsRealtimeSync();
+    }
+});
+
+window.addEventListener('offline', () => {
+    if (DOM.syncIndicator) {
+        DOM.syncIndicator.classList.remove('saving');
+        DOM.syncIndicator.classList.add('disconnected');
+        DOM.syncIndicator.title = "Offline";
+    }
+    showToast("Connection lost (Offline)");
+});
+
+// Guest Room Login Handler
+if (DOM.loginBtn) {
+    DOM.loginBtn.addEventListener('click', async () => {
+        const roomCode = (DOM.roomNameInput?.value || '').trim();
+        await handleGuestRoomLogin(roomCode);
+    });
+}
+
+// Google Sign In Handler
+if (DOM.btnGoogleLogin) {
+    DOM.btnGoogleLogin.addEventListener('click', async () => {
+        try {
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(auth, provider);
+            currentUser = result.user;
+            isGuestRoom = false;
+            
+            currentRoomHash = await hashPassword('google_user_' + currentUser.uid);
+            
+            const userObj = {
+                displayName: currentUser.displayName,
+                email: currentUser.email,
+                photoURL: currentUser.photoURL,
+                uid: currentUser.uid
+            };
+            localStorage.setItem('last_google_user', JSON.stringify(userObj));
+            
+            if (DOM.headerTitleText) DOM.headerTitleText.textContent = currentUser.displayName || 'Google Clipboard';
+            unlockApp();
+        } catch (err) {
+            console.error("Google sign in error:", err);
+            showToast("Google sign in error: " + (err.message || err));
+        }
+    });
+}
+
+// Quick Resume Previous Google Account Button
+if (DOM.btnQuickContinueGoogle) {
+    DOM.btnQuickContinueGoogle.addEventListener('click', async () => {
+        const savedStr = localStorage.getItem('last_google_user');
+        if (!savedStr) return;
+        try {
+            const savedUser = JSON.parse(savedStr);
+            isGuestRoom = false;
+            currentRoomHash = await hashPassword('google_user_' + savedUser.uid);
+            
+            if (!auth.currentUser) {
+                try {
+                    const cred = await signInAnonymously(auth);
+                    currentUser = cred.user;
+                } catch (e) {}
+            }
+            
+            if (DOM.headerTitleText) DOM.headerTitleText.textContent = savedUser.displayName || 'Google Clipboard';
+            unlockApp();
+        } catch (e) {
+            console.error("Quick continue error:", e);
+        }
+    });
+}
+
+// Access Request Response Handlers
+if (DOM.btnApproveAccessRequest) {
+    DOM.btnApproveAccessRequest.addEventListener('click', async () => {
+        if (activePendingRequestId && currentRoomHash) {
+            const reqRef = doc(db, 'clipboards', currentRoomHash, 'notes', activePendingRequestId);
+            await updateDoc(reqRef, { status: 'approved' });
+            if (DOM.accessRequestModal) DOM.accessRequestModal.classList.add('hidden');
+            showToast("Device access approved!");
+        }
+    });
+}
+
+if (DOM.btnDenyAccessRequest) {
+    DOM.btnDenyAccessRequest.addEventListener('click', async () => {
+        if (activePendingRequestId && currentRoomHash) {
+            const reqRef = doc(db, 'clipboards', currentRoomHash, 'notes', activePendingRequestId);
+            await updateDoc(reqRef, { status: 'denied' });
+            if (DOM.accessRequestModal) DOM.accessRequestModal.classList.add('hidden');
+            showToast("Device access denied.");
+        }
+    });
+}
+
+if (DOM.btnCancelWaitingRequest) {
+    DOM.btnCancelWaitingRequest.addEventListener('click', () => {
+        if (DOM.waitingApprovalModal) DOM.waitingApprovalModal.classList.add('hidden');
+        if (unsubscribeMyRequest) unsubscribeMyRequest();
+    });
+}
+
+// Lock button
+if (DOM.btnLock) {
+    DOM.btnLock.addEventListener('click', () => {
+        closeSearchOverlay();
+        closeUndoRedoPopup();
+        lockApp();
+    });
+}
+
+// ==========================================
+// 🔍 UNDO / REDO POPUP MENU LISTENERS
+// ==========================================
+if (DOM.btnToggleUndoRedo) {
+    DOM.btnToggleUndoRedo.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeSearchOverlay();
+        if (DOM.undoRedoPopup) {
+            if (DOM.undoRedoPopup.classList.contains('hidden')) {
+                openUndoRedoPopup();
+            } else {
+                closeUndoRedoPopup();
+            }
+        }
+    });
+}
+
+if (DOM.btnDoUndo) {
+    DOM.btnDoUndo.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await performUndo();
+        closeUndoRedoPopup();
+    });
+}
+
+if (DOM.btnDoRedo) {
+    DOM.btnDoRedo.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await performRedo();
+        closeUndoRedoPopup();
+    });
+}
+
+// ==========================================
+// 🔍 EXPANDABLE TOP BAR SEARCH LISTENERS
+// ==========================================
+if (DOM.btnOpenSearch) {
+    DOM.btnOpenSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeUndoRedoPopup();
+        if (DOM.headerNormalView) DOM.headerNormalView.classList.add('hidden');
+        if (DOM.headerSearchOverlay) DOM.headerSearchOverlay.classList.remove('hidden');
+        if (DOM.fabContainer) DOM.fabContainer.classList.add('hidden');
+        if (DOM.searchInput) DOM.searchInput.focus();
+    });
+}
+
+if (DOM.btnCloseSearch) {
+    DOM.btnCloseSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeSearchOverlay();
+    });
+}
+
+if (DOM.btnSearch) {
+    DOM.btnSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        performSearch();
+    });
+}
+
+if (DOM.searchInput) {
+    DOM.searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performSearch();
+        }
+    });
+}
+
+if (DOM.btnResetSearchBanner) {
+    DOM.btnResetSearchBanner.addEventListener('click', () => {
+        resetSearchMode();
+    });
+}
+
+// Global click listener to auto-close search bar, undo/redo popup
+document.addEventListener('click', (e) => {
+    if (DOM.headerSearchOverlay && !DOM.headerSearchOverlay.classList.contains('hidden')) {
+        const isClickInsideSearch = DOM.headerSearchOverlay.contains(e.target);
+        const isClickOpenSearchBtn = DOM.btnOpenSearch?.contains(e.target);
+        if (!isClickInsideSearch && !isClickOpenSearchBtn) {
+            closeSearchOverlay();
+        }
+    }
+    
+    if (DOM.undoRedoPopup && !DOM.undoRedoPopup.classList.contains('hidden')) {
+        const isClickInsidePopup = DOM.undoRedoPopup.contains(e.target);
+        const isClickToggleBtn = DOM.btnToggleUndoRedo?.contains(e.target);
+        if (!isClickInsidePopup && !isClickToggleBtn) {
+            closeUndoRedoPopup();
+        }
+    }
+});
+
+// ==========================================
+// 🔘 2 FABs MECHANISM LISTENERS
+// ==========================================
+
+// FAB Top (+ Plus): Open Add Clip Modal (Default to Text Tab)
+if (DOM.btnFabEditor) {
+    DOM.btnFabEditor.addEventListener('click', () => {
+        closeSearchOverlay();
+        closeUndoRedoPopup();
+        openAddClipModalWithTab('text');
+    });
+}
+
+// Full Page Editor: Close Button
+if (DOM.btnCloseFullPageEditor) {
+    DOM.btnCloseFullPageEditor.addEventListener('click', () => {
+        editorAttachment = null;
+        renderEditorAttachment();
+        if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.add('hidden');
+    });
+}
+
+// Full Page Editor: Paste Button (Paste Text or Browser Image, or fallback to File Tab)
+if (DOM.btnFullEditorPaste) {
+    DOM.btnFullEditorPaste.addEventListener('click', async () => {
+        try {
+            const content = await readClipboardContent();
+            if (content) {
+                const kind = content.kind || content.type;
+                if (kind === 'image') {
+                    editorAttachment = { kind: 'image', data: content.data };
+                    renderEditorAttachment();
+                    setEditorTab('image');
+                    showToast("Pasted image!");
+                } else if (kind === 'text') {
+                    editorAttachment = null;
+                    renderEditorAttachment();
+                    setEditorTab('text');
+                    if (DOM.txtFullPageEditor) {
+                        DOM.txtFullPageEditor.value = content.text;
+                    }
+                    showToast("Pasted text!");
+                }
+            } else {
+                showToast("Empty/File clipboard detected. Switch to File tab...");
+                setEditorTab('file');
+            }
+        } catch (err) {
+            showToast("Clipboard access issue. Opening File picker...");
+            setEditorTab('file');
+        }
+    });
+}
+
+// Full Page Editor: Save Button
+if (DOM.btnFullEditorSend) {
+    DOM.btnFullEditorSend.addEventListener('click', async () => {
+        const text = (DOM.txtFullPageEditor?.value || '').trim();
+        if (editorAttachment || text) {
+            await createNewClip(text, editorAttachment);
+            if (DOM.fullPageEditorModal) DOM.fullPageEditorModal.classList.add('hidden');
+        } else {
+            showToast("Write text or select a file first");
+        }
+    });
+}
+
+// FAB Bottom (Paste Icon): 1-Tap Auto Paste Text/Image. Opens New Clip modal with Toast Warning if Clipboard is empty!
+if (DOM.btnFabQuickPaste) {
+    DOM.btnFabQuickPaste.addEventListener('click', async () => {
+        closeSearchOverlay();
+        closeUndoRedoPopup();
+        
+        try {
+            const content = await readClipboardContent();
+            if (content) {
+                const kind = content.kind || content.type;
+                if (kind === 'image' && content.data) {
+                    await createNewClip('', { kind: 'image', data: content.data });
+                    showToast("Pasted image saved!");
+                    return;
+                } else if (kind === 'text' && content.text && content.text.trim()) {
+                    await createNewClip(content.text);
+                    showToast("Pasted text saved!");
+                    return;
+                }
+            }
+            
+            showToast("System clipboard is empty or not detected");
+            openAddClipModalWithTab('text');
+            
+        } catch (err) {
+            console.error("Paste error:", err);
+            showToast("System clipboard is empty or not detected");
+            openAddClipModalWithTab('text');
+        }
+    });
+}
+
+// ==========================================
+// 📖 FULL PAGE PREVIEW MODAL LISTENERS
+// ==========================================
+
+if (DOM.btnClosePreviewModal) {
+    DOM.btnClosePreviewModal.addEventListener('click', () => {
+        closePreviewModal();
+    });
+}
+
+if (DOM.btnPreviewCopy) {
+    DOM.btnPreviewCopy.addEventListener('click', async () => {
+        let textToCopy = DOM.txtPreviewText?.value || '';
+        if (previewAttachment && (previewAttachment.kind === 'image' || previewAttachment.type === 'image')) textToCopy = previewAttachment.data;
+        else if (previewAttachment && (previewAttachment.kind === 'file' || previewAttachment.type === 'file')) textToCopy = previewAttachment.data || previewAttachment.fileName || previewAttachment.name;
+        
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+            showToast("Clip copied to clipboard!");
+        } catch (err) {
+            console.error("Failed to copy text:", err);
+            showToast("Failed to copy text");
+        }
+    });
+}
+
+if (DOM.btnPreviewSave) {
+    DOM.btnPreviewSave.addEventListener('click', async () => {
+        const text = (DOM.txtPreviewText?.value || '').trim();
+        if (activePreviewClipId) {
+            await updateClip(activePreviewClipId, text, previewAttachment);
+            closePreviewModal();
+        }
+    });
+}
+
+if (DOM.btnPreviewDelete) {
+    DOM.btnPreviewDelete.addEventListener('click', async () => {
+        if (activePreviewClipId) {
+            await deleteClip(activePreviewClipId);
+            closePreviewModal();
+        }
+    });
+}
+
+// ==========================================
+// 💻 DESKTOP SIDEBAR & DIRECT ACTION LISTENERS
+// ==========================================
+
+if (DOM.btnToggleSidebar) {
+    DOM.btnToggleSidebar.addEventListener('click', () => {
+        if (DOM.appSidebar) DOM.appSidebar.classList.toggle('collapsed');
+    });
+}
+
+if (DOM.navAllClips) {
+    DOM.navAllClips.addEventListener('click', () => {
+        if (isSearchMode && DOM.btnCloseSearch) DOM.btnCloseSearch.click();
+        const mainScroll = document.querySelector('.main-scroll');
+        if (mainScroll) mainScroll.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+}
+
+if (DOM.navAddClip) {
+    DOM.navAddClip.addEventListener('click', () => {
+        if (DOM.btnFabEditor) DOM.btnFabEditor.click();
+    });
+}
+
+if (DOM.navQuickPaste) {
+    DOM.navQuickPaste.addEventListener('click', () => {
+        if (DOM.btnFabQuickPaste) DOM.btnFabQuickPaste.click();
+    });
+}
+
+if (DOM.navLockApp) {
+    DOM.navLockApp.addEventListener('click', () => {
+        if (DOM.btnLock) DOM.btnLock.click();
+    });
+}
+
+if (DOM.btnDirectUndo) {
+    DOM.btnDirectUndo.addEventListener('click', async () => {
+        await performUndo();
+    });
+}
+
+if (DOM.btnDirectRedo) {
+    DOM.btnDirectRedo.addEventListener('click', async () => {
+        await performRedo();
+    });
+}
+
+// Initial Auth State Check
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+    }
+    renderSavedGoogleUser();
+});

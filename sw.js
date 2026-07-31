@@ -1,4 +1,4 @@
-const CACHE_NAME = 'clipboardy-cache-v1';
+const CACHE_NAME = 'clipboardy-cache-v3';
 const ASSETS = [
     './',
     './index.html',
@@ -10,10 +10,11 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
+    self.skipWaiting();
     e.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             return cache.addAll(ASSETS);
-        }).then(() => self.skipWaiting())
+        })
     );
 });
 
@@ -31,25 +32,20 @@ self.addEventListener('activate', (e) => {
     );
 });
 
+// Network-First strategy: fetch latest from network first so updates show immediately
 self.addEventListener('fetch', (e) => {
-    // Only intercept requests for local static assets to avoid Firestore/Firebase Auth connection interference
     if (e.request.url.startsWith(self.location.origin) && !e.request.url.includes('firestore.googleapis.com')) {
         e.respondWith(
-            caches.match(e.request).then((cachedResponse) => {
-                if (cachedResponse) {
-                    return cachedResponse;
+            fetch(e.request).then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+                    const responseClone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(e.request, responseClone);
+                    });
                 }
-                return fetch(e.request).then((networkResponse) => {
-                    if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-                        const responseClone = networkResponse.clone();
-                        caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(e.request, responseClone);
-                        });
-                    }
-                    return networkResponse;
-                }).catch(() => {
-                    // Catch network errors silently
-                });
+                return networkResponse;
+            }).catch(() => {
+                return caches.match(e.request);
             })
         );
     }
