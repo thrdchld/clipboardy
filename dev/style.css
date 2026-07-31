@@ -541,8 +541,8 @@ header {
 }
 
 .fab {
-    width: 50px;
-    height: 50px;
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     border: none;
     box-shadow: 0 4px 14px rgba(153, 135, 103, 0.35);
@@ -551,6 +551,11 @@ header {
     justify-content: center;
     cursor: pointer;
     transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fab svg {
+    width: 48px;
+    height: 48px;
 }
 
 .fab:hover {
@@ -851,3 +856,114 @@ header {
 .text-muted {
     color: var(--text-muted);
 }
+
+/* ==========================================
+   📱 💻 RESPONSIVE DESKTOP & TABLET LAYOUTS
+   ========================================== */
+
+/* Mobile Scaling Defaults (< 640px) */
+@media (max-width: 639px) {
+    .fab {
+        width: 70px;
+        height: 70px;
+    }
+    .fab svg {
+        width: 32px;
+        height: 32px;
+    }
+}
+
+/* Tablet Layout (min-width: 640px) */
+@media (min-width: 640px) {
+    #appScreen {
+        max-width: 92%;
+        height: calc(100vh - 32px);
+        height: calc(100dvh - 32px);
+        margin: 16px auto;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow-lg);
+        overflow: hidden;
+    }
+
+    #clipGrid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .fab {
+        width: 80px;
+        height: 80px;
+    }
+
+    .fab svg {
+        width: 38px;
+        height: 38px;
+    }
+
+    .fullpage-editor-overlay {
+        background: rgba(43, 39, 35, 0.45);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+    }
+
+    .fullpage-editor-container {
+        max-width: 680px;
+        height: 85vh;
+        max-height: 640px;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow-lg);
+        background: var(--bg-base);
+    }
+}
+
+/* Desktop Web Layout (min-width: 1024px) */
+@media (min-width: 1024px) {
+    #appScreen {
+        max-width: 1240px;
+        height: calc(100vh - 48px);
+        height: calc(100dvh - 48px);
+        margin: 24px auto;
+    }
+
+    #clipGrid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 16px;
+    }
+
+    .clip-card {
+        padding: 16px;
+    }
+
+    .header-normal-view {
+        padding: 0 8px;
+    }
+
+    .fab-container {
+        bottom: 28px;
+        right: 28px;
+        gap: 14px;
+    }
+
+    .fab {
+        width: 88px;
+        height: 88px;
+    }
+
+    .fab svg {
+        width: 42px;
+        height: 42px;
+    }
+
+    .fullpage-editor-container {
+        max-width: 760px;
+        max-height: 700px;
+    }
+}
+

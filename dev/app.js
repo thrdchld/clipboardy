@@ -494,24 +494,48 @@ export async function performRedo() {
     }
 }
 
-// Global Keyboard Shortcut Listener
+// Global Keyboard Shortcut Listener for Desktop & Web
 document.addEventListener('keydown', (e) => {
     if (isAppLocked) return;
-    
+
+    const activeElem = document.activeElement;
+    const isTypingInInput = activeElem && (activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'INPUT');
+    const key = e.key.toLowerCase();
+
+    // Escape to close modals or exit search mode
+    if (e.key === 'Escape') {
+        if (DOM.fullPageEditorModal && !DOM.fullPageEditorModal.classList.contains('hidden')) {
+            DOM.btnCloseFullPageEditor.click();
+        } else if (DOM.fullPagePreviewModal && !DOM.fullPagePreviewModal.classList.contains('hidden')) {
+            DOM.btnClosePreviewModal.click();
+        } else if (isSearchMode) {
+            DOM.btnCloseSearch.click();
+        }
+        return;
+    }
+
     const isCtrlOrCmd = e.ctrlKey || e.metaKey;
     if (!isCtrlOrCmd) return;
-    
-    const activeElem = document.activeElement;
-    const isTypingInTextarea = activeElem && (activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'INPUT');
-    const key = e.key.toLowerCase();
-    
-    if ((key === 'z' && e.shiftKey) || key === 'y') {
-        if (!isTypingInTextarea) {
+
+    if (key === 'n' && !isTypingInInput) {
+        e.preventDefault();
+        if (DOM.btnFabEditor) DOM.btnFabEditor.click();
+    } else if (key === 'v' && e.shiftKey) {
+        e.preventDefault();
+        if (DOM.btnFabQuickPaste) DOM.btnFabQuickPaste.click();
+    } else if (key === 'f' && !isTypingInInput) {
+        e.preventDefault();
+        if (DOM.btnOpenSearch) {
+            DOM.btnOpenSearch.click();
+            if (DOM.searchInput) DOM.searchInput.focus();
+        }
+    } else if ((key === 'z' && e.shiftKey) || key === 'y') {
+        if (!isTypingInInput) {
             e.preventDefault();
             performRedo();
         }
     } else if (key === 'z' && !e.shiftKey) {
-        if (!isTypingInTextarea) {
+        if (!isTypingInInput) {
             e.preventDefault();
             performUndo();
         }
