@@ -544,7 +544,7 @@ header {
     margin-top: 4px;
 }
 
-/* 2 Stacked Floating Action Buttons (FAB Atas & Bawah) */
+/* Standard Ergonomic Floating Action Buttons (FAB Atas & Bawah: 56px x 56px) */
 .fab-container {
     position: fixed;
     bottom: 20px;
@@ -556,11 +556,11 @@ header {
 }
 
 .fab {
-    width: 100px;
-    height: 100px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     border: none;
-    box-shadow: 0 4px 14px rgba(153, 135, 103, 0.35);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -569,8 +569,8 @@ header {
 }
 
 .fab svg {
-    width: 48px;
-    height: 48px;
+    width: 24px;
+    height: 24px;
 }
 
 .fab:hover {
