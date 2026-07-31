@@ -901,12 +901,22 @@ header {
         position: relative;
     }
 
-    /* 2. Hide FABs & Duplicate Header Brand on Desktop */
+    /* 2. Desktop Header Refinements (Hide FABs & Top Bar Lock Button, Search on Far Right) */
     #fabContainer {
         display: none !important;
     }
 
+    header #btnLock {
+        display: none !important;
+    }
+
     header .brand {
+        display: flex !important;
+        align-items: center;
+        gap: 8px;
+    }
+
+    header .brand svg {
         display: none !important;
     }
 
