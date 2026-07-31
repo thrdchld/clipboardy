@@ -1690,7 +1690,7 @@ if (DOM.btnFullEditorSend) {
     });
 }
 
-// FAB Bottom (Paste Icon): 1-Tap Auto Paste Text or Browser Image. Mitigates Files/Empty by opening File Picker Modal!
+// FAB Bottom (Paste Icon): 1-Tap Auto Paste Text/Image. Opens New Clip modal with Toast Warning if Clipboard is empty!
 if (DOM.btnFabQuickPaste) {
     DOM.btnFabQuickPaste.addEventListener('click', async () => {
         closeSearchOverlay();
@@ -1700,24 +1700,24 @@ if (DOM.btnFabQuickPaste) {
             const content = await readClipboardContent();
             if (content) {
                 const kind = content.kind || content.type;
-                if (kind === 'image') {
+                if (kind === 'image' && content.data) {
                     await createNewClip('', { kind: 'image', data: content.data });
                     showToast("Pasted image saved!");
                     return;
-                } else if (kind === 'text') {
+                } else if (kind === 'text' && content.text && content.text.trim()) {
                     await createNewClip(content.text);
                     showToast("Pasted text saved!");
                     return;
                 }
             }
             
-            showToast("File/Empty clipboard detected. Opening File Picker...");
-            openAddClipModalWithTab('file');
+            showToast("Clipboard sistem kosong atau tidak terdeteksi");
+            openAddClipModalWithTab('text');
             
         } catch (err) {
             console.error("Paste error:", err);
-            showToast("Opening File Picker...");
-            openAddClipModalWithTab('file');
+            showToast("Clipboard sistem kosong atau tidak terdeteksi");
+            openAddClipModalWithTab('text');
         }
     });
 }
