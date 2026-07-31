@@ -774,7 +774,9 @@ function startClipsRealtimeSync() {
     
     unsubscribeClips = onSnapshot(q, (snapshot) => {
         clipsArray = [];
-        const startOfTodayWib = getStartOfTodayWibMs();
+        const nowMs = Date.now();
+        const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+        const cutoff24hMs = nowMs - TWENTY_FOUR_HOURS_MS;
         
         snapshot.forEach(docSnap => {
             // Filter out system metadata and request documents
@@ -785,8 +787,13 @@ function startClipsRealtimeSync() {
             const data = docSnap.data();
             const clipTs = getTimeMs(data.timestamp);
             
-            if (isGuestRoom && clipTs > 0 && clipTs < startOfTodayWib) {
-                return;
+            // STRICT 24-HOUR EXPIRATION & AUTO-CLEANUP FOR GUEST ROOMS:
+            if (isGuestRoom && clipTs > 0) {
+                if (clipTs < cutoff24hMs) {
+                    // Delete expired clip from Firestore database asynchronously
+                    deleteDoc(docSnap.ref).catch(() => {});
+                    return;
+                }
             }
             
             clipsArray.push({
