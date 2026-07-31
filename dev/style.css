@@ -977,52 +977,14 @@ header {
         overflow: hidden;
     }
 
-    .sidebar-header-btn {
-        display: flex;
-        align-items: center;
-        justify-content: flex-start;
-        gap: 14px;
-        padding: 10px 14px;
-        border-radius: var(--radius-md);
-        border: none;
-        background: transparent;
-        color: var(--text-main);
+    .sidebar-brand-btn {
         cursor: pointer;
-        width: 100%;
-        height: 44px;
-        transition: background 0.15s ease, color 0.15s ease;
-        overflow: hidden;
     }
 
-    .sidebar-header-btn:hover {
-        background: var(--bg-hover);
-        color: var(--primary);
-    }
-
-    .sidebar-header-btn svg.toggle-icon {
-        width: 20px;
-        height: 20px;
-        flex-shrink: 0;
-        min-width: 20px;
-    }
-
-    .sidebar-brand {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    .sidebar-brand-text {
         font-weight: 800;
         font-size: 1.05rem;
         color: var(--text-main);
-        white-space: nowrap;
-        opacity: 1;
-        max-width: 140px;
-        transition: opacity 0.18s ease-in-out, max-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        overflow: hidden;
-    }
-
-    .sidebar.collapsed .sidebar-header-btn .sidebar-brand {
-        opacity: 0;
-        max-width: 0;
     }
 
     .sidebar-nav {
