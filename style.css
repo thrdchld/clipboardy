@@ -544,23 +544,23 @@ header {
     margin-top: 4px;
 }
 
-/* Standard Ergonomic Floating Action Buttons (FAB Atas & Bawah: 56px x 56px) */
+/* Compact Ergonomic Floating Action Buttons (FAB Atas & Bawah: 44px x 44px) */
 .fab-container {
     position: fixed;
     bottom: 20px;
     right: 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     z-index: 1000;
 }
 
 .fab {
-    width: 56px;
-    height: 56px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     border: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -569,8 +569,8 @@ header {
 }
 
 .fab svg {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
 }
 
 .fab:hover {
