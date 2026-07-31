@@ -129,7 +129,19 @@ const DOM = {
     btnApproveAccessRequest: document.getElementById('btnApproveAccessRequest'),
     btnDenyAccessRequest: document.getElementById('btnDenyAccessRequest'),
     
-    toast: document.getElementById('toast')
+    toast: document.getElementById('toast'),
+
+    // Sidebar & Desktop Navigation DOM Elements
+    appSidebar: document.getElementById('appSidebar'),
+    btnToggleSidebar: document.getElementById('btnToggleSidebar'),
+    btnMobileSidebarToggle: document.getElementById('btnMobileSidebarToggle'),
+    navAllClips: document.getElementById('navAllClips'),
+    navAddClip: document.getElementById('navAddClip'),
+    navQuickPaste: document.getElementById('navQuickPaste'),
+    navSearch: document.getElementById('navSearch'),
+    navLockApp: document.getElementById('navLockApp'),
+    btnDirectUndo: document.getElementById('btnDirectUndo'),
+    btnDirectRedo: document.getElementById('btnDirectRedo')
 };
 
 function getOrCreateDeviceId() {
@@ -376,9 +388,12 @@ export function pushHistoryAction(action) {
 }
 
 export function updateUndoRedoUI() {
-    if (DOM.btnDoUndo) {
-        DOM.btnDoUndo.disabled = undoStack.length === 0;
-    }
+    const isUndoDisabled = undoStack.length === 0;
+    const isRedoDisabled = redoStack.length === 0;
+
+    if (DOM.btnDoUndo) DOM.btnDoUndo.disabled = isUndoDisabled;
+    if (DOM.btnDirectUndo) DOM.btnDirectUndo.disabled = isUndoDisabled;
+
     if (DOM.undoSubtext) {
         if (undoStack.length > 0) {
             const last = undoStack[undoStack.length - 1];
@@ -388,9 +403,9 @@ export function updateUndoRedoUI() {
         }
     }
     
-    if (DOM.btnDoRedo) {
-        DOM.btnDoRedo.disabled = redoStack.length === 0;
-    }
+    if (DOM.btnDoRedo) DOM.btnDoRedo.disabled = isRedoDisabled;
+    if (DOM.btnDirectRedo) DOM.btnDirectRedo.disabled = isRedoDisabled;
+
     if (DOM.redoSubtext) {
         if (redoStack.length > 0) {
             const last = redoStack[redoStack.length - 1];
@@ -517,7 +532,7 @@ document.addEventListener('keydown', (e) => {
     const isCtrlOrCmd = e.ctrlKey || e.metaKey;
     if (!isCtrlOrCmd) return;
 
-    if (key === 'n' && !isTypingInInput) {
+    if (key === 'n' && e.shiftKey && !isTypingInInput) {
         e.preventDefault();
         if (DOM.btnFabEditor) DOM.btnFabEditor.click();
     } else if (key === 'v' && e.shiftKey) {
@@ -1744,6 +1759,74 @@ if (DOM.btnPreviewDelete) {
             await deleteClip(activePreviewClipId);
             closePreviewModal();
         }
+    });
+}
+
+// ==========================================
+// 💻 DESKTOP SIDEBAR & DIRECT ACTION LISTENERS
+// ==========================================
+
+if (DOM.btnToggleSidebar) {
+    DOM.btnToggleSidebar.addEventListener('click', () => {
+        if (DOM.appSidebar) DOM.appSidebar.classList.toggle('collapsed');
+    });
+}
+
+if (DOM.btnMobileSidebarToggle) {
+    DOM.btnMobileSidebarToggle.addEventListener('click', () => {
+        if (DOM.appSidebar) DOM.appSidebar.classList.toggle('mobile-open');
+    });
+}
+
+if (DOM.navAllClips) {
+    DOM.navAllClips.addEventListener('click', () => {
+        if (isSearchMode && DOM.btnCloseSearch) DOM.btnCloseSearch.click();
+        const mainScroll = document.querySelector('.main-scroll');
+        if (mainScroll) mainScroll.scrollTo({ top: 0, behavior: 'smooth' });
+        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
+    });
+}
+
+if (DOM.navAddClip) {
+    DOM.navAddClip.addEventListener('click', () => {
+        if (DOM.btnFabEditor) DOM.btnFabEditor.click();
+        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
+    });
+}
+
+if (DOM.navQuickPaste) {
+    DOM.navQuickPaste.addEventListener('click', () => {
+        if (DOM.btnFabQuickPaste) DOM.btnFabQuickPaste.click();
+        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
+    });
+}
+
+if (DOM.navSearch) {
+    DOM.navSearch.addEventListener('click', () => {
+        if (DOM.btnOpenSearch) {
+            DOM.btnOpenSearch.click();
+            if (DOM.searchInput) DOM.searchInput.focus();
+        }
+        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
+    });
+}
+
+if (DOM.navLockApp) {
+    DOM.navLockApp.addEventListener('click', () => {
+        if (DOM.btnLock) DOM.btnLock.click();
+        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
+    });
+}
+
+if (DOM.btnDirectUndo) {
+    DOM.btnDirectUndo.addEventListener('click', async () => {
+        await performUndo();
+    });
+}
+
+if (DOM.btnDirectRedo) {
+    DOM.btnDirectRedo.addEventListener('click', async () => {
+        await performRedo();
     });
 }
 

@@ -861,8 +861,227 @@ header {
    📱 💻 RESPONSIVE DESKTOP & TABLET LAYOUTS
    ========================================== */
 
-/* Mobile Scaling Defaults (< 640px) */
-@media (max-width: 639px) {
+/* Main App Container Structure */
+#appScreen {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    height: 100dvh;
+    display: flex;
+    flex-direction: row;
+    background: var(--bg-base);
+    position: relative;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.app-main-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+}
+
+/* Collapsible Desktop Sidebar */
+.sidebar {
+    width: 220px;
+    height: 100%;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 200;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.sidebar.collapsed {
+    width: 64px;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    height: 56px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.sidebar-toggle-btn {
+    flex-shrink: 0;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: var(--text-main);
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.15s ease;
+}
+
+.sidebar.collapsed .sidebar-brand {
+    display: none;
+    opacity: 0;
+}
+
+.sidebar-nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 10px;
+    overflow-y: auto;
+}
+
+.sidebar-footer {
+    padding: 10px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.sidebar-item:hover {
+    background: var(--bg-hover);
+    color: var(--primary);
+}
+
+.sidebar-item.active {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.sidebar-item svg {
+    flex-shrink: 0;
+}
+
+.sidebar-label {
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.15s ease;
+}
+
+.sidebar.collapsed .sidebar-item {
+    justify-content: center;
+    padding: 12px;
+}
+
+.sidebar.collapsed .sidebar-label {
+    display: none;
+    opacity: 0;
+}
+
+.btn-sidebar-danger {
+    color: var(--danger) !important;
+}
+
+.btn-sidebar-danger:hover {
+    background: rgba(229, 62, 62, 0.1) !important;
+}
+
+/* Mobile Sidebar Buttons & History Group Defaults */
+.mobile-sidebar-btn {
+    display: none;
+}
+
+.desktop-undo-redo-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-desktop-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-desktop-action:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.btn-desktop-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.mobile-history-wrap {
+    display: none;
+    position: relative;
+}
+
+/* Mobile Layout (< 768px) */
+@media (max-width: 767px) {
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        transform: translateX(-100%);
+        box-shadow: var(--shadow-lg);
+        width: 240px !important;
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    .sidebar.mobile-open .sidebar-label,
+    .sidebar.mobile-open .sidebar-brand {
+        display: inline-block !important;
+        opacity: 1 !important;
+    }
+
+    .mobile-sidebar-btn {
+        display: inline-flex;
+    }
+
+    .desktop-undo-redo-group {
+        display: none;
+    }
+
+    .mobile-history-wrap {
+        display: block;
+    }
+
     .fab {
         width: 70px;
         height: 70px;
@@ -873,17 +1092,16 @@ header {
     }
 }
 
-/* Tablet Layout (min-width: 640px) */
-@media (min-width: 640px) {
+/* Tablet & Desktop Container (min-width: 768px) */
+@media (min-width: 768px) {
     #appScreen {
-        max-width: 92%;
+        max-width: 95%;
         height: calc(100vh - 32px);
         height: calc(100dvh - 32px);
         margin: 16px auto;
         border-radius: var(--radius-lg);
         border: 1px solid var(--border);
         box-shadow: var(--shadow-lg);
-        overflow: hidden;
     }
 
     #clipGrid {
@@ -893,13 +1111,13 @@ header {
     }
 
     .fab {
-        width: 80px;
-        height: 80px;
+        width: 76px;
+        height: 76px;
     }
 
     .fab svg {
-        width: 38px;
-        height: 38px;
+        width: 36px;
+        height: 36px;
     }
 
     .fullpage-editor-overlay {
@@ -922,10 +1140,10 @@ header {
     }
 }
 
-/* Desktop Web Layout (min-width: 1024px) */
+/* Desktop Wide Web Layout (min-width: 1024px) */
 @media (min-width: 1024px) {
     #appScreen {
-        max-width: 1240px;
+        max-width: 1280px;
         height: calc(100vh - 48px);
         height: calc(100dvh - 48px);
         margin: 24px auto;
@@ -941,10 +1159,6 @@ header {
         padding: 16px;
     }
 
-    .header-normal-view {
-        padding: 0 8px;
-    }
-
     .fab-container {
         bottom: 28px;
         right: 28px;
@@ -952,13 +1166,13 @@ header {
     }
 
     .fab {
-        width: 88px;
-        height: 88px;
+        width: 80px;
+        height: 80px;
     }
 
     .fab svg {
-        width: 42px;
-        height: 42px;
+        width: 38px;
+        height: 38px;
     }
 
     .fullpage-editor-container {
@@ -966,4 +1180,5 @@ header {
         max-height: 700px;
     }
 }
+
 
