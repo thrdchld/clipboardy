@@ -134,11 +134,9 @@ const DOM = {
     // Sidebar & Desktop Navigation DOM Elements
     appSidebar: document.getElementById('appSidebar'),
     btnToggleSidebar: document.getElementById('btnToggleSidebar'),
-    btnMobileSidebarToggle: document.getElementById('btnMobileSidebarToggle'),
     navAllClips: document.getElementById('navAllClips'),
     navAddClip: document.getElementById('navAddClip'),
     navQuickPaste: document.getElementById('navQuickPaste'),
-    navSearch: document.getElementById('navSearch'),
     navLockApp: document.getElementById('navLockApp'),
     btnDirectUndo: document.getElementById('btnDirectUndo'),
     btnDirectRedo: document.getElementById('btnDirectRedo')
@@ -1772,49 +1770,29 @@ if (DOM.btnToggleSidebar) {
     });
 }
 
-if (DOM.btnMobileSidebarToggle) {
-    DOM.btnMobileSidebarToggle.addEventListener('click', () => {
-        if (DOM.appSidebar) DOM.appSidebar.classList.toggle('mobile-open');
-    });
-}
-
 if (DOM.navAllClips) {
     DOM.navAllClips.addEventListener('click', () => {
         if (isSearchMode && DOM.btnCloseSearch) DOM.btnCloseSearch.click();
         const mainScroll = document.querySelector('.main-scroll');
         if (mainScroll) mainScroll.scrollTo({ top: 0, behavior: 'smooth' });
-        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
     });
 }
 
 if (DOM.navAddClip) {
     DOM.navAddClip.addEventListener('click', () => {
         if (DOM.btnFabEditor) DOM.btnFabEditor.click();
-        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
     });
 }
 
 if (DOM.navQuickPaste) {
     DOM.navQuickPaste.addEventListener('click', () => {
         if (DOM.btnFabQuickPaste) DOM.btnFabQuickPaste.click();
-        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
-    });
-}
-
-if (DOM.navSearch) {
-    DOM.navSearch.addEventListener('click', () => {
-        if (DOM.btnOpenSearch) {
-            DOM.btnOpenSearch.click();
-            if (DOM.searchInput) DOM.searchInput.focus();
-        }
-        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
     });
 }
 
 if (DOM.navLockApp) {
     DOM.navLockApp.addEventListener('click', () => {
         if (DOM.btnLock) DOM.btnLock.click();
-        if (DOM.appSidebar) DOM.appSidebar.classList.remove('mobile-open');
     });
 }
 

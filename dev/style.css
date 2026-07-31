@@ -901,7 +901,16 @@ header {
         position: relative;
     }
 
-    /* 2. Collapsible Desktop Sidebar */
+    /* 2. Hide FABs & Duplicate Header Brand on Desktop */
+    #fabContainer {
+        display: none !important;
+    }
+
+    header .brand {
+        display: none !important;
+    }
+
+    /* 3. Collapsible Desktop Sidebar (Seamless Transitions, Stationary Icons) */
     .sidebar {
         display: flex !important;
         width: 220px;
@@ -909,10 +918,11 @@ header {
         background: var(--bg-surface);
         border-right: 1px solid var(--border);
         flex-direction: column;
-        transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         z-index: 200;
         flex-shrink: 0;
         user-select: none;
+        overflow: hidden;
     }
 
     .sidebar.collapsed {
@@ -922,8 +932,8 @@ header {
     .sidebar-header {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 12px 14px;
+        gap: 14px;
+        padding: 12px 18px;
         height: 56px;
         border-bottom: 1px solid var(--border);
         flex-shrink: 0;
@@ -943,12 +953,14 @@ header {
         color: var(--text-main);
         white-space: nowrap;
         opacity: 1;
-        transition: opacity 0.15s ease;
+        max-width: 140px;
+        transition: opacity 0.18s ease-in-out, max-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
     }
 
     .sidebar.collapsed .sidebar-brand {
-        display: none;
         opacity: 0;
+        max-width: 0;
     }
 
     .sidebar-nav {
@@ -956,19 +968,27 @@ header {
         display: flex;
         flex-direction: column;
         gap: 6px;
-        padding: 12px 10px;
+        padding: 12px 8px;
         overflow-y: auto;
     }
 
     .sidebar-footer {
-        padding: 10px;
+        padding: 10px 8px;
         border-top: 1px solid var(--border);
         flex-shrink: 0;
     }
 
+    .sidebar-divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 6px 10px;
+    }
+
+    /* Fixed Icon Position Alignment */
     .sidebar-item {
         display: flex;
         align-items: center;
+        justify-content: flex-start;
         gap: 14px;
         padding: 10px 14px;
         border-radius: var(--radius-md);
@@ -980,7 +1000,7 @@ header {
         cursor: pointer;
         transition: background 0.15s, color 0.15s;
         width: 100%;
-        white-space: nowrap;
+        height: 44px;
         overflow: hidden;
     }
 
@@ -996,23 +1016,28 @@ header {
     }
 
     .sidebar-item svg {
+        width: 20px;
+        height: 20px;
         flex-shrink: 0;
+        min-width: 20px;
     }
 
     .sidebar-label {
         white-space: nowrap;
         opacity: 1;
-        transition: opacity 0.15s ease;
-    }
-
-    .sidebar.collapsed .sidebar-item {
-        justify-content: center;
-        padding: 12px;
+        max-width: 140px;
+        transition: opacity 0.18s ease-in-out, max-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
     }
 
     .sidebar.collapsed .sidebar-label {
-        display: none;
         opacity: 0;
+        max-width: 0;
+    }
+
+    .sidebar-item:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
     }
 
     .btn-sidebar-danger {
@@ -1023,58 +1048,16 @@ header {
         background: rgba(229, 62, 62, 0.1) !important;
     }
 
-    /* 3. Header Action Buttons for Desktop */
+    /* 4. Hide Mobile History Wrap on Desktop */
     .mobile-history-wrap {
         display: none !important;
     }
 
-    .desktop-undo-redo-group {
-        display: flex !important;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .btn-desktop-action {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        font-size: 0.82rem;
-        font-weight: 600;
-        border-radius: var(--radius-sm);
-        border: 1px solid var(--border);
-        background: var(--bg-surface);
-        color: var(--text-main);
-        cursor: pointer;
-        transition: all 0.15s ease;
-    }
-
-    .btn-desktop-action:hover:not(:disabled) {
-        background: var(--bg-hover);
-        border-color: var(--primary);
-        color: var(--primary);
-    }
-
-    .btn-desktop-action:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-    }
-
-    /* 4. Multi-Column Clip Grid System */
+    /* 5. Multi-Column Clip Grid System */
     #clipGrid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 12px;
-    }
-
-    .fab {
-        width: 76px;
-        height: 76px;
-    }
-
-    .fab svg {
-        width: 36px;
-        height: 36px;
     }
 
     .fullpage-editor-overlay {
@@ -1116,27 +1099,12 @@ header {
         padding: 16px;
     }
 
-    .fab-container {
-        bottom: 28px;
-        right: 28px;
-        gap: 14px;
-    }
-
-    .fab {
-        width: 80px;
-        height: 80px;
-    }
-
-    .fab svg {
-        width: 38px;
-        height: 38px;
-    }
-
     .fullpage-editor-container {
         max-width: 760px;
         max-height: 700px;
     }
 }
+
 
 
 
