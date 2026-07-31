@@ -1,40 +1,59 @@
-# 📋 Clipboardy
+# 📋 Clipboardy v0.2.0
 
-Clipboardy is a secure, lightweight, and real-time syncing multi-device clipboard application. Designed with an elegant earth-tone user interface, Clipboardy allows you to instantly share and sync transient plain text clips across all your devices.
+Clipboardy is a secure, lightweight, and real-time syncing multi-device clipboard application. Built with an eye-friendly **Sage & Warm Linen** light design system, Clipboardy allows you to instantly share and sync text, compressed images, and files across desktop and mobile devices.
 
 ---
 
-## ✨ Features
+## ✨ Features (v0.2.0)
 
-* **🔒 Room-Locked Security**: Access clipboard rooms securely using 4-digit PIN room hashing or Google Sign-In authentication.
-* **⚡ Live Real-Time Sync**: Powered by Firebase Firestore LIFO stream (`limit(50)`), clips sync instantly across active devices.
-* **📦 Cold Storage Search**: Perform explicit on-demand searches through your historical clipboard cold storage without slowing down realtime sync.
-* **📱 Mobile-First 2-FAB Interface**:
-  * **Top FAB (`+`)**: Opens a fullscreen text editor modal for writing, editing, pasting, and saving clips.
-  * **Bottom FAB (Paste)**: 1-tap quick action to automatically read your device clipboard and instantly save it to Firestore.
-* **📄 Full-Page Preview & Edit**: Tap any clip card (non-selectable list cards up to 3 lines) to open the fullscreen preview modal where text can be selected, copied, edited, or deleted.
-* **🎨 Neutral Earth-Tone Theme**: Modern, comfortable single earth-tone palette featuring Tan (`#998767`), Sand (`#AD9F85`), Warm Beige (`#C2B7A4`), Light Gray-Beige (`#D6CFC2`), and Cream (`#EBE7E1`).
+* **🔒 Room-Locked Security & Authorization**:
+  * Join private temporary rooms via Room Codes or authenticate securely using Google Sign-In.
+  * Realtime multi-device approval: New devices joining a room require 1-tap authorization from active devices.
+
+* **⚡ Real-Time Instant Sync**:
+  * Powered by Firebase Firestore LIFO stream (`limit(50)`), clips sync instantly across all connected screens.
+  * **Strict 24-Hour Expiration & Auto-Cleanup**: Guest room clips automatically expire and delete from Firestore after 24 hours to keep temporary rooms lightweight and secure.
+
+* **📱 Hybrid Mobile & Collapsible Desktop UX**:
+  * **Desktop (`>= 768px`)**: Collapsible sidebar with stationary icon alignment, direct **Undo (Ctrl+Z)** and **Redo (Ctrl+Shift+Z)** buttons, and top-right header search.
+  * **Mobile (`< 768px`)**: Pure, un-cluttered touch interface with 2 compact Floating Action Buttons (**FABs**).
+
+* **📋 Discrete Clip Types (Gboard Style)**:
+  * Save discrete **Text**, **Image** (compressed <128KB), or **File** clips.
+  * **1-Tap Quick Paste**: Instantly reads device clipboard text/image and saves to Firestore. If the clipboard is empty or unreadable, opens the New Clip modal with a clear warning toast notification.
+
+* **⌨️ Non-Conflicting Keyboard Shortcuts**:
+  * `Ctrl + Shift + N` / `Cmd + Shift + N`: Open New Clip Modal.
+  * `Ctrl + Shift + V` / `Cmd + Shift + V`: Quick Paste from System Clipboard.
+  * `Ctrl + F` / `Cmd + F`: Focus Header Search Bar.
+  * `Ctrl + Z`: Undo last delete or edit action.
+  * `Ctrl + Y` / `Ctrl + Shift + Z`: Redo action.
+  * `Escape`: Close modals or reset search.
+
+* **🌿 Eye-Friendly Sage & Warm Linen Palette**:
+  * Designed according to visual ergonomics to prevent eye strain. Avoids harsh dark mode or 100% pure white glare by employing organic paper linen backgrounds (`#F8F7F4`), soothing Sage Forest Green (`#347A5A`), and soft dark forest graphite text (`#242D27`).
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Frontend**: Vanilla HTML5, CSS3 Custom Properties (Earth-tone design tokens), Vanilla ES6 JavaScript Modules.
-* **Database**: Firebase Firestore JS SDK v11 (Realtime LIFO collection listener & cold storage query).
-* **Authentication**: Firebase Anonymous Auth & Google Sign-In SDK.
+* **Frontend**: Vanilla HTML5, CSS3 Custom Properties (Sage & Warm Linen Tokens), ES6 JavaScript Modules.
+* **Database & Sync**: Firebase Firestore JS SDK v11.
+* **Authentication**: Firebase Anonymous Auth & Google Auth Provider.
+* **Testing**: Vitest + JSDOM unit testing suite.
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-├── index.html        # Clean HTML5 structure & DOM elements
-├── style.css         # Earth-tone design system, FABs, and modal animations
-├── app.js            # Realtime Firestore sync, search, and 2-FAB logic
-├── sw.js             # PWA Service Worker for offline support
-├── manifest.json     # PWA configuration
-└── tests/            # Test suite for utility functions and auth flow
-    └── app.test.js   # Unit tests for hash, word counter, and lock state
+├── index.html        # Modern HTML5 app layout, sidebar, and modals
+├── style.css         # Responsive mobile-first & desktop CSS design system
+├── app.js            # Realtime Firestore sync, authorization, and clip management
+├── sw.js             # PWA Service Worker for offline capability
+├── manifest.json     # Web App Manifest
+└── tests/            # Vitest unit test suite
+    └── app.test.js   # Unit tests for hashing, word count, and auth flows
 ```
 
 ---

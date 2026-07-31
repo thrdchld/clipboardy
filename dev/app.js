@@ -1711,12 +1711,12 @@ if (DOM.btnFabQuickPaste) {
                 }
             }
             
-            showToast("Clipboard sistem kosong atau tidak terdeteksi");
+            showToast("System clipboard is empty or not detected");
             openAddClipModalWithTab('text');
             
         } catch (err) {
             console.error("Paste error:", err);
-            showToast("Clipboard sistem kosong atau tidak terdeteksi");
+            showToast("System clipboard is empty or not detected");
             openAddClipModalWithTab('text');
         }
     });
