@@ -89,56 +89,120 @@
 
     <!-- Main App Layout -->
     <div id="appScreen" class="hidden">
-        
-        <!-- Header -->
-        <header>
-            <!-- Normal Header State -->
-            <div id="headerNormalView" class="header-normal-view">
-                <div class="brand">
+
+        <!-- COLLAPSIBLE SIDEBAR (Desktop Web Navigation) -->
+        <aside id="appSidebar" class="sidebar collapsed">
+            <div class="sidebar-header">
+                <button id="btnToggleSidebar" class="btn-icon sidebar-toggle-btn" title="Toggle Sidebar (Expand / Collapse)" aria-label="Toggle Sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                <div class="sidebar-brand">
                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-                    <span id="headerTitleText">Clipboardy</span>
-                    <span id="syncIndicator" class="status-dot" title="Synced"></span>
-                </div>
-
-                <div class="header-actions">
-                    <!-- Search Icon Button -->
-                    <button id="btnOpenSearch" class="btn-icon" title="Search Clips" aria-label="Search Clips">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    </button>
-
-                    <!-- History Clock Undo/Redo Button (Between Search & Lock) -->
-                    <div style="position: relative;">
-                        <button id="btnToggleUndoRedo" class="btn-icon" title="History (Undo / Redo)" aria-label="History (Undo / Redo)">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>
-                        </button>
-                        
-                        <!-- Dropdown Popup Menu for Undo & Redo -->
-                        <div id="undoRedoPopup" class="undo-redo-popup hidden">
-                            <div class="undo-popup-header">History (50 max)</div>
-                            <button id="btnDoUndo" class="undo-popup-item" disabled>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
-                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-weight: 600;">Undo</span>
-                                    <span id="undoSubtext" style="font-size: 0.72rem; opacity: 0.7;">No actions</span>
-                                </div>
-                            </button>
-                            <button id="btnDoRedo" class="undo-popup-item" disabled>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>
-                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                    <span style="font-weight: 600;">Redo</span>
-                                    <span id="redoSubtext" style="font-size: 0.72rem; opacity: 0.7;">No actions</span>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Lock Button -->
-                    <button id="btnLock" class="btn btn-danger" title="Lock Application" style="padding: 6px 10px; font-size: 0.82rem;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                        <span class="btn-text">Lock</span>
-                    </button>
+                    <span class="sidebar-brand-text">Clipboardy</span>
                 </div>
             </div>
+
+            <nav class="sidebar-nav">
+                <!-- All Clips -->
+                <button id="navAllClips" class="sidebar-item active" title="All Clips">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span class="sidebar-label">All Clips</span>
+                </button>
+
+                <!-- New Clip -->
+                <button id="navAddClip" class="sidebar-item" title="New Clip (Ctrl+Shift+N)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span class="sidebar-label">New Clip</span>
+                </button>
+
+                <!-- Quick Paste -->
+                <button id="navQuickPaste" class="sidebar-item" title="Quick Paste (Ctrl+Shift+V)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                    <span class="sidebar-label">Quick Paste</span>
+                </button>
+
+                <!-- Search -->
+                <button id="navSearch" class="sidebar-item" title="Search (Ctrl+F)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <span class="sidebar-label">Search</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <!-- Lock Room -->
+                <button id="navLockApp" class="sidebar-item btn-sidebar-danger" title="Lock Room">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    <span class="sidebar-label">Lock Room</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Body Wrapper -->
+        <div class="app-main-content">
+            <!-- Header -->
+            <header>
+                <!-- Normal Header State -->
+                <div id="headerNormalView" class="header-normal-view">
+                    <div class="brand">
+                        <button id="btnMobileSidebarToggle" class="btn-icon mobile-sidebar-btn" title="Toggle Menu" aria-label="Toggle Menu">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        </button>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                        <span id="headerTitleText">Clipboardy</span>
+                        <span id="syncIndicator" class="status-dot" title="Synced"></span>
+                    </div>
+
+                    <div class="header-actions">
+                        <!-- Search Icon Button -->
+                        <button id="btnOpenSearch" class="btn-icon" title="Search Clips" aria-label="Search Clips">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        </button>
+
+                        <!-- Desktop Direct Separate 2 Buttons: Undo & Redo -->
+                        <div id="desktopUndoRedoGroup" class="desktop-undo-redo-group">
+                            <button id="btnDirectUndo" class="btn btn-desktop-action" title="Undo Action (Ctrl+Z)" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+                                <span>Undo</span>
+                            </button>
+                            <button id="btnDirectRedo" class="btn btn-desktop-action" title="Redo Action (Ctrl+Y / Ctrl+Shift+Z)" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>
+                                <span>Redo</span>
+                            </button>
+                        </div>
+
+                        <!-- Mobile History Clock Dropdown Popup Button -->
+                        <div class="mobile-history-wrap">
+                            <button id="btnToggleUndoRedo" class="btn-icon" title="History (Undo / Redo)" aria-label="History (Undo / Redo)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>
+                            </button>
+                            
+                            <!-- Dropdown Popup Menu for Undo & Redo -->
+                            <div id="undoRedoPopup" class="undo-redo-popup hidden">
+                                <div class="undo-popup-header">History (50 max)</div>
+                                <button id="btnDoUndo" class="undo-popup-item" disabled>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+                                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                        <span style="font-weight: 600;">Undo</span>
+                                        <span id="undoSubtext" style="font-size: 0.72rem; opacity: 0.7;">No actions</span>
+                                    </div>
+                                </button>
+                                <button id="btnDoRedo" class="undo-popup-item" disabled>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>
+                                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                        <span style="font-weight: 600;">Redo</span>
+                                        <span id="redoSubtext" style="font-size: 0.72rem; opacity: 0.7;">No actions</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Lock Button -->
+                        <button id="btnLock" class="btn btn-danger" title="Lock Application" style="padding: 6px 10px; font-size: 0.82rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            <span class="btn-text">Lock</span>
+                        </button>
+                    </div>
+                </div>
 
             <!-- Expandable Top Bar Search View -->
             <div id="headerSearchOverlay" class="header-search-overlay hidden">
