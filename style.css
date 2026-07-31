@@ -1,35 +1,35 @@
 :root {
-    /* Eye-Friendly Soft Light Theme with Earthy Accents */
-    --bg-base: #F7F5F0;          /* Warm soft cream-white background */
-    --bg-surface: #FFFFFF;       /* Clean white surface */
+    /* 🌿 Premium Eye-Friendly Light Theme (Sage & Warm Linen Palette) */
+    --bg-base: #F8F7F4;          /* Soft organic warm linen / off-white paper (Anti-Silau) */
+    --bg-surface: #FFFFFF;       /* Clean white surface for cards & panels */
     --bg-card: #FFFFFF;          /* Pure white card */
-    --bg-hover: #EFECE6;         /* Soft warm gray-beige hover */
+    --bg-hover: #F0ECE3;         /* Gentle warm beige hover */
     
-    --text-main: #2B2723;        /* Soft dark espresso/charcoal */
-    --text-muted: #7A7063;       /* Warm tan-gray for secondary text */
-    --text: #2B2723;
+    --text-main: #242D27;        /* Soft dark forest graphite (Rendah kontras tajam) */
+    --text-muted: #68766D;       /* Muted sage charcoal for secondary text */
+    --text: #242D27;
     
-    --primary: #998767;          /* Tan earthy primary accent */
-    --primary-hover: #807054;    /* Deeper Tan hover */
-    --primary-light: rgba(153, 135, 103, 0.16);
+    --primary: #347A5A;          /* Soothing Sage Forest Green (Sangat menenangkan mata) */
+    --primary-hover: #23553E;    /* Deeper Sage Green hover */
+    --primary-light: #E8F3ED;    /* Soft sage tint for active menu highlights */
     
-    --accent-sand: #AD9F85;      /* Sand secondary accent */
-    --accent-beige: #C2B7A4;     /* Warm Beige border accent */
+    --accent-sand: #4BA377;      /* Muted Mint secondary accent */
+    --accent-beige: #D9D3C7;     /* Soft warm border accent */
     
-    --danger: #e53e3e;
-    --danger-hover: #c53030;
-    --warning: #d69e2e;
-    --success: #38a169;
+    --danger: #E53E3E;
+    --danger-hover: #C53030;
+    --warning: #D69E2E;
+    --success: #38A169;
     
-    --border: #E5E0D8;
-    --border-color: #E5E0D8;
+    --border: #E3DFD5;           /* Soft warm organic border */
+    --border-color: #E3DFD5;
     
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 18px;
-    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 16px -2px rgba(153, 135, 103, 0.12);
-    --shadow-lg: 0 10px 30px -3px rgba(0, 0, 0, 0.12);
+    --shadow-sm: 0 1px 3px 0 rgba(36, 45, 39, 0.04);
+    --shadow-md: 0 4px 16px -2px rgba(52, 122, 90, 0.08);
+    --shadow-lg: 0 10px 30px -3px rgba(36, 45, 39, 0.08);
     --glass-blur: blur(12px);
 }
 
