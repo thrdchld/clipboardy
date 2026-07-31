@@ -992,8 +992,21 @@ header {
         overflow: hidden;
     }
 
-    .sidebar-brand-btn {
-        cursor: pointer;
+    /* Dynamic Sidebar Toggle Icon Switcher */
+    .sidebar .icon-expand {
+        display: none !important;
+    }
+
+    .sidebar .icon-collapse {
+        display: block !important;
+    }
+
+    .sidebar.collapsed .icon-expand {
+        display: block !important;
+    }
+
+    .sidebar.collapsed .icon-collapse {
+        display: none !important;
     }
 
     .sidebar-brand-text {
