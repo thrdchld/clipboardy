@@ -66,7 +66,7 @@ body {
 }
 
 /* Auth Container */
-#authScreen {
+#authScreen:not(.hidden) {
     width: 100%;
     max-width: 400px;
     padding: 16px;
@@ -168,7 +168,7 @@ body {
 }
 
 /* Main App Layout */
-#appScreen {
+#appScreen:not(.hidden) {
     width: 100%;
     max-width: 720px;
     height: 100%;
@@ -971,7 +971,7 @@ header {
         display: flex;
         align-items: center;
         gap: 14px;
-        padding: 12px 18px;
+        padding: 10px 14px;
         height: 56px;
         border-bottom: 1px solid var(--border);
         flex-shrink: 0;
@@ -979,7 +979,23 @@ header {
     }
 
     .sidebar-toggle-btn {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        margin: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
         flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-main);
+        transition: color 0.15s ease;
+    }
+
+    .sidebar-toggle-btn:hover {
+        color: var(--primary);
     }
 
     .sidebar-brand {
